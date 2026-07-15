@@ -1,0 +1,68 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Apex-arena</title>
+<style>
+:root{--bg:#0A0D12;--bg2:#0e131b;--surf:#141B24;--ink:#E7EDF4;--mut:#9AA6B4;--faint:#5C6675;--hair:#242E3B;--signal:#1FDDC9;--gold:#E7B24C;--ember:#FF7A45;
+--sans:"SF Pro Display","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;--mono:ui-monospace,"SF Mono","JetBrains Mono","DejaVu Sans Mono",monospace;}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;
+background:radial-gradient(1200px 600px at 70% -10%,#12202b,var(--bg));}
+.wrap{max-width:920px;margin:0 auto;padding:clamp(24px,6vw,64px) clamp(16px,5vw,36px) 80px}
+h1{font-size:clamp(1.8rem,6vw,2.6rem);font-weight:760;letter-spacing:-.03em;margin:0}
+h1 b{color:var(--signal)}
+.tag{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);margin:10px 0 0}
+.lead{color:var(--mut);font-size:1rem;line-height:1.6;margin:16px 0 34px;max-width:60ch}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:640px){.grid{grid-template-columns:1fr}}
+a.card{display:flex;flex-direction:column;gap:8px;text-decoration:none;background:var(--surf);border:1px solid var(--hair);border-radius:14px;
+padding:20px;transition:border-color .15s,transform .1s}
+a.card:hover{border-color:var(--signal);transform:translateY(-2px)}
+a.card:active{transform:translateY(0)}
+.card .badge{font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:5px;align-self:flex-start;color:#0c1620;font-weight:700}
+.card h2{font-size:1.12rem;margin:2px 0 0;color:var(--ink);font-weight:640}
+.card p{margin:0;color:var(--mut);font-size:.88rem;line-height:1.5}
+.card .go{font-family:var(--mono);font-size:.72rem;color:var(--signal);margin-top:4px}
+.sec{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:34px 0 14px}
+footer{margin-top:44px;font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:1.7}
+</style></head><body>
+<div class="wrap">
+  <h1>APEX<b>·</b>ARENA</h1>
+  <p class="tag">자율주행 알고리즘을 만들고 · 겨루는 게임</p>
+  <p class="lead">데이터플로 그래프로 차의 두뇌를 짓고, 결정론 동역학 시뮬에서 랩타임으로 겨룬다. 아래는 개발 중 프로토타입·설계.</p>
+
+  <div class="sec">▶ 실행 가능 (Playable)</div>
+  <div class="grid">
+    <a class="card" href="graph/">
+      <span class="badge" style="background:var(--signal)">Graph Engine</span>
+      <h2>알고리즘 그래프 엔진</h2>
+      <p>컨트롤러 = 데이터플로 그래프(Map·Argmax·PID). Follow-the-Gap / Pure Pursuit 전환, 노드 라이브 값.</p>
+      <span class="go">열기 →</span>
+    </a>
+    <a class="card" href="mvp/">
+      <span class="badge" style="background:var(--gold)">Sim MVP</span>
+      <h2>동역학 시뮬 · 스택 빌더</h2>
+      <p>동역학 single-track 물리(슬립·드리프트), 지형 높낮이, 알고리즘 시각화(초기 버전).</p>
+      <span class="go">열기 →</span>
+    </a>
+  </div>
+
+  <div class="sec">◆ 설계 · 목업 (Concept)</div>
+  <div class="grid">
+    <a class="card" href="design/graph-mockup.html">
+      <span class="badge" style="background:var(--ember)">Mockup</span>
+      <h2>알고리즘 그래프 목업</h2>
+      <p>ROS 네이티브 데이터플로 빌더 컨셉 — 노드 배선·와이어 프로브·서브그래프.</p>
+      <span class="go">열기 →</span>
+    </a>
+    <a class="card" href="design/style-tile.html">
+      <span class="badge" style="background:var(--ember)">Style</span>
+      <h2>스타일 타일</h2>
+      <p>비주얼 아이덴티티 — 온/오프로드, 컬러·타입·컴포넌트.</p>
+      <span class="go">열기 →</span>
+    </a>
+  </div>
+
+  <footer>
+    설계 문서: docs/GAME_DESIGN.md · design/node-spec.md<br>
+    dev prototype · 개발 중
+  </footer>
+</div>
+</body></html>
