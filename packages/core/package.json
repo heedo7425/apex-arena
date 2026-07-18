@@ -1,0 +1,8 @@
+{
+  "name": "@apex/core",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "node test/drive.ts" }
+}

@@ -1,0 +1,34 @@
+// Headless verification of @apex/core: graphs drive the car, deterministically.
+import { buildWorld } from '../src/sim/world.ts';
+import { runFor, medalFor } from '../src/sim/runner.ts';
+import { FTG, PURSUIT } from '../src/graph/presets.ts';
+
+let failed = 0;
+function ok(cond: boolean, msg: string) { console.log((cond ? 'PASS ' : 'FAIL ') + msg); if (!cond) failed++; }
+
+const world = buildWorld();
+
+// 1) FTG graph drives the car and completes clean laps
+const ftg = runFor(world, FTG, 1, 70);
+console.log('FTG:', 'laps=' + ftg.laps.length, 'bestClean=' + (ftg.bestClean?.toFixed(2) ?? '--'), 'maxV=' + ftg.maxV.toFixed(1), 'medal=' + medalFor(ftg.bestClean));
+ok(!ftg.nan, 'FTG no NaN');
+ok(ftg.bestClean !== null && ftg.bestClean < 25, 'FTG completes a clean lap under 25s');
+
+// 2) Pure Pursuit graph drives too
+const pur = runFor(world, PURSUIT, 1, 70);
+console.log('PURSUIT:', 'laps=' + pur.laps.length, 'bestClean=' + (pur.bestClean?.toFixed(2) ?? '--'), 'maxV=' + pur.maxV.toFixed(1), 'medal=' + medalFor(pur.bestClean));
+ok(!pur.nan, 'PURSUIT no NaN');
+ok(pur.bestClean !== null, 'PURSUIT completes a clean lap');
+
+// 3) Determinism: same seed → identical result (essential for leaderboards/replay)
+const a = runFor(world, FTG, 42, 40);
+const b = runFor(world, FTG, 42, 40);
+ok(a.bestClean === b.bestClean && a.laps.length === b.laps.length, 'deterministic: same seed → identical laps');
+
+// 4) Model-as-node hook wired: sim.predict exists in registry (for MPPI/MPC later)
+import { NT } from '../src/graph/registry.ts';
+ok(!!NT['sim.predict'] && NT['sim.predict'].kind === 'builtin', 'hook: sim.predict (model-as-node) present');
+ok(!!NT['rng.uniform'] && !!NT['array.map'], 'hooks: rng + higher-order Map present');
+
+console.log(failed === 0 ? '\n✅ ALL PASS — core drives deterministically' : '\n❌ ' + failed + ' FAILED');
+if (failed) process.exit(1);
