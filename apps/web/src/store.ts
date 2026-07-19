@@ -5,6 +5,13 @@ export const useLive = create<{ vals: Record<string, any> | null; setVals: (v: R
   (set) => ({ vals: null, setVals: (v) => set({ vals: v }) })
 )
 
+// ---- tutorial (shown once, reopenable) ----
+export const useTut = create<{ open: boolean; show: () => void; close: () => void }>((set) => ({
+  open: (() => { try { return !localStorage.getItem('apex_tut_v1') } catch { return true } })(),
+  show: () => set({ open: true }),
+  close: () => { try { localStorage.setItem('apex_tut_v1', '1') } catch {} ; set({ open: false }) },
+}))
+
 // ---- game progress (persisted) ----
 const KEY = 'apex_progress_v1'
 type Saved = { completed: string[]; best: Record<string, number> }

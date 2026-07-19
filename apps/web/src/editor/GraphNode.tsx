@@ -3,11 +3,14 @@ import { Handle, Position } from '@xyflow/react'
 import { ins, outs, metaOf, colorOf } from './nodeMeta'
 import { useLive } from '../store'
 
+const HEADER = 26, ROWH = 22
+
 function fmt(v: any): string {
-  if (v == null) return '—'
+  if (v == null) return ''
   if (typeof v === 'number') return Math.abs(v) >= 1000 ? v.toFixed(0) : v.toFixed(2)
   if (Array.isArray(v)) return `[${v.length}]`
-  if (typeof v === 'object') return v.x != null ? `${v.x.toFixed(1)},${v.y.toFixed(1)}` : '{}'
+  if (typeof v === 'object') return v.x != null ? `${v.x.toFixed(1)}, ${v.y.toFixed(1)}` : '…'
+  if (typeof v === 'boolean') return v ? 'true' : 'false'
   return String(v)
 }
 
@@ -16,25 +19,28 @@ export function GraphNode({ id, data }: { id: string; data: any }) {
   const meta = metaOf(type), col = colorOf(type)
   const inP = ins(type), outP = outs(type)
   const live = useLive((s) => (s.vals ? s.vals[id] : null))
-  const setParam = data.onParam as (id: string, key: string, v: number) => void
-  const rows = Math.max(inP.length, outP.length, 1)
+  const setParam = data.onParam as ((id: string, key: string, v: number) => void) | undefined
+  const nRows = Math.max(inP.length, outP.length, 1)
+
   return (
-    <div className="gnode" style={{ borderColor: col, minHeight: 30 + rows * 20 }}>
+    <div className="gnode" style={{ ['--accent' as any]: col }}>
       <div className="gnode-h" style={{ background: col }}>{meta.label}</div>
-      <div className="gnode-body">
-        <div className="gports in">
-          {inP.map((p, i) => (
-            <div className="gport" key={p} style={{ top: 6 + i * 20 }}>
-              <Handle id={p} type="target" position={Position.Left} style={{ background: col }} />
-              <span>{p}</span>
-            </div>
-          ))}
-        </div>
-        <div className="gports out">
-          {outP.map((p, i) => (
-            <div className="gport out" key={p} style={{ top: 6 + i * 20 }}>
-              <span>{p}{live ? ' ' : ''}<b>{live ? fmt(live[p]) : ''}</b></span>
-              <Handle id={p} type="source" position={Position.Right} style={{ background: col }} />
+      <div className="gnode-io" style={{ height: nRows * ROWH }}>
+        {inP.map((p, i) => (
+          <Handle key={'i' + p} id={p} type="target" position={Position.Left}
+            style={{ top: HEADER + i * ROWH + ROWH / 2, background: col }} />
+        ))}
+        {outP.map((p, i) => (
+          <Handle key={'o' + p} id={p} type="source" position={Position.Right}
+            style={{ top: HEADER + i * ROWH + ROWH / 2, background: col }} />
+        ))}
+        <div className="io-rows">
+          {Array.from({ length: nRows }).map((_, i) => (
+            <div className="io-row" key={i} style={{ height: ROWH }}>
+              <span className="pin">{inP[i] ?? ''}</span>
+              <span className="pout">
+                {outP[i] ? <><span className="pname">{outP[i]}</span>{live != null && <b>{fmt(live[outP[i]])}</b>}</> : ''}
+              </span>
             </div>
           ))}
         </div>

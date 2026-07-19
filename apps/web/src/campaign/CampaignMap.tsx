@@ -1,14 +1,18 @@
 import React from 'react'
-import { useGame } from '../store'
+import { useGame, useTut } from '../store'
 import { LEVELS } from './levels'
 
 export function CampaignMap() {
   const { completed, best, goLevel } = useGame()
+  const showTut = useTut((s) => s.show)
   const unlocked = (n: number) => n === 1 || completed.includes(LEVELS[n - 2].id)
   return (
     <div className="map">
       <div className="map-h">
-        <h1>APEX<b>·</b>ARENA</h1>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <h1>APEX<b>·</b>ARENA</h1>
+          <button className="help-btn" style={{ marginLeft: 'auto', marginTop: 6 }} title="튜토리얼" onClick={showTut}>?</button>
+        </div>
         <p>데이터플로 그래프로 차의 두뇌를 짓는다. 레벨마다 새 노드를 열며 Pure Pursuit → Follow-the-Gap을 직접 조립.</p>
       </div>
       <div className="lvls">

@@ -4,7 +4,7 @@ import type { Graph } from '@apex/core'
 import { Editor } from '../editor/Editor'
 import { coreToRF } from '../editor/compile'
 import { Viewport } from '../sim/Viewport'
-import { useGame, useLive } from '../store'
+import { useGame, useLive, useTut } from '../store'
 import { levelById, LEVELS } from './levels'
 
 export function LevelScreen({ id }: { id: string }) {
@@ -32,7 +32,8 @@ export function LevelScreen({ id }: { id: string }) {
       <div className="lv-top">
         <button className="back" onClick={goMap}>← 캠페인</button>
         <div className="lv-title"><b>Level {level.n}</b> · {level.title}</div>
-        <div className="lv-best mono">best {best[level.id] != null ? best[level.id].toFixed(2) + 's' : '—'}</div>
+        <div className="lv-best mono" style={{ marginLeft: 'auto' }}>best {best[level.id] != null ? best[level.id].toFixed(2) + 's' : '—'}</div>
+        <button className="help-btn" title="튜토리얼" onClick={() => useTut.getState().show()}>?</button>
       </div>
       <div className="lv-teach">{level.teach}</div>
       <div className="lv-body">

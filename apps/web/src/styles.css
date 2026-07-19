@@ -56,18 +56,42 @@ button{cursor:pointer;font-family:var(--sans)}
 .rf-wrap{min-width:0;min-height:400px;background:var(--bg)}
 .react-flow__attribution{display:none}
 
-/* custom graph node */
-.gnode{background:var(--surf2);border:1px solid var(--hairS);border-radius:9px;min-width:120px;font-size:11px;overflow:hidden}
-.gnode-h{padding:4px 9px;font-weight:700;color:#0c1620;font-size:11px}
-.gnode-body{position:relative;padding:4px 0;min-height:22px}
-.gports{position:relative}
-.gport{position:absolute;display:flex;align-items:center;gap:4px;height:16px;font-family:var(--mono);font-size:10px;color:var(--mut)}
-.gport{left:8px}.gport.out{right:8px;left:auto;flex-direction:row-reverse}
-.gport b{color:var(--signal)}
-.gparams{border-top:1px solid var(--hair);padding:5px 8px;display:flex;flex-direction:column;gap:3px}
-.gparams label{display:flex;align-items:center;justify-content:space-between;gap:6px;font-family:var(--mono);font-size:10px;color:var(--mut)}
-.gparams input{width:56px;background:var(--bg);border:1px solid var(--hairS);color:var(--ink);border-radius:4px;padding:2px 4px;font-family:var(--mono);font-size:10px}
-.react-flow__handle{width:8px;height:8px;border:1px solid #0a0d12}
+/* custom graph node — row-aligned ports */
+.gnode{background:var(--surf2);border:1px solid var(--hairS);border-radius:10px;width:172px;font-size:11px;box-shadow:0 5px 16px -7px rgba(0,0,0,.55);overflow:hidden}
+.react-flow__node.selected .gnode{border-color:var(--accent,#1FDDC9)}
+.gnode-h{padding:5px 10px;font-weight:700;color:#0c1620;font-size:11.5px}
+.gnode-io{position:relative}
+.io-rows{display:flex;flex-direction:column}
+.io-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 11px;font-family:var(--mono);font-size:10.5px}
+.pin{color:var(--mut);white-space:nowrap}
+.pout{display:flex;align-items:center;gap:6px;white-space:nowrap;margin-left:auto}
+.pout .pname{color:var(--mut)}
+.pout b{color:var(--signal);font-weight:600;font-variant-numeric:tabular-nums}
+.gparams{border-top:1px solid var(--hair);padding:6px 10px;display:flex;flex-direction:column;gap:4px;background:rgba(0,0,0,.16)}
+.gparams label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:10px;color:var(--mut)}
+.gparams input{width:62px;background:var(--bg);border:1px solid var(--hairS);color:var(--ink);border-radius:5px;padding:3px 6px;font-family:var(--mono);font-size:10px;text-align:right}
+.gparams input:focus{outline:none;border-color:var(--accent,#1FDDC9)}
+.react-flow__handle{width:9px;height:9px;border:1.5px solid #0a0d12;border-radius:50%}
+.react-flow__edge-path{stroke:#3a4a5a;stroke-width:1.5}
+.react-flow__edge.selected .react-flow__edge-path{stroke:var(--signal)}
+.react-flow__controls{background:var(--surf);border:1px solid var(--hair);border-radius:8px;overflow:hidden}
+.react-flow__controls-button{background:var(--surf);border-bottom:1px solid var(--hair);color:var(--ink);fill:var(--ink)}
+
+/* tutorial */
+.tut-overlay{position:fixed;inset:0;background:rgba(6,9,13,.72);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.tut{max-width:460px;width:100%;background:var(--surf);border:1px solid var(--hairS);border-radius:16px;padding:24px;box-shadow:0 24px 70px -24px #000}
+.tut .step-n{font-family:var(--mono);font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--signal)}
+.tut h3{margin:8px 0;font-size:1.2rem;letter-spacing:-.01em}
+.tut p{color:var(--mut);line-height:1.65;font-size:.9rem;margin:0}
+.tut p b{color:var(--ink)}
+.tut-nav{display:flex;gap:8px;margin-top:22px;align-items:center}
+.tut-nav .dots{display:flex;gap:5px;margin-right:auto}
+.tut-nav .dots i{width:7px;height:7px;border-radius:50%;background:var(--hairS)}
+.tut-nav .dots i.on{background:var(--signal)}
+.tut-nav button{font-family:var(--sans);font-size:.84rem;padding:8px 15px;border-radius:9px;border:1px solid var(--hairS);background:transparent;color:var(--ink)}
+.tut-nav button.primary{background:var(--signal);color:#04231f;border:none;font-weight:600}
+.help-btn{background:transparent;border:1px solid var(--hairS);color:var(--mut);border-radius:50%;width:26px;height:26px;font-size:.78rem;flex:none}
+.help-btn:hover{border-color:var(--signal);color:var(--signal)}
 
 /* ---------- viewport ---------- */
 .viewport{display:flex;flex-direction:column;gap:8px}
