@@ -9,14 +9,15 @@ import type { Graph } from '@apex/core'
 
 const nodeTypes = { apex: GraphNode }
 
-function EditorInner({ initial, palette, onGraph }:
-  { initial: { nodes: RFNode[]; edges: RFEdge[] }; palette: string[]; onGraph: (g: Graph) => void }) {
+type Decorate = Record<string, { label?: string; highlight?: boolean }>
+function EditorInner({ initial, palette, onGraph, decorate }:
+  { initial: { nodes: RFNode[]; edges: RFEdge[] }; palette: string[]; onGraph: (g: Graph) => void; decorate?: Decorate }) {
 
   const onParam = useCallback((id: string, key: string, val: number) => {
     setNodes((nds: any) => nds.map((n: any) => n.id === id ? { ...n, data: { ...n.data, params: { ...n.data.params, [key]: val } } } : n))
     // eslint-disable-next-line
   }, [])
-  const withCb = (ns: RFNode[]) => ns.map(n => ({ ...n, data: { ...n.data, onParam } }))
+  const withCb = (ns: RFNode[]) => ns.map(n => ({ ...n, data: { ...n.data, onParam, ...(decorate?.[n.id] || {}) } }))
 
   const [nodes, setNodes, onNodesChange] = useNodesState(withCb(initial.nodes) as any)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges as any)
@@ -86,6 +87,6 @@ function EditorInner({ initial, palette, onGraph }:
   )
 }
 
-export function Editor(props: { initial: { nodes: RFNode[]; edges: RFEdge[] }; palette: string[]; onGraph: (g: Graph) => void }) {
+export function Editor(props: { initial: { nodes: RFNode[]; edges: RFEdge[] }; palette: string[]; onGraph: (g: Graph) => void; decorate?: Decorate }) {
   return <ReactFlowProvider><EditorInner {...props} /></ReactFlowProvider>
 }

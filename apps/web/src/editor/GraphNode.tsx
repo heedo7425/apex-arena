@@ -23,8 +23,9 @@ export function GraphNode({ id, data }: { id: string; data: any }) {
   const nRows = Math.max(inP.length, outP.length, 1)
 
   return (
-    <div className="gnode" style={{ ['--accent' as any]: col }}>
-      <div className="gnode-h" style={{ background: col }}>{meta.label}</div>
+    <div className={'gnode' + (data.highlight ? ' hl' : '')} style={{ ['--accent' as any]: col }}>
+      {data.highlight && <div className="hl-tag">여기 바꿔봐 ↓</div>}
+      <div className="gnode-h" style={{ background: col }}>{data.label || meta.label}</div>
       <div className="gnode-io" style={{ height: nRows * ROWH }}>
         {inP.map((p, i) => (
           <Handle key={'i' + p} id={p} type="target" position={Position.Left}

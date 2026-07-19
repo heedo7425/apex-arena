@@ -56,9 +56,10 @@ export function LevelScreen({ id }: { id: string }) {
       </div>
       <div className="lv-teach">{level.teach}</div>
       <div className="lv-body">
-        <Editor key={id} initial={initial} palette={level.palette} onGraph={setGraph} />
+        <Editor key={id} initial={initial} palette={level.palette} onGraph={setGraph}
+          decorate={isTut ? { vt: { label: '목표속도 (Const)', highlight: true } } : undefined} />
         <div className="lv-right">
-          <Viewport world={world} graph={graph}
+          <Viewport world={world} graph={graph} autoplay={!isTut}
             onValues={(vals, info) => { setVals(vals); setHud({ speed: info.speed, best: info.best }); if (isTut && coach === 0 && info.speed > 2) setCoach(1) }}
             onLap={onLap} />
           {isTut && (

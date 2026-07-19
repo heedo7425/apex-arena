@@ -7,12 +7,13 @@ type Props = {
   world: World
   graph: Graph
   seed?: number
+  autoplay?: boolean
   onValues?: (lastVal: Record<string, any> | null, info: { speed:number; lapT:number; best:number|null }) => void
   onLap?: (t: number, dirty: boolean) => void
 }
 const CW = 1200, CH = 760
 
-export function Viewport({ world, graph, seed = 1, onValues, onLap }: Props) {
+export function Viewport({ world, graph, seed = 1, autoplay = true, onValues, onLap }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const simRef = useRef<ReturnType<typeof makeSim> | null>(null)
   const terrainRef = useRef<HTMLCanvasElement | null>(null)
@@ -20,7 +21,7 @@ export function Viewport({ world, graph, seed = 1, onValues, onLap }: Props) {
   const argmaxId = useRef<string | null>(null)
   const runRef = useRef(true)
   const speedRef = useRef(1)
-  const [running, setRunning] = useState(true)
+  const [running, setRunning] = useState(autoplay)
   const [speed, setSpeed] = useState(1)
   const [lapMsg, setLapMsg] = useState<string>('READY')
   // keep latest callbacks (loop effect captures once)

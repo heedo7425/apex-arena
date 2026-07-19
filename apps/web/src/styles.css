@@ -72,9 +72,13 @@ button{cursor:pointer;font-family:var(--sans)}
 .ni-hint{color:var(--faint);font-size:.78rem;line-height:1.5}
 
 /* custom graph node — row-aligned ports */
-.gnode{background:var(--surf2);border:1px solid var(--hairS);border-radius:10px;width:172px;font-size:11px;box-shadow:0 5px 16px -7px rgba(0,0,0,.55);overflow:hidden}
+.gnode{position:relative;background:var(--surf2);border:1px solid var(--hairS);border-radius:10px;width:172px;font-size:11px;box-shadow:0 5px 16px -7px rgba(0,0,0,.55)}
 .react-flow__node.selected .gnode{border-color:var(--accent,#1FDDC9)}
-.gnode-h{padding:5px 10px;font-weight:700;color:#0c1620;font-size:11.5px}
+.gnode-h{padding:5px 10px;font-weight:700;color:#0c1620;font-size:11.5px;border-radius:10px 10px 0 0}
+.gnode.hl{border-color:var(--gold);animation:hlpulse 1.4s ease-in-out infinite}
+@keyframes hlpulse{0%,100%{box-shadow:0 0 0 2px rgba(231,178,76,.3),0 0 14px -2px rgba(231,178,76,.4)}50%{box-shadow:0 0 0 3px rgba(231,178,76,.6),0 0 26px 0 rgba(231,178,76,.7)}}
+.hl-tag{position:absolute;top:-20px;left:2px;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--gold);white-space:nowrap;animation:hlbob 1.2s ease-in-out infinite}
+@keyframes hlbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 .gnode-io{position:relative}
 .io-rows{display:flex;flex-direction:column}
 .io-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 11px;font-family:var(--mono);font-size:10.5px}
@@ -82,7 +86,7 @@ button{cursor:pointer;font-family:var(--sans)}
 .pout{display:flex;align-items:center;gap:6px;white-space:nowrap;margin-left:auto}
 .pout .pname{color:var(--mut)}
 .pout b{color:var(--signal);font-weight:600;font-variant-numeric:tabular-nums}
-.gparams{border-top:1px solid var(--hair);padding:6px 10px;display:flex;flex-direction:column;gap:4px;background:rgba(0,0,0,.16)}
+.gparams{border-top:1px solid var(--hair);padding:6px 10px;display:flex;flex-direction:column;gap:4px;background:rgba(0,0,0,.16);border-radius:0 0 9px 9px}
 .gparams label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:10px;color:var(--mut)}
 .gparams input{width:62px;background:var(--bg);border:1px solid var(--hairS);color:var(--ink);border-radius:5px;padding:3px 6px;font-family:var(--mono);font-size:10px;text-align:right}
 .gparams input:focus{outline:none;border-color:var(--accent,#1FDDC9)}
