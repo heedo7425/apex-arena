@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ReactFlow, ReactFlowProvider, Background, Controls, addEdge,
   useNodesState, useEdgesState, type Connection } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { GraphNode } from './GraphNode'
 import { newNode, rfToCore, type RFNode, type RFEdge } from './compile'
-import { defaultParams, metaOf, colorOf, PALETTE_CATS } from './nodeMeta'
+import { defaultParams, metaOf, colorOf, ins, outs, PALETTE_CATS } from './nodeMeta'
 import type { Graph } from '@apex/core'
 
 const nodeTypes = { apex: GraphNode }
@@ -20,6 +20,7 @@ function EditorInner({ initial, palette, onGraph }:
 
   const [nodes, setNodes, onNodesChange] = useNodesState(withCb(initial.nodes) as any)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges as any)
+  const [info, setInfo] = useState<string | null>(null)
 
   const onConnect = useCallback((c: Connection) => {
     setEdges((eds: any) => addEdge({ ...c, id: `${c.source}.${c.sourceHandle}->${c.target}.${c.targetHandle}` }, eds))
@@ -50,7 +51,7 @@ function EditorInner({ initial, palette, onGraph }:
               <div className="pal-cat-h" style={{ color: colorOf(types[0]) }}>{g.cat}</div>
               <div className="pal-chips">
                 {types.map(t => (
-                  <button key={t} className="pal-chip" onClick={() => addNode(t)}
+                  <button key={t} className="pal-chip" onClick={() => addNode(t)} onMouseEnter={() => setInfo(t)}
                     style={{ borderColor: colorOf(t) }}>{metaOf(t).label}</button>
                 ))}
               </div>
@@ -62,10 +63,24 @@ function EditorInner({ initial, palette, onGraph }:
       <div className="rf-wrap">
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes}
           onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
+          onNodeClick={(_, node: any) => setInfo(node.data.coreType)}
           fitView minZoom={0.3} maxZoom={2} proOptions={{ hideAttribution: true }}>
           <Background color="#222c38" gap={22} />
           <Controls showInteractive={false} />
         </ReactFlow>
+        <div className="node-info">
+          {info ? (
+            <>
+              <div className="ni-h" style={{ color: colorOf(info) }}>{metaOf(info).label}<span className="ni-cat">{metaOf(info).cat}</span></div>
+              <p>{metaOf(info).desc || '설명 준비 중.'}</p>
+              {metaOf(info).real && <p className="ni-real">◆ {metaOf(info).real}</p>}
+              <div className="ni-ports">
+                {ins(info).length > 0 && <span>입력 <b>{ins(info).join(', ')}</b></span>}
+                {outs(info).length > 0 && <span>출력 <b>{outs(info).join(', ')}</b></span>}
+              </div>
+            </>
+          ) : <span className="ni-hint">노드를 클릭하거나 팔레트 칩에 마우스를 올리면 설명이 나와요.</span>}
+        </div>
       </div>
     </div>
   )

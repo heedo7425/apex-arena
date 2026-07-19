@@ -57,8 +57,16 @@ button{cursor:pointer;font-family:var(--sans)}
 .pal-chip{font-size:.72rem;padding:4px 8px;border-radius:6px;border:1px solid var(--hairS);background:var(--surf2);color:var(--ink)}
 .pal-chip:hover{filter:brightness(1.2)}
 .pal-note{font-family:var(--mono);font-size:.58rem;color:var(--faint);line-height:1.5;margin-top:8px}
-.rf-wrap{min-width:0;min-height:400px;background:var(--bg)}
+.rf-wrap{position:relative;min-width:0;min-height:400px;background:var(--bg)}
 .react-flow__attribution{display:none}
+.node-info{position:absolute;left:12px;bottom:12px;width:min(300px,calc(100% - 24px));background:rgba(10,15,21,.92);backdrop-filter:blur(8px);border:1px solid var(--hairS);border-radius:12px;padding:12px 14px;z-index:5}
+.ni-h{font-weight:700;font-size:.92rem;display:flex;align-items:baseline;gap:8px}
+.ni-cat{font-family:var(--mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.node-info p{margin:6px 0 0;color:var(--mut);font-size:.8rem;line-height:1.55}
+.ni-real{color:var(--gold) !important;font-size:.74rem !important}
+.ni-ports{display:flex;gap:14px;margin-top:8px;font-family:var(--mono);font-size:.66rem;color:var(--faint)}
+.ni-ports b{color:var(--ink)}
+.ni-hint{color:var(--faint);font-size:.78rem;line-height:1.5}
 
 /* custom graph node — row-aligned ports */
 .gnode{background:var(--surf2);border:1px solid var(--hairS);border-radius:10px;width:172px;font-size:11px;box-shadow:0 5px 16px -7px rgba(0,0,0,.55);overflow:hidden}
