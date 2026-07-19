@@ -40,8 +40,8 @@ function EditorInner({ initial, palette, onGraph }:
   }
 
   return (
-    <div className="editor">
-      <div className="palette">
+    <div className={'editor' + (palette.length ? '' : ' no-pal')}>
+      {palette.length > 0 && <div className="palette">
         <div className="palette-h">노드 팔레트</div>
         {PALETTE_CATS.map(g => {
           const types = g.types.filter(t => palette.includes(t))
@@ -59,7 +59,7 @@ function EditorInner({ initial, palette, onGraph }:
           )
         })}
         <div className="pal-note">칩을 눌러 노드 추가 · 포트를 드래그해 연결 · 노드 선택 후 Del 삭제</div>
-      </div>
+      </div>}
       <div className="rf-wrap">
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes}
           onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}

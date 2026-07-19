@@ -5,11 +5,11 @@ export const useLive = create<{ vals: Record<string, any> | null; setVals: (v: R
   (set) => ({ vals: null, setVals: (v) => set({ vals: v }) })
 )
 
-// ---- tutorial (shown once, reopenable) ----
+// ---- concept overview modal (reopenable via ? — not auto-shown; onboarding is the tutorial level) ----
 export const useTut = create<{ open: boolean; show: () => void; close: () => void }>((set) => ({
-  open: (() => { try { return !localStorage.getItem('apex_tut_v1') } catch { return true } })(),
+  open: false,
   show: () => set({ open: true }),
-  close: () => { try { localStorage.setItem('apex_tut_v1', '1') } catch {} ; set({ open: false }) },
+  close: () => set({ open: false }),
 }))
 
 // ---- game progress (persisted) ----
@@ -29,8 +29,12 @@ type Game = {
 }
 export const useGame = create<Game>((set, get) => {
   const s = load()
+  // first-ever visit → drop straight into the tutorial level (no "where do I start")
+  const onboarded = (() => { try { return !!localStorage.getItem('apex_onboard') } catch { return true } })()
+  try { localStorage.setItem('apex_onboard', '1') } catch {}
   return {
-    screen: 'map', levelId: null, completed: s.completed, best: s.best,
+    screen: onboarded ? 'map' : 'level', levelId: onboarded ? null : 'tut',
+    completed: s.completed, best: s.best,
     goMap: () => set({ screen: 'map', levelId: null }),
     goLevel: (id) => set({ screen: 'level', levelId: id }),
     complete: (id, time) => {

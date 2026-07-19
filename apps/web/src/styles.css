@@ -46,9 +46,12 @@ button{cursor:pointer;font-family:var(--sans)}
 .coach-n{font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);margin-bottom:6px}
 .coach p{margin:0;font-size:.86rem;line-height:1.6;color:var(--ink)}
 .coach p b{color:var(--signal)}
+.coach-go{margin-top:12px;background:var(--signal);color:#04231f;border:none;border-radius:9px;padding:9px 16px;font-weight:600;font-size:.86rem}
+.coach-go:hover{filter:brightness(1.06)}
 
 /* ---------- editor ---------- */
 .editor{display:grid;grid-template-columns:160px 1fr;min-height:0;min-width:0}
+.editor.no-pal{grid-template-columns:1fr}
 .palette{border-right:1px solid var(--hair);overflow:auto;padding:12px 10px;background:var(--bg2)}
 .palette-h{font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
 .pal-cat{margin-bottom:12px}

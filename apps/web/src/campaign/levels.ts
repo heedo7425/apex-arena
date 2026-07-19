@@ -59,9 +59,10 @@ const L4: Graph = makeGraph({
   ssink:{type:'sink.steer',in:{x:['n','s0','v']}},
 })
 
-// TUT — guided: steering given, a Const(0.4) sits unwired; connect it to THROTTLE, then run.
+// TUT — a complete, already-driving graph (Pure Pursuit + PID speed control).
+// No palette, no wiring. Just: run → raise the target-speed Const → see it respond.
 const TUT: Graph = makeGraph({
-  pose:{type:'src.pose'}, track:{type:'src.track'},
+  pose:{type:'src.pose'}, track:{type:'src.track'}, speed:{type:'src.speed'},
   Ld:{type:'const',params:{value:6}},
   look:{type:'std.lookahead',in:{pose:['n','pose','pose'],track:['n','track','track'],Ld:['n','Ld','v']}},
   e:{type:'std.tocar',in:{pt:['n','look','pt'],pose:['n','pose','pose']}},
@@ -69,13 +70,16 @@ const TUT: Graph = makeGraph({
   gain:{type:'const',params:{value:1}},
   steer:{type:'std.steerFromCurv',in:{k:['n','k','k'],gain:['n','gain','v']}},
   ssink:{type:'sink.steer',in:{x:['n','steer','steer']}},
-  tconst:{type:'const',params:{value:0.4}},
-  tsink:{type:'sink.throttle'},              // ← unwired on purpose
+  vt:{type:'const',params:{value:8}},                    // ← target speed the player raises
+  verr:{type:'sub',in:{a:['n','vt','v'],b:['n','speed','v']}},
+  pid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0},in:{err:['n','verr','v']}},
+  thr:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','pid','u']}},
+  tsink:{type:'sink.throttle',in:{x:['n','thr','v']}},
 })
 
 export const LEVELS: Level[] = [
-  { id:'tut', n:0, title:'튜토리얼 (Tutorial)', teach:'그래프로 차를 모는 법을 손으로 익혀보자. 오른쪽 아래 안내를 따라와.',
-    palette:['const','sub','ctrl.pid','clamp','src.speed','sink.throttle'], objective:{type:'clean'}, starter:TUT },
+  { id:'tut', n:0, title:'튜토리얼 (Tutorial)', teach:'이 노드 그래프가 곧 차의 두뇌야. 오른쪽 아래 안내 3단계만 따라와 — 짓는 건 다음 레벨부터.',
+    palette:[], objective:{type:'clean'}, starter:TUT },
   { id:'l1', n:1, title:'스로틀 (Throttle)', teach:'조향은 주어져 있어. 속도 제어를 그래프로 짜자 — 목표속도 const에서 speed를 빼고(sub) → PID → clamp → THROTTLE. 노드를 이어봐.',
     palette:['const','sub','ctrl.pid','clamp','src.speed','sink.throttle'], objective:{type:'clean'}, starter:L1 },
   { id:'l2', n:2, title:'조향 (Steer)', teach:'이번엔 스로틀이 주어져. 지금은 직진해서 코너에서 나가떨어져. Pure Pursuit 조향을 조립: Lookahead point → To car frame → Pursuit curvature → Steer.',
