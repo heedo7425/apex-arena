@@ -68,7 +68,7 @@ export const NT: Record<string, NodeDef> = {
     const nx=stepDynamics(c.car, { steer:i.steer, throttle:i.throttle }, c.world, c.dt); return { x:nx.x, y:nx.y, v:nx.vx };
   } },
 
-  // ---- sinks (write command) ----
-  'sink.steer':    { kind:'sink', cat:'Output', ins:['x'], fn:(i,p,s,c)=>{ c.cmd.steer=i.x; return {}; } },
-  'sink.throttle': { kind:'sink', cat:'Output', ins:['x'], fn:(i,p,s,c)=>{ c.cmd.throttle=i.x; return {}; } },
+  // ---- sinks (write command) — coerce unwired/NaN inputs to 0 so a partial graph is safe ----
+  'sink.steer':    { kind:'sink', cat:'Output', ins:['x'], fn:(i,p,s,c)=>{ c.cmd.steer=Number.isFinite(i.x)?i.x:0; return {}; } },
+  'sink.throttle': { kind:'sink', cat:'Output', ins:['x'], fn:(i,p,s,c)=>{ c.cmd.throttle=Number.isFinite(i.x)?i.x:0; return {}; } },
 };

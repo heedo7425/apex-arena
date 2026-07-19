@@ -42,6 +42,10 @@ button{cursor:pointer;font-family:var(--sans)}
 .lv-result.ok{background:rgba(63,206,133,.12);border:1px solid rgba(63,206,133,.4);color:var(--good)}
 .lv-result.bad{background:rgba(228,115,106,.1);border:1px solid rgba(228,115,106,.35);color:var(--bad)}
 .lv-result button{margin-left:auto;background:var(--signal);color:#04231f;border:none;border-radius:8px;padding:8px 14px;font-weight:600}
+.coach{background:rgba(31,221,201,.08);border:1px solid rgba(31,221,201,.35);border-radius:10px;padding:12px 14px}
+.coach-n{font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);margin-bottom:6px}
+.coach p{margin:0;font-size:.86rem;line-height:1.6;color:var(--ink)}
+.coach p b{color:var(--signal)}
 
 /* ---------- editor ---------- */
 .editor{display:grid;grid-template-columns:160px 1fr;min-height:0;min-width:0}

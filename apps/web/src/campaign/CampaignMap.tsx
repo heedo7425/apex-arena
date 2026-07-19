@@ -5,7 +5,7 @@ import { LEVELS } from './levels'
 export function CampaignMap() {
   const { completed, best, goLevel } = useGame()
   const showTut = useTut((s) => s.show)
-  const unlocked = (n: number) => n === 1 || completed.includes(LEVELS[n - 2].id)
+  const isOpen = (i: number) => i === 0 || completed.includes(LEVELS[i - 1].id)
   return (
     <div className="map">
       <div className="map-h">
@@ -16,12 +16,12 @@ export function CampaignMap() {
         <p>데이터플로 그래프로 차의 두뇌를 짓는다. 레벨마다 새 노드를 열며 Pure Pursuit → Follow-the-Gap을 직접 조립.</p>
       </div>
       <div className="lvls">
-        {LEVELS.map((l) => {
-          const open = unlocked(l.n), done = completed.includes(l.id)
+        {LEVELS.map((l, i) => {
+          const open = isOpen(i), done = completed.includes(l.id)
           return (
             <button key={l.id} className={'lvl-card' + (open ? '' : ' locked') + (done ? ' done' : '')}
               disabled={!open} onClick={() => open && goLevel(l.id)}>
-              <div className="lvl-n">{done ? '✓' : l.n}</div>
+              <div className="lvl-n">{done ? '✓' : (l.n === 0 ? '★' : l.n)}</div>
               <div className="lvl-meta">
                 <div className="lvl-title">{l.title}</div>
                 <div className="lvl-obj mono">{l.objective.type === 'time' ? `클린 ≤ ${l.objective.target}s` : '클린 랩'}{best[l.id] != null ? ` · best ${best[l.id].toFixed(2)}s` : ''}</div>

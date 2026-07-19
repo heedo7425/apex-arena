@@ -59,7 +59,23 @@ const L4: Graph = makeGraph({
   ssink:{type:'sink.steer',in:{x:['n','s0','v']}},
 })
 
+// TUT — guided: steering given, a Const(0.4) sits unwired; connect it to THROTTLE, then run.
+const TUT: Graph = makeGraph({
+  pose:{type:'src.pose'}, track:{type:'src.track'},
+  Ld:{type:'const',params:{value:6}},
+  look:{type:'std.lookahead',in:{pose:['n','pose','pose'],track:['n','track','track'],Ld:['n','Ld','v']}},
+  e:{type:'std.tocar',in:{pt:['n','look','pt'],pose:['n','pose','pose']}},
+  k:{type:'std.pursuitCurv',in:{e:['n','e','e']}},
+  gain:{type:'const',params:{value:1}},
+  steer:{type:'std.steerFromCurv',in:{k:['n','k','k'],gain:['n','gain','v']}},
+  ssink:{type:'sink.steer',in:{x:['n','steer','steer']}},
+  tconst:{type:'const',params:{value:0.4}},
+  tsink:{type:'sink.throttle'},              // ← unwired on purpose
+})
+
 export const LEVELS: Level[] = [
+  { id:'tut', n:0, title:'튜토리얼 (Tutorial)', teach:'그래프로 차를 모는 법을 손으로 익혀보자. 오른쪽 아래 안내를 따라와.',
+    palette:['const','sub','ctrl.pid','clamp','src.speed','sink.throttle'], objective:{type:'clean'}, starter:TUT },
   { id:'l1', n:1, title:'스로틀 (Throttle)', teach:'조향은 주어져 있어. 속도 제어를 그래프로 짜자 — 목표속도 const에서 speed를 빼고(sub) → PID → clamp → THROTTLE. 노드를 이어봐.',
     palette:['const','sub','ctrl.pid','clamp','src.speed','sink.throttle'], objective:{type:'clean'}, starter:L1 },
   { id:'l2', n:2, title:'조향 (Steer)', teach:'이번엔 스로틀이 주어져. 지금은 직진해서 코너에서 나가떨어져. Pure Pursuit 조향을 조립: Lookahead point → To car frame → Pursuit curvature → Steer.',

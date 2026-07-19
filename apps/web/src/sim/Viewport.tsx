@@ -23,6 +23,9 @@ export function Viewport({ world, graph, seed = 1, onValues, onLap }: Props) {
   const [running, setRunning] = useState(true)
   const [speed, setSpeed] = useState(1)
   const [lapMsg, setLapMsg] = useState<string>('READY')
+  // keep latest callbacks (loop effect captures once)
+  const onValuesRef = useRef(onValues); const onLapRef = useRef(onLap)
+  useEffect(() => { onValuesRef.current = onValues; onLapRef.current = onLap })
 
   // (re)build sim when world changes
   useEffect(() => {
@@ -57,14 +60,14 @@ export function Viewport({ world, graph, seed = 1, onValues, onLap }: Props) {
           if (s.laps.length > prevLaps) {
             const lp = s.laps[s.laps.length - 1]
             setLapMsg((lp.dirty ? 'DIRTY ' : 'LAP ') + lp.t.toFixed(3) + 's')
-            onLap?.(lp.t, lp.dirty)
+            onLapRef.current?.(lp.t, lp.dirty)
           }
         }
         const scan = castScan(s.car, world)
         const gap = argmaxId.current && s.lastVal ? s.lastVal[argmaxId.current]?.i ?? null : null
         renderSim(ctx, world, s.car, scan, gap, cam, terrainRef.current)
         valAcc += dt
-        if (valAcc > 0.1) { valAcc = 0; onValues?.(s.lastVal, { speed: s.car.vx, lapT: s.lapT, best: s.best }) }
+        if (valAcc > 0.1) { valAcc = 0; onValuesRef.current?.(s.lastVal, { speed: s.car.vx, lapT: s.lapT, best: s.best }) }
       }
       raf = requestAnimationFrame(loop)
     }
