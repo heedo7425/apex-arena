@@ -168,3 +168,11 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Added venue and layout names to the live simulation header.
 - Headless verification: L2 completed graph clean at 35.15s, L3 completed graph clean at 30.72s, and L4 completed graph clean at 26.12s.
 - Visually verified the distinct ORBIT and RIDGELINE layouts in the running app.
+
+## 2026-07-20 - Contextual block explanations (complete)
+
+- Added a contextual PART GUIDE tooltip for both Parts Bay blocks and placed graph nodes.
+- Tooltips explain the block purpose, robotics meaning, and input/output port names without interrupting the build flow.
+- Added viewport-aware positioning so the card flips to the open side and remains on screen.
+- Added keyboard-focus support while preserving click-to-pin PART INSPECT details and mobile node inspection.
+- Visually verified the Grip speed guide card in the live Level 3 workspace.

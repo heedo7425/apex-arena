@@ -11,6 +11,7 @@ import type { Graph } from '@apex/core'
 const nodeTypes = { apex: GraphNode }
 
 type Decorate = Record<string, { label?: string; highlight?: boolean; tag?: string }>
+type HoverInfo = { type:string; x:number; y:number }
 function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, nodeDefaults, requiredOutputs }:
   { initial:{nodes:RFNode[];edges:RFEdge[]}; palette:string[]; onGraph:(g:Graph)=>void; decorate?:Decorate; highlightPalette?:string; nodeDefaults?:Record<string,Record<string,number>>; requiredOutputs?:string[] }) {
 
@@ -21,6 +22,8 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   const latest = useRef<{nodes:RFNode[];edges:RFEdge[]}>({nodes:arranged,edges:initial.edges})
   const [notice,setNotice] = useState<string|null>(null)
   const [bayOpen,setBayOpen] = useState(true)
+  const [info,setInfo]=useState<string|null>(null)
+  const [hover,setHover]=useState<HoverInfo|null>(null)
   const history = useRef<{nodes:RFNode[];edges:RFEdge[]}[]>([])
   const [undoCount,setUndoCount] = useState(0)
   const remember = () => {
@@ -56,11 +59,16 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     // eslint-disable-next-line
   },[])
   const clearPending=()=>{pending.current=null;usePending.getState().setSel(null);setNotice(null)}
-  const withCb=(ns:RFNode[])=>ns.map(n=>({...n,data:{...n.data,onParam,onPort,...(decorate?.[n.id]||{})}}))
+  const showHover=(type:string, el:HTMLElement)=>{
+    const box=el.getBoundingClientRect(), width=286, height=190, gap=12
+    const right=box.right+gap, left=box.left-width-gap
+    setHover({type,x:right+width<window.innerWidth?right:Math.max(8,left),y:Math.max(8,Math.min(box.top,window.innerHeight-height-8))})
+  }
+  const hideHover=()=>setHover(null)
+  const withCb=(ns:RFNode[])=>ns.map(n=>({...n,data:{...n.data,onParam,onPort,onHover:showHover,onHoverEnd:hideHover,...(decorate?.[n.id]||{})}}))
 
   const [nodes,setNodes,onNodesChange]=useNodesState(withCb(arranged) as any)
   const [edges,setEdges,onEdgesChange]=useEdgesState(initial.edges as any)
-  const [info,setInfo]=useState<string|null>(null)
   const handleNodesChange = (changes:any[]) => {
     if (changes.some(c => c.type === 'remove')) remember()
     onNodesChange(changes)
@@ -102,7 +110,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     remember()
     const index=nodes.length
     const nn=newNode(type,compact?10+(index%2)*185:70+(index%3)*210,compact?70+Math.floor(index/2)*105:70+(Math.floor(index/3)%4)*110)
-    setNodes((nds:any)=>nds.concat({...nn,data:{coreType:type,params:{...defaultParams(type),...(nodeDefaults?.[type]??{})},onParam,onPort}}))
+    setNodes((nds:any)=>nds.concat({...nn,data:{coreType:type,params:{...defaultParams(type),...(nodeDefaults?.[type]??{})},onParam,onPort,onHover:showHover,onHoverEnd:hideHover}}))
     setNotice(`${metaOf(type).label} 파트를 장착했습니다.`)
     if(compact)setBayOpen(false)
     frameBuild()
@@ -128,7 +136,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
             return <div className="pal-cat" key={g.cat}>
               <div className="pal-cat-h" style={{color:colorOf(types[0])}}>{g.cat}</div>
               <div className="pal-chips">{types.map(t=>
-                <button key={t} className={'pal-chip'+(t===highlightPalette?' hl':'')} onClick={()=>addNode(t)} onMouseEnter={()=>setInfo(t)}
+                <button key={t} className={'pal-chip'+(t===highlightPalette?' hl':'')} onClick={()=>addNode(t)} onMouseEnter={e=>showHover(t,e.currentTarget)} onMouseLeave={hideHover} onFocus={e=>showHover(t,e.currentTarget)} onBlur={hideHover}
                   style={{['--part' as any]:colorOf(t)}}>
                   <i>+</i><span>{metaOf(t).label}</span>
                 </button>)}</div>
@@ -148,7 +156,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes}
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange} onConnect={onConnect}
           isValidConnection={c=>!!c.source&&!!c.sourceHandle&&!!c.target&&!!c.targetHandle&&!connectionIssue(latest.current.nodes,latest.current.edges,c.source,c.sourceHandle,c.target,c.targetHandle)}
-          onNodeClick={(_,node:any)=>setInfo(node.data.coreType)} onPaneClick={clearPending}
+          onNodeClick={(_,node:any)=>{setHover(null);setInfo(node.data.coreType)}} onPaneClick={clearPending}
           fitView minZoom={0.3} maxZoom={2} proOptions={{hideAttribution:true}}>
           <Background color="#314052" gap={24} size={1}/>
           <Controls showInteractive={false}/>
@@ -165,6 +173,16 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
           </div>
         </div>}
       </div>
+      {hover&&<div className="node-tooltip" role="tooltip" style={{left:hover.x,top:hover.y,['--tip' as any]:colorOf(hover.type)}}>
+        <div className="nt-cap">{metaOf(hover.type).cat} · PART GUIDE</div>
+        <div className="nt-title">{metaOf(hover.type).label}</div>
+        <p>{metaOf(hover.type).desc||'설명 준비 중.'}</p>
+        {metaOf(hover.type).real&&<div className="nt-real">REAL WORLD · {metaOf(hover.type).real}</div>}
+        <div className="nt-ports">
+          {ins(hover.type).length>0&&<span>IN <b>{ins(hover.type).join(', ')}</b></span>}
+          {outs(hover.type).length>0&&<span>OUT <b>{outs(hover.type).join(', ')}</b></span>}
+        </div>
+      </div>}
     </div>
   )
 }

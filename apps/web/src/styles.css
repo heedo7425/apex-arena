@@ -366,3 +366,18 @@ button:focus-visible,.react-flow__handle:focus-visible,input:focus-visible{
 .editor-actions button:hover:not(:disabled){border-color:var(--signal);color:var(--signal)}
 .editor-actions button:disabled{opacity:.35;cursor:not-allowed}
 @media(max-width:900px){.editor-actions{right:8px;bottom:8px}}
+
+/* Contextual part guide */
+.node-tooltip{position:fixed;z-index:100;width:min(286px,calc(100vw - 16px));pointer-events:none;overflow:hidden;
+  padding:13px 14px 12px;border:1px solid color-mix(in srgb,var(--tip) 48%,var(--hairS));border-radius:11px;
+  background:color-mix(in srgb,var(--surf) 96%,transparent);color:var(--ink);backdrop-filter:blur(14px);
+  box-shadow:0 22px 52px -24px rgba(0,0,0,.9),inset 3px 0 0 var(--tip);animation:tip-in .14s ease-out}
+.nt-cap{font-family:var(--mono);font-size:.48rem;letter-spacing:.14em;color:var(--tip)}
+.nt-title{margin-top:4px;font-size:.92rem;font-weight:750;letter-spacing:-.01em}
+.node-tooltip p{margin:6px 0 0;color:var(--mut);font-size:.72rem;line-height:1.5;word-break:keep-all}
+.nt-real{margin-top:8px;padding-top:7px;border-top:1px solid var(--hair);font-size:.62rem;line-height:1.45;color:var(--gold)}
+.nt-ports{display:flex;gap:12px;margin-top:8px;font-family:var(--mono);font-size:.5rem;color:var(--faint)}
+.nt-ports b{margin-left:4px;color:var(--ink);font-weight:600}
+.gnode:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@keyframes tip-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@media(hover:none){.node-tooltip{display:none}}

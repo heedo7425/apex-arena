@@ -23,10 +23,14 @@ export function GraphNode({ id, data }:{ id:string; data:any }) {
   const sel = usePending((s) => s.sel)
   const setParam = data.onParam as ((id:string,key:string,v:number)=>void)|undefined
   const onPort = data.onPort as ((id:string,handle:string,kind:'source'|'target')=>void)|undefined
+  const onHover = data.onHover as ((type:string,el:HTMLElement)=>void)|undefined
+  const onHoverEnd = data.onHoverEnd as (()=>void)|undefined
   const nRows = Math.max(inP.length, outP.length, 1)
 
   return (
-    <div className={'gnode'+(data.highlight?' hl':'')} style={{ ['--accent' as any]:col }}>
+    <div className={'gnode'+(data.highlight?' hl':'')} style={{ ['--accent' as any]:col }} tabIndex={0}
+      onMouseEnter={e=>onHover?.(type,e.currentTarget)} onMouseLeave={onHoverEnd}
+      onFocus={e=>onHover?.(type,e.currentTarget)} onBlur={onHoverEnd}>
       {data.highlight && <div className="hl-tag">{data.tag || '여기 ↓'}</div>}
       <div className="gnode-h" style={{ background:col }}>{data.label || meta.label}</div>
       <div className="gnode-io" style={{ height:nRows*ROWH }}>
