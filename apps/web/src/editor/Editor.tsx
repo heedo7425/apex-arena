@@ -116,6 +116,12 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     frameBuild()
   }
 
+  const renderedNodes = (nodes as RFNode[]).map(n => {
+    if (n.data.coreType !== 'const') return n
+    const targets = [...new Set((edges as RFEdge[]).filter(e => e.source === n.id && e.sourceHandle === 'v').map(e => e.targetHandle))]
+    const label = targets.length === 1 ? "value → " + targets[0] : "value"
+    return {...n,data:{...n.data,outputLabels:{v:label}}}
+  })
   const ready=graphReady(nodes as any,edges as any,requiredOutputs)
 
   return (
@@ -153,7 +159,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
         <div className={'graph-feedback '+(notice?'active':ready?'ready':'waiting')} role="status" aria-live="polite">
           <span className="gf-dot"/>{notice||(ready?'CONTROL ONLINE · 출전 준비 완료':'CONTROL OFFLINE · 출력 링크를 완성하세요')}
         </div>
-        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes}
+        <ReactFlow nodes={renderedNodes} edges={edges} nodeTypes={nodeTypes}
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange} onConnect={onConnect}
           isValidConnection={c=>!!c.source&&!!c.sourceHandle&&!!c.target&&!!c.targetHandle&&!connectionIssue(latest.current.nodes,latest.current.edges,c.source,c.sourceHandle,c.target,c.targetHandle)}
           onNodeClick={(_,node:any)=>{setHover(null);setInfo(node.data.coreType)}} onPaneClick={clearPending}

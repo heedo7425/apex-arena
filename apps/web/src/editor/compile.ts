@@ -3,7 +3,7 @@ import { makeGraph, NT, arePortsCompatible, portType, validateGraph } from '@ape
 import type { Graph, GNode, GraphIssue } from '@apex/core'
 import { defaultParams, metaOf } from './nodeMeta'
 
-export type RFNode = { id:string; type:'apex'; position:{x:number;y:number}; data:{ coreType:string; params:Record<string,number> } }
+export type RFNode = { id:string; type:'apex'; position:{x:number;y:number}; data:{ coreType:string; params:Record<string,number>; outputLabels?:Record<string,string> } }
 export type RFEdge = { id:string; source:string; sourceHandle:string; target:string; targetHandle:string }
 
 // RF graph -> runnable core Graph

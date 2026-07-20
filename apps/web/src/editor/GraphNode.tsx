@@ -26,6 +26,7 @@ export function GraphNode({ id, data }:{ id:string; data:any }) {
   const onHover = data.onHover as ((type:string,el:HTMLElement)=>void)|undefined
   const onHoverEnd = data.onHoverEnd as (()=>void)|undefined
   const nRows = Math.max(inP.length, outP.length, 1)
+  const outputLabel = (port:string) => data.outputLabels?.[port] ?? (type === "const" && port === "v" ? "value" : port)
 
   return (
     <div className={'gnode'+(data.highlight?' hl':'')} style={{ ['--accent' as any]:col }} tabIndex={0}
@@ -46,7 +47,7 @@ export function GraphNode({ id, data }:{ id:string; data:any }) {
           const pType = portType(type,p,'out') || 'unknown'
           return <Handle key={'o'+p} id={p} type="source" position={Position.Right}
             className={sel===`${id}|${p}|source`?'armed':''}
-            aria-label={`${meta.label} ${p} 출력, ${pType}`} title={`${p} · ${pType}`}
+            aria-label={`${meta.label} ${outputLabel(p)} 출력, ${pType}`} title={`${outputLabel(p)} · ${pType}`}
             onClick={(e)=>{e.stopPropagation();onPort?.(id,p,'source')}}
             style={{top:i*ROWH+ROWH/2,background:col}}/>
         })}
@@ -55,7 +56,7 @@ export function GraphNode({ id, data }:{ id:string; data:any }) {
             <div className="io-row" key={i} style={{height:ROWH}}>
               <span className="pin">{inP[i]??''}</span>
               <span className="pout">
-                {outP[i]?<><span className="pname">{outP[i]}</span>{live!=null&&<b>{fmt(live[outP[i]])}</b>}</>:''}
+                {outP[i]?<><span className="pname">{outputLabel(outP[i])}</span>{live!=null&&<b>{fmt(live[outP[i]])}</b>}</>:''}
               </span>
             </div>
           ))}

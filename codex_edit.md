@@ -196,3 +196,10 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Increased automatic node spacing and the graph's minimum zoom so larger circuits stay readable instead of shrinking into an overview.
 - Expanded the default graph workspace split and Parts Bay touch targets to make building easier.
 - Visually checked Level 1 and the 16-node Level 3 circuit: the quiz is gone, the open question remains, and enlarged nodes and ports stay aligned.
+
+## 2026-07-20 - Context-aware Const output labels (complete)
+
+- Replaced the ambiguous visible `v` label on Const blocks with the clearer `value` label.
+- When a Const is connected to one input, its output now shows the signal destination, such as `value → Ld` or `value → gain`.
+- Kept the internal `v` port key unchanged so existing graphs, validation, and simulation behavior remain compatible.
+- Confirmed the Level 3 preset renders both `value → Ld` and `value → gain` correctly.
