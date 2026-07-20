@@ -157,3 +157,14 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Added DYNO-specific run labels, target-speed HUD, hold-time progress, and completion feedback.
 - Kept circuit lap driving behind Level 2, where localization, track input, and steering are introduced.
 - Verified the full guided build and a successful target lock in 2.87s at 4x simulation speed.
+
+## 2026-07-20 - Mission-specific venues (complete)
+
+- Added a dedicated world factory so every campaign mission loads its own track geometry and venue identity.
+- First Ignition now uses a wide, flat pit apron; Level 1 keeps its long flat velocity straight.
+- Level 2 now runs on the wide ORBIT flow loop for Pure Pursuit steering.
+- Level 3 now runs on the RIDGELINE switchback course, with its calibrated clean-lap target updated from 24s to 32s.
+- Level 4 now runs through the narrow SENSOR CANYON S-course to make LiDAR gap selection meaningful.
+- Added venue and layout names to the live simulation header.
+- Headless verification: L2 completed graph clean at 35.15s, L3 completed graph clean at 30.72s, and L4 completed graph clean at 26.12s.
+- Visually verified the distinct ORBIT and RIDGELINE layouts in the running app.

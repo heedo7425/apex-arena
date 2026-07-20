@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { buildWorld, makeGraph, NT, validateGraph } from '@apex/core'
+import { makeGraph, NT, validateGraph } from '@apex/core'
 import type { Graph, GraphIssue } from '@apex/core'
 import { Editor } from '../editor/Editor'
 import { coreToRF } from '../editor/compile'
 import { Viewport } from '../sim/Viewport'
 import { useGame, useLive, useTut } from '../store'
 import { levelById, LEVELS, L2_THROTTLE_ASSIST } from './levels'
+import { missionVenue } from './worlds'
 
 const COACH: React.ReactNode[] = [
   <><b>1단계.</b> 캔버스는 비어 있습니다. PARTS BAY에서 반짝이는 <b>Const</b>를 장착하세요.</>,
@@ -136,15 +137,8 @@ function issueLabel(issue: GraphIssue): string {
 
 export function LevelScreen({ id }: { id: string }) {
   const level = levelById(id)
-  const world = useMemo(() => {
-    if (id !== 'l1') return buildWorld()
-    const provingGround = buildWorld({
-      ctrl:[[0,0],[100,0],[200,0],[260,40],[200,80],[100,80],[0,80],[-60,40],[-100,0]] as [number,number][],
-      half:7,
-    })
-    provingGround.height = { at:() => 0, grad:():[number,number] => [0,0], zmin:0, zmax:0, zlo:0, zhi:0 }
-    return provingGround
-  }, [id])
+  const venue = useMemo(() => missionVenue(id), [id])
+  const world = venue.world
   const initial = useMemo(() => coreToRF(level.starter), [id])
   const [graph, setGraph] = useState<Graph>(level.starter)
   const [hud, setHud] = useState({ speed:0, best:null as number | null, hold:0 })
@@ -268,7 +262,7 @@ export function LevelScreen({ id }: { id: string }) {
           <span />
         </button>
         <div className={'lv-pane lv-right' + (pane !== 'sim' ? ' mobile-hidden' : '')}>
-          <div className="circuit-head"><div><span>{isL1 ? 'SPEED LAB' : 'LIVE CIRCUIT'}</span><b>{isL1 ? 'STRAIGHT · CONTROL TEST' : 'ON-ROAD · SECTOR 01'}</b></div><em><i /> TELEMETRY ONLINE</em></div>
+          <div className="circuit-head"><div><span>{venue.name}</span><b>{venue.layout}</b></div><em><i /> TELEMETRY ONLINE</em></div>
           <Viewport key={simKey} world={world} graph={simGraph} canRun={canRun}
             trial={level.objective.type === 'speed' ? level.objective : undefined} onTrial={onSpeedTrial}
             onValues={(vals, info) => {
