@@ -91,7 +91,9 @@ button{cursor:pointer;font-family:var(--sans)}
 .gparams label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:10px;color:var(--mut)}
 .gparams input{width:62px;background:var(--bg);border:1px solid var(--hairS);color:var(--ink);border-radius:5px;padding:3px 6px;font-family:var(--mono);font-size:10px;text-align:right}
 .gparams input:focus{outline:none;border-color:var(--accent,#1FDDC9)}
-.react-flow__handle{width:9px;height:9px;border:1.5px solid #0a0d12;border-radius:50%}
+.react-flow__handle{width:12px;height:12px;border:1.5px solid #0a0d12;border-radius:50%;cursor:pointer}
+.react-flow__handle:hover{box-shadow:0 0 0 3px rgba(31,221,201,.35)}
+.react-flow__handle.armed{background:var(--gold) !important;box-shadow:0 0 0 4px rgba(231,178,76,.5);animation:hlpulse 1s ease-in-out infinite}
 .react-flow__edge-path{stroke:#3a4a5a;stroke-width:1.5}
 .react-flow__edge.selected .react-flow__edge-path{stroke:var(--signal)}
 .react-flow__controls{background:var(--surf);border:1px solid var(--hair);border-radius:8px;overflow:hidden}

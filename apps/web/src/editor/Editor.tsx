@@ -5,6 +5,7 @@ import '@xyflow/react/dist/style.css'
 import { GraphNode } from './GraphNode'
 import { newNode, rfToCore, type RFNode, type RFEdge } from './compile'
 import { defaultParams, metaOf, colorOf, ins, outs, PALETTE_CATS } from './nodeMeta'
+import { usePending } from '../store'
 import type { Graph } from '@apex/core'
 
 const nodeTypes = { apex: GraphNode }
@@ -17,7 +18,22 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette }:
     setNodes((nds: any) => nds.map((n: any) => n.id === id ? { ...n, data: { ...n.data, params: { ...n.data.params, [key]: val } } } : n))
     // eslint-disable-next-line
   }, [])
-  const withCb = (ns: RFNode[]) => ns.map(n => ({ ...n, data: { ...n.data, onParam, ...(decorate?.[n.id] || {}) } }))
+  // click-to-connect: click one port then a compatible port on another node
+  const pending = useRef<{ node: string; handle: string; kind: 'source' | 'target' } | null>(null)
+  const onPort = useCallback((node: string, handle: string, kind: 'source' | 'target') => {
+    const p = pending.current
+    if (p && p.kind !== kind && p.node !== node) {
+      const src = kind === 'source' ? { node, handle } : { node: p.node, handle: p.handle }
+      const tgt = kind === 'target' ? { node, handle } : { node: p.node, handle: p.handle }
+      setEdges((eds: any) => addEdge({ id: `${src.node}.${src.handle}->${tgt.node}.${tgt.handle}`, source: src.node, sourceHandle: src.handle, target: tgt.node, targetHandle: tgt.handle }, eds))
+      pending.current = null; usePending.getState().setSel(null)
+    } else {
+      pending.current = { node, handle, kind }; usePending.getState().setSel(`${node}|${handle}|${kind}`)
+    }
+    // eslint-disable-next-line
+  }, [])
+  const clearPending = () => { pending.current = null; usePending.getState().setSel(null) }
+  const withCb = (ns: RFNode[]) => ns.map(n => ({ ...n, data: { ...n.data, onParam, onPort, ...(decorate?.[n.id] || {}) } }))
 
   const [nodes, setNodes, onNodesChange] = useNodesState(withCb(initial.nodes) as any)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges as any)
@@ -37,7 +53,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette }:
 
   const addNode = (type: string) => {
     const nn = newNode(type, 40 + Math.random() * 100, 30 + Math.random() * 120)
-    setNodes((nds: any) => nds.concat({ ...nn, data: { coreType: type, params: defaultParams(type), onParam } }))
+    setNodes((nds: any) => nds.concat({ ...nn, data: { coreType: type, params: defaultParams(type), onParam, onPort } }))
   }
 
   return (
@@ -59,12 +75,13 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette }:
             </div>
           )
         })}
-        <div className="pal-note">칩을 눌러 노드 추가 · 포트를 드래그해 연결 · 노드 선택 후 Del 삭제</div>
+        <div className="pal-note">칩을 눌러 노드 추가 · <b>포트를 클릭 → 다른 포트를 클릭</b>해서 연결(드래그도 됨) · 노드 선택 후 Del 삭제</div>
       </div>}
       <div className="rf-wrap">
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes}
           onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
           onNodeClick={(_, node: any) => setInfo(node.data.coreType)}
+          onPaneClick={clearPending}
           fitView minZoom={0.3} maxZoom={2} proOptions={{ hideAttribution: true }}>
           <Background color="#222c38" gap={22} />
           <Controls showInteractive={false} />

@@ -1,7 +1,7 @@
 import React from 'react'
 import { Handle, Position } from '@xyflow/react'
 import { ins, outs, metaOf, colorOf } from './nodeMeta'
-import { useLive } from '../store'
+import { useLive, usePending } from '../store'
 
 const HEADER = 26, ROWH = 22
 
@@ -19,7 +19,9 @@ export function GraphNode({ id, data }: { id: string; data: any }) {
   const meta = metaOf(type), col = colorOf(type)
   const inP = ins(type), outP = outs(type)
   const live = useLive((s) => (s.vals ? s.vals[id] : null))
+  const sel = usePending((s) => s.sel)
   const setParam = data.onParam as ((id: string, key: string, v: number) => void) | undefined
+  const onPort = data.onPort as ((id: string, handle: string, kind: 'source' | 'target') => void) | undefined
   const nRows = Math.max(inP.length, outP.length, 1)
 
   return (
@@ -29,10 +31,14 @@ export function GraphNode({ id, data }: { id: string; data: any }) {
       <div className="gnode-io" style={{ height: nRows * ROWH }}>
         {inP.map((p, i) => (
           <Handle key={'i' + p} id={p} type="target" position={Position.Left}
+            className={sel === `${id}|${p}|target` ? 'armed' : ''}
+            onClick={(e) => { e.stopPropagation(); onPort?.(id, p, 'target') }}
             style={{ top: HEADER + i * ROWH + ROWH / 2, background: col }} />
         ))}
         {outP.map((p, i) => (
           <Handle key={'o' + p} id={p} type="source" position={Position.Right}
+            className={sel === `${id}|${p}|source` ? 'armed' : ''}
+            onClick={(e) => { e.stopPropagation(); onPort?.(id, p, 'source') }}
             style={{ top: HEADER + i * ROWH + ROWH / 2, background: col }} />
         ))}
         <div className="io-rows">

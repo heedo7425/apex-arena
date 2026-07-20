@@ -5,6 +5,11 @@ export const useLive = create<{ vals: Record<string, any> | null; setVals: (v: R
   (set) => ({ vals: null, setVals: (v) => set({ vals: v }) })
 )
 
+// ---- click-to-connect: currently armed port (nodeId|handle|kind) ----
+export const usePending = create<{ sel: string | null; setSel: (s: string | null) => void }>(
+  (set) => ({ sel: null, setSel: (sel) => set({ sel }) })
+)
+
 // ---- concept overview modal (reopenable via ? — not auto-shown; onboarding is the tutorial level) ----
 export const useTut = create<{ open: boolean; show: () => void; close: () => void }>((set) => ({
   open: false,
