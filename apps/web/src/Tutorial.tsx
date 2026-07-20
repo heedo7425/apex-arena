@@ -2,31 +2,28 @@ import React, { useState } from 'react'
 import { useTut } from './store'
 
 const STEPS = [
-  { n: '개요', h: '차의 두뇌를 그래프로 만든다', p: <>센서(LiDAR·속도·자세)가 들어오면 <b>조향·스로틀</b>을 뱉는 알고리즘을 노드로 조립합니다. 매 순간(tick) 그래프가 평가돼 차를 몹니다.</> },
-  { n: '1 · 노드', h: '팔레트에서 노드 추가', p: <>왼쪽 <b>팔레트</b>의 칩을 누르면 캔버스에 노드가 생깁니다. 노드는 센서·수학·기하·제어 같은 작은 연산 하나.</> },
-  { n: '2 · 배선', h: '포트를 드래그해 연결', p: <>노드의 <b>출력 포트</b>(오른쪽 점)를 다른 노드의 <b>입력 포트</b>(왼쪽 점)로 드래그. 데이터가 그 선을 따라 흐릅니다.</> },
-  { n: '3 · 프로브', h: '실시간 값 보기', p: <>출력 포트 옆 숫자는 지금 그 와이어에 흐르는 <b>실시간 값</b>. 알고리즘이 뭘 계산하는지 그대로 보입니다.</> },
-  { n: '4 · 실행', h: '▶ 재생 → 목표 달성', p: <>오른쪽 시뮬에서 재생하면 그래프대로 차가 달립니다. <b>클린 랩</b>(목표)을 달성하면 레벨 클리어 + 새 노드 언락.</> },
+  { n:'개요', h:'센서에서 행동까지, 선으로 연결합니다', p:<>센서가 만든 데이터를 수학·기하·제어 노드에 흘려보내 <b>STEER와 THROTTLE</b>을 계산합니다.</> },
+  { n:'1 · 노드', h:'팔레트에서 필요한 계산을 꺼냅니다', p:<>왼쪽 팔레트의 칩을 누르면 겹치지 않는 위치에 노드가 추가됩니다. 노드를 클릭하면 역할과 실제 로보틱스 의미를 볼 수 있어요.</> },
+  { n:'2 · 연결', h:'포트를 차례로 클릭합니다', p:<>출력 포트를 클릭한 뒤 호환되는 입력 포트를 클릭하세요. 드래그도 가능합니다. 맞지 않는 타입이면 이유를 바로 알려줍니다.</> },
+  { n:'3 · 관찰', h:'실시간 값으로 생각을 들여다봅니다', p:<>실행 중 출력 포트 옆 숫자가 계속 변합니다. 차량이 왜 그렇게 움직였는지 그래프에서 역추적할 수 있어요.</> },
+  { n:'4 · 실행', h:'준비 신호가 켜지면 트랙으로', p:<>필수 연결이 끝나면 <b>실행 준비됨</b>이 표시됩니다. 실행하고 목표를 달성하면 다음 알고리즘이 열립니다.</> },
 ]
 
 export function Tutorial() {
   const close = useTut((s) => s.close)
   const [i, setI] = useState(0)
-  const last = i === STEPS.length - 1
-  const s = STEPS[i]
+  const last = i === STEPS.length-1, step = STEPS[i]
   return (
     <div className="tut-overlay" onClick={close}>
-      <div className="tut" onClick={(e) => e.stopPropagation()}>
-        <div className="step-n">{s.n}</div>
-        <h3>{s.h}</h3>
-        <p>{s.p}</p>
+      <div className="tut" role="dialog" aria-modal="true" aria-labelledby="tutorial-title" onClick={e => e.stopPropagation()}>
+        <button className="tut-close" aria-label="도움말 닫기" onClick={close}>×</button>
+        <div className="step-n">{step.n}</div>
+        <h3 id="tutorial-title">{step.h}</h3>
+        <p>{step.p}</p>
         <div className="tut-nav">
-          <div className="dots">{STEPS.map((_, k) => <i key={k} className={k === i ? 'on' : ''} />)}</div>
-          {i > 0 && <button onClick={() => setI(i - 1)}>이전</button>}
-          {!last
-            ? <button className="primary" onClick={() => setI(i + 1)}>다음</button>
-            : <button className="primary" onClick={close}>시작하기</button>}
-          {!last && <button onClick={close}>건너뛰기</button>}
+          <div className="dots" aria-label={`${i+1}/${STEPS.length}`}>{STEPS.map((_,k)=><i key={k} className={k===i?'on':''}/>)}</div>
+          {i>0 && <button onClick={()=>setI(i-1)}>이전</button>}
+          {!last ? <button className="primary" onClick={()=>setI(i+1)}>다음</button> : <button className="primary" onClick={close}>확인</button>}
         </div>
       </div>
     </div>

@@ -2,88 +2,86 @@ import { makeGraph } from '@apex/core'
 import type { Graph } from '@apex/core'
 
 export type Objective = { type: 'clean' } | { type: 'time'; target: number }
-export type Level = { id: string; n: number; title: string; teach: string; palette: string[]; objective: Objective; starter: Graph }
+export type Requirement = { type:string; label:string }
+export type Level = {
+  id:string; n:number; title:string; kicker:string; teach:string; palette:string[]
+  objective:Objective; starter:Graph; requirements:Requirement[]; unlock:string
+}
 
-// L1 — Throttle: steering is given (pursuit); build a speed controller.
+// L1: steering is complete; the learner wires the speed-control chain.
 const L1: Graph = makeGraph({
-  pose:{type:'src.pose'}, track:{type:'src.track'},
-  Ld:{type:'const',params:{value:6}},
+  pose:{type:'src.pose'}, track:{type:'src.track'}, Ld:{type:'const',params:{value:6}},
   look:{type:'std.lookahead',in:{pose:['n','pose','pose'],track:['n','track','track'],Ld:['n','Ld','v']}},
   e:{type:'std.tocar',in:{pt:['n','look','pt'],pose:['n','pose','pose']}},
-  k:{type:'std.pursuitCurv',in:{e:['n','e','e']}},
-  gain:{type:'const',params:{value:1}},
+  k:{type:'std.pursuitCurv',in:{e:['n','e','e']}}, gain:{type:'const',params:{value:1}},
   steer:{type:'std.steerFromCurv',in:{k:['n','k','k'],gain:['n','gain','v']}},
   ssink:{type:'sink.steer',in:{x:['n','steer','steer']}},
-  tconst:{type:'const',params:{value:0.4}},
-  tsink:{type:'sink.throttle',in:{x:['n','tconst','v']}},
+  speed:{type:'src.speed'}, vt:{type:'const',params:{value:8}},
+  verr:{type:'sub'}, pid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0}},
+  thr:{type:'clamp',params:{lo:-1,hi:1}}, tsink:{type:'sink.throttle'},
 })
 
-// L2 — Steer: throttle is given; build Pure Pursuit steering (now the straight one crashes).
+// L2: throttle is complete; the learner wires the Pure Pursuit chain.
 const L2: Graph = makeGraph({
-  speed:{type:'src.speed'},
-  vt:{type:'const',params:{value:8}},
+  speed:{type:'src.speed'}, vt:{type:'const',params:{value:8}},
   verr:{type:'sub',in:{a:['n','vt','v'],b:['n','speed','v']}},
   pid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0},in:{err:['n','verr','v']}},
   thr:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','pid','u']}},
   tsink:{type:'sink.throttle',in:{x:['n','thr','v']}},
-  s0:{type:'const',params:{value:0}},
-  ssink:{type:'sink.steer',in:{x:['n','s0','v']}},
+  pose:{type:'src.pose'}, track:{type:'src.track'}, Ld:{type:'const',params:{value:6}},
+  look:{type:'std.lookahead'}, e:{type:'std.tocar'}, k:{type:'std.pursuitCurv'},
+  gain:{type:'const',params:{value:1}}, steer:{type:'std.steerFromCurv'}, ssink:{type:'sink.steer'},
 })
 
-// L3 — Corner speed: constant speed goes off in corners; add curvature→grip speed.
+// L3: steering and PID are complete; replace constant target speed with a grip-aware target.
 const L3: Graph = makeGraph({
   pose:{type:'src.pose'}, track:{type:'src.track'}, speed:{type:'src.speed'},
   Ld:{type:'const',params:{value:6}},
   look:{type:'std.lookahead',in:{pose:['n','pose','pose'],track:['n','track','track'],Ld:['n','Ld','v']}},
   e:{type:'std.tocar',in:{pt:['n','look','pt'],pose:['n','pose','pose']}},
-  k:{type:'std.pursuitCurv',in:{e:['n','e','e']}},
-  gain:{type:'const',params:{value:1}},
+  k:{type:'std.pursuitCurv',in:{e:['n','e','e']}}, gain:{type:'const',params:{value:1}},
   steer:{type:'std.steerFromCurv',in:{k:['n','k','k'],gain:['n','gain','v']}},
   ssink:{type:'sink.steer',in:{x:['n','steer','steer']}},
-  vt:{type:'const',params:{value:12}},
-  verr:{type:'sub',in:{a:['n','vt','v'],b:['n','speed','v']}},
+  curve:{type:'std.curvAhead'}, grip:{type:'std.gripSpeed',params:{vmax:13,margin:0.85}},
+  verr:{type:'sub',in:{b:['n','speed','v']}},
   pid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0},in:{err:['n','verr','v']}},
   thr:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','pid','u']}},
   tsink:{type:'sink.throttle',in:{x:['n','thr','v']}},
 })
 
-// L4 — Sense the gap: steer straight; use LiDAR + argmax to follow the widest gap.
+// L4: throttle is complete; build angle = a0 + argmax(ranges) * da.
 const L4: Graph = makeGraph({
-  scan:{type:'src.scan'}, speed:{type:'src.speed'},
-  vt:{type:'const',params:{value:10}},
+  speed:{type:'src.speed'}, vt:{type:'const',params:{value:10}},
   verr:{type:'sub',in:{a:['n','vt','v'],b:['n','speed','v']}},
   pid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0},in:{err:['n','verr','v']}},
   thr:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','pid','u']}},
   tsink:{type:'sink.throttle',in:{x:['n','thr','v']}},
-  s0:{type:'const',params:{value:0}},
-  ssink:{type:'sink.steer',in:{x:['n','s0','v']}},
+  scan:{type:'src.scan'}, gap:{type:'array.argmax'}, beam:{type:'mul'},
+  angle:{type:'add'}, safe:{type:'clamp',params:{lo:-1,hi:1}}, ssink:{type:'sink.steer'},
 })
 
-// TUT — from scratch: steering is given & wired, but THROTTLE is empty (car can't move).
-// Player adds a Const and wires it to THROTTLE → first time making the car go.
-const TUT: Graph = makeGraph({
-  pose:{type:'src.pose'}, track:{type:'src.track'}, speed:{type:'src.speed'},
-  Ld:{type:'const',params:{value:6}},
-  look:{type:'std.lookahead',in:{pose:['n','pose','pose'],track:['n','track','track'],Ld:['n','Ld','v']}},
-  e:{type:'std.tocar',in:{pt:['n','look','pt'],pose:['n','pose','pose']}},
-  k:{type:'std.pursuitCurv',in:{e:['n','e','e']}},
-  gain:{type:'const',params:{value:1}},
-  steer:{type:'std.steerFromCurv',in:{k:['n','k','k'],gain:['n','gain','v']}},
-  ssink:{type:'sink.steer',in:{x:['n','steer','steer']}},
-  tsink:{type:'sink.throttle'},                          // ← empty on purpose (player wires it)
-})
-export const TUT_STARTER_N = Object.keys(TUT.nodes).length
+/* The first mission starts as a true blank build: install power and an actuator. */
+const TUT: Graph = makeGraph({})
 
 export const LEVELS: Level[] = [
-  { id:'tut', n:0, title:'튜토리얼 (Tutorial)', teach:'차는 STEER·THROTTLE 두 출력으로 달려. 조향은 이미 됐어 — 네가 THROTTLE을 직접 이어서 차를 처음 굴려보자. 오른쪽 아래 안내를 따라와.',
-    palette:['const'], objective:{type:'clean'}, starter:TUT },
-  { id:'l1', n:1, title:'스로틀 (Throttle)', teach:'조향은 주어져 있어. 속도 제어를 그래프로 짜자 — 목표속도 const에서 speed를 빼고(sub) → PID → clamp → THROTTLE. 노드를 이어봐.',
-    palette:['const','sub','ctrl.pid','clamp','src.speed','sink.throttle'], objective:{type:'clean'}, starter:L1 },
-  { id:'l2', n:2, title:'조향 (Steer)', teach:'이번엔 스로틀이 주어져. 지금은 직진해서 코너에서 나가떨어져. Pure Pursuit 조향을 조립: Lookahead point → To car frame → Pursuit curvature → Steer.',
-    palette:['const','src.pose','src.track','std.lookahead','std.tocar','std.pursuitCurv','std.steerFromCurv','sink.steer'], objective:{type:'clean'}, starter:L2 },
-  { id:'l3', n:3, title:'코너 감속 (Corner speed)', teach:'상수 속도로는 코너에서 밀려나. Curvature ahead → Grip speed로 목표속도를 곡률에 맞춰 스스로 줄여봐. 클린 랩 24초 이내.',
-    palette:['const','sub','ctrl.pid','clamp','src.speed','src.pose','src.track','std.curvAhead','std.gripSpeed','sink.throttle'], objective:{type:'time',target:24}, starter:L3 },
-  { id:'l4', n:4, title:'갭 감지 (Sense the gap)', teach:'트랙 지오메트리 대신 LiDAR로. scan.ranges에서 argmax로 가장 먼 빔을 찾아 → 그 각도(a0+beam·da)로 조향. 배열·argmax를 써서 Follow-the-Gap을 짜봐.',
-    palette:['src.scan','const','mul','add','abs','array.argmax','array.max','clamp','sink.steer'], objective:{type:'clean'}, starter:L4 },
+  { id:'tut', n:0, title:'첫 시동', kicker:'FIRST IGNITION',
+    teach:'빈 캔버스에 동력과 출력을 직접 장착해, 네 첫 제어 신호로 차량을 움직여라.',
+    palette:['const','sink.throttle'], objective:{type:'clean'}, starter:TUT, requirements:[], unlock:'Const · THROTTLE' },
+  { id:'l1', n:1, title:'속도를 붙잡아라', kicker:'THROTTLE CONTROL',
+    teach:'목표속도에서 현재속도를 빼고 PID와 Clamp를 거쳐 THROTTLE까지 연결하세요.',
+    palette:['const','sub','ctrl.pid','clamp','src.speed','sink.throttle'], objective:{type:'clean'}, starter:L1,
+    requirements:[{type:'sub',label:'속도 오차 계산'},{type:'ctrl.pid',label:'PID 제어'},{type:'clamp',label:'출력 제한'}], unlock:'PID · Clamp' },
+  { id:'l2', n:2, title:'코너를 읽어라', kicker:'PURE PURSUIT',
+    teach:'Pose와 Track에서 목표점을 찾고, 차 좌표계와 곡률을 거쳐 STEER까지 연결하세요.',
+    palette:['const','src.pose','src.track','std.lookahead','std.tocar','std.pursuitCurv','std.steerFromCurv','sink.steer'], objective:{type:'clean'}, starter:L2,
+    requirements:[{type:'std.lookahead',label:'전방 목표점'},{type:'std.tocar',label:'차 좌표 변환'},{type:'std.pursuitCurv',label:'추종 곡률'}], unlock:'Pure Pursuit' },
+  { id:'l3', n:3, title:'그립의 한계', kicker:'CORNER SPEED',
+    teach:'전방 곡률로 안전 속도를 계산해 PID의 목표속도로 넣고 24초 안에 완주하세요.',
+    palette:['sub','ctrl.pid','clamp','src.speed','src.pose','src.track','std.curvAhead','std.gripSpeed','sink.throttle'], objective:{type:'time',target:24}, starter:L3,
+    requirements:[{type:'std.curvAhead',label:'전방 곡률'},{type:'std.gripSpeed',label:'그립 속도'}], unlock:'곡률 기반 속도 계획' },
+  { id:'l4', n:4, title:'보이지 않는 길', kicker:'FOLLOW THE GAP',
+    teach:'LiDAR 거리 배열의 가장 넓은 빔을 찾아 각도로 바꾸고 STEER까지 연결하세요.',
+    palette:['src.scan','mul','add','array.argmax','clamp','sink.steer'], objective:{type:'clean'}, starter:L4,
+    requirements:[{type:'src.scan',label:'LiDAR 감지'},{type:'array.argmax',label:'최대 간격 탐색'},{type:'mul',label:'빔 각도 변환'},{type:'add',label:'조향각 합성'}], unlock:'Follow-the-Gap' },
 ]
 export const levelById = (id: string) => LEVELS.find(l => l.id === id)!

@@ -7,28 +7,26 @@ type Props = {
   world: World
   graph: Graph
   seed?: number
-  autoplay?: boolean
+  canRun?: boolean
   onValues?: (lastVal: Record<string, any> | null, info: { speed:number; lapT:number; best:number|null }) => void
   onLap?: (t: number, dirty: boolean) => void
 }
 const CW = 1200, CH = 760
 
-export function Viewport({ world, graph, seed = 1, autoplay = true, onValues, onLap }: Props) {
+export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLap }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const simRef = useRef<ReturnType<typeof makeSim> | null>(null)
   const terrainRef = useRef<HTMLCanvasElement | null>(null)
   const camRef = useRef<Cam | null>(null)
   const argmaxId = useRef<string | null>(null)
-  const runRef = useRef(true)
+  const runRef = useRef(false)
   const speedRef = useRef(1)
-  const [running, setRunning] = useState(autoplay)
+  const [running, setRunning] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [lapMsg, setLapMsg] = useState<string>('READY')
-  // keep latest callbacks (loop effect captures once)
   const onValuesRef = useRef(onValues); const onLapRef = useRef(onLap)
   useEffect(() => { onValuesRef.current = onValues; onLapRef.current = onLap })
 
-  // (re)build sim when world changes
   useEffect(() => {
     simRef.current = makeSim(world, graph, seed)
     terrainRef.current = buildTerrain(world, CW, CH)
@@ -36,16 +34,18 @@ export function Viewport({ world, graph, seed = 1, autoplay = true, onValues, on
     // eslint-disable-next-line
   }, [world])
 
-  // hot-swap graph without resetting car position (live editing)
+  // Editing changes the program: pause and restart so every attempt is comparable.
   useEffect(() => {
-    if (simRef.current) { simRef.current.graph = graph; simRef.current.graphState = {} }
+    simRef.current = makeSim(world, graph, seed)
     argmaxId.current = graph.order.find(id => graph.nodes[id].type === 'array.argmax') || null
-  }, [graph])
+    setRunning(false)
+    setLapMsg(canRun ? 'READY' : 'WIRE GRAPH')
+  }, [graph, world, seed, canRun])
 
+  useEffect(() => { if (!canRun) setRunning(false) }, [canRun])
   useEffect(() => { runRef.current = running }, [running])
   useEffect(() => { speedRef.current = speed }, [speed])
 
-  // main loop
   useEffect(() => {
     let raf = 0, last = 0, acc = 0, valAcc = 0
     const loop = (ts: number) => {
@@ -57,7 +57,7 @@ export function Viewport({ world, graph, seed = 1, autoplay = true, onValues, on
         if (runRef.current) {
           acc += dt * speedRef.current
           let g = 0, prevLaps = s.laps.length
-          try { while (acc >= DT && g < 2000) { tick(s); acc -= DT; g++ } } catch (e:any) { setLapMsg('ERR: ' + (e?.message||e)) }
+          try { while (acc >= DT && g < 2000) { tick(s); acc -= DT; g++ } } catch (e:any) { setLapMsg('ERR: ' + (e?.message||e)); setRunning(false) }
           if (s.laps.length > prevLaps) {
             const lp = s.laps[s.laps.length - 1]
             setLapMsg((lp.dirty ? 'DIRTY ' : 'LAP ') + lp.t.toFixed(3) + 's')
@@ -77,21 +77,27 @@ export function Viewport({ world, graph, seed = 1, autoplay = true, onValues, on
     // eslint-disable-next-line
   }, [world])
 
-  const reset = () => { if (simRef.current) simRef.current = makeSim(world, graph, seed); setLapMsg('READY') }
-  const stepN = () => { const s = simRef.current; if (s) { try { for (let i=0;i<12;i++) tick(s) } catch {} } }
+  const reset = () => {
+    simRef.current = makeSim(world, graph, seed)
+    setRunning(false)
+    setLapMsg(canRun ? 'READY' : 'WIRE GRAPH')
+  }
+  const stepN = () => { const s = simRef.current; if (s && canRun) { try { for (let i=0;i<12;i++) tick(s) } catch {} } }
 
   return (
     <div className="viewport">
       <div className="vp-stage">
-        <div className="vp-tag"><span className="dot" /> SIM · {lapMsg}</div>
+        <div className={'vp-tag' + (canRun ? '' : ' blocked')}><span className="dot" /> SIM · {lapMsg}</div>
         <canvas ref={canvasRef} width={CW} height={CH} />
+        {!canRun && <div className="vp-lock"><b>차량 대기 중</b><span>제어 링크를 완성하면 출전할 수 있어요.</span></div>}
       </div>
       <div className="vp-controls">
-        <button className={running ? 'on' : ''} onClick={() => setRunning(r => !r)}>{running ? '⏸ 일시정지' : '⏵ 재생'}</button>
-        <button onClick={stepN} disabled={running}>⏭ 스텝</button>
+        <button className={'run-btn' + (running ? ' on' : '')} disabled={!canRun}
+          onClick={() => setRunning(r => !r)}>{running ? '⏸ 일시정지' : '▶ 주행 시작'}</button>
+        <button onClick={stepN} disabled={running || !canRun}>⏭ 스텝</button>
         <button onClick={reset}>↻ 리셋</button>
-        <span className="sp">속도</span>
-        {[0.5, 1, 2, 4].map(x => <button key={x} className={speed === x ? 'on' : ''} onClick={() => setSpeed(x)}>{x}×</button>)}
+        <span className="sp">배속</span>
+        {[0.5, 1, 2, 4].map(x => <button key={x} disabled={!canRun} className={speed === x ? 'on' : ''} onClick={() => setSpeed(x)}>{x}×</button>)}
       </div>
     </div>
   )

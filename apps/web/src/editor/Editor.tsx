@@ -3,7 +3,7 @@ import { ReactFlow, ReactFlowProvider, Background, Controls, addEdge,
   useNodesState, useEdgesState, type Connection } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { GraphNode } from './GraphNode'
-import { newNode, rfToCore, type RFNode, type RFEdge } from './compile'
+import { connectionIssue, graphReady, newNode, rfToCore, type RFNode, type RFEdge } from './compile'
 import { defaultParams, metaOf, colorOf, ins, outs, PALETTE_CATS } from './nodeMeta'
 import { usePending } from '../store'
 import type { Graph } from '@apex/core'
@@ -12,98 +12,121 @@ const nodeTypes = { apex: GraphNode }
 
 type Decorate = Record<string, { label?: string; highlight?: boolean; tag?: string }>
 function EditorInner({ initial, palette, onGraph, decorate, highlightPalette }:
-  { initial: { nodes: RFNode[]; edges: RFEdge[] }; palette: string[]; onGraph: (g: Graph) => void; decorate?: Decorate; highlightPalette?: string }) {
+  { initial:{nodes:RFNode[];edges:RFEdge[]}; palette:string[]; onGraph:(g:Graph)=>void; decorate?:Decorate; highlightPalette?:string }) {
 
-  const onParam = useCallback((id: string, key: string, val: number) => {
-    setNodes((nds: any) => nds.map((n: any) => n.id === id ? { ...n, data: { ...n.data, params: { ...n.data.params, [key]: val } } } : n))
+  const compact = typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches
+  const arranged = compact ? initial.nodes.map((n,i)=>({...n,position:{x:10+(i%2)*185,y:70+Math.floor(i/2)*105}})) : initial.nodes
+  const latest = useRef<{nodes:RFNode[];edges:RFEdge[]}>({nodes:arranged,edges:initial.edges})
+  const [notice,setNotice] = useState<string|null>(null)
+  const [bayOpen,setBayOpen] = useState(true)
+  const onParam = useCallback((id:string,key:string,val:number)=>{
+    setNodes((nds:any)=>nds.map((n:any)=>n.id===id?{...n,data:{...n.data,params:{...n.data.params,[key]:val}}}:n))
     // eslint-disable-next-line
-  }, [])
-  // click-to-connect: click one port then a compatible port on another node
-  const pending = useRef<{ node: string; handle: string; kind: 'source' | 'target' } | null>(null)
-  const onPort = useCallback((node: string, handle: string, kind: 'source' | 'target') => {
-    const p = pending.current
-    if (p && p.kind !== kind && p.node !== node) {
-      const src = kind === 'source' ? { node, handle } : { node: p.node, handle: p.handle }
-      const tgt = kind === 'target' ? { node, handle } : { node: p.node, handle: p.handle }
-      setEdges((eds: any) => addEdge({ id: `${src.node}.${src.handle}->${tgt.node}.${tgt.handle}`, source: src.node, sourceHandle: src.handle, target: tgt.node, targetHandle: tgt.handle }, eds))
-      pending.current = null; usePending.getState().setSel(null)
-    } else {
-      pending.current = { node, handle, kind }; usePending.getState().setSel(`${node}|${handle}|${kind}`)
+  },[])
+  const pending = useRef<{node:string;handle:string;kind:'source'|'target'}|null>(null)
+  const onPort = useCallback((node:string,handle:string,kind:'source'|'target')=>{
+    const p=pending.current
+    if(p&&p.kind!==kind&&p.node!==node){
+      const src=kind==='source'?{node,handle}:{node:p.node,handle:p.handle}
+      const tgt=kind==='target'?{node,handle}:{node:p.node,handle:p.handle}
+      const issue=connectionIssue(latest.current.nodes,latest.current.edges,src.node,src.handle,tgt.node,tgt.handle)
+      if(issue){setNotice(issue);pending.current=null;usePending.getState().setSel(null);return}
+      setEdges((eds:any)=>addEdge({id:`${src.node}.${src.handle}->${tgt.node}.${tgt.handle}`,source:src.node,sourceHandle:src.handle,target:tgt.node,targetHandle:tgt.handle},eds))
+      setNotice('링크 체결 완료 · 데이터 신호가 흐릅니다.')
+      pending.current=null;usePending.getState().setSel(null)
+    }else{
+      pending.current={node,handle,kind};usePending.getState().setSel(`${node}|${handle}|${kind}`)
+      setNotice(kind==='source'?'신호를 받을 입력 포트를 선택하세요.':'신호를 보낼 출력 포트를 선택하세요.')
     }
     // eslint-disable-next-line
-  }, [])
-  const clearPending = () => { pending.current = null; usePending.getState().setSel(null) }
-  const withCb = (ns: RFNode[]) => ns.map(n => ({ ...n, data: { ...n.data, onParam, onPort, ...(decorate?.[n.id] || {}) } }))
+  },[])
+  const clearPending=()=>{pending.current=null;usePending.getState().setSel(null);setNotice(null)}
+  const withCb=(ns:RFNode[])=>ns.map(n=>({...n,data:{...n.data,onParam,onPort,...(decorate?.[n.id]||{})}}))
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(withCb(initial.nodes) as any)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges as any)
-  const [info, setInfo] = useState<string | null>(null)
+  const [nodes,setNodes,onNodesChange]=useNodesState(withCb(arranged) as any)
+  const [edges,setEdges,onEdgesChange]=useEdgesState(initial.edges as any)
+  const [info,setInfo]=useState<string|null>(null)
+  latest.current={nodes:nodes as any,edges:edges as any}
 
-  const onConnect = useCallback((c: Connection) => {
-    setEdges((eds: any) => addEdge({ ...c, id: `${c.source}.${c.sourceHandle}->${c.target}.${c.targetHandle}` }, eds))
-  }, [setEdges])
+  const onConnect=useCallback((c:Connection)=>{
+    if(!c.source||!c.sourceHandle||!c.target||!c.targetHandle)return
+    const issue=connectionIssue(latest.current.nodes,latest.current.edges,c.source,c.sourceHandle,c.target,c.targetHandle)
+    if(issue){setNotice(issue);return}
+    setEdges((eds:any)=>addEdge({...c,id:`${c.source}.${c.sourceHandle}->${c.target}.${c.targetHandle}`},eds))
+    setNotice('링크 체결 완료 · 데이터 신호가 흐릅니다.')
+  },[setEdges])
 
-  // recompile ONLY on structural change (not on live-value updates)
-  const sigRef = useRef('')
-  useEffect(() => {
-    const sig = JSON.stringify([nodes.map((n: any) => [n.id, n.data.coreType, n.data.params]),
-      edges.map((e: any) => [e.source, e.sourceHandle, e.target, e.targetHandle])])
-    if (sig !== sigRef.current) { sigRef.current = sig; onGraph(rfToCore(nodes as any, edges as any)) }
-  }, [nodes, edges, onGraph])
+  const sigRef=useRef('')
+  useEffect(()=>{
+    const sig=JSON.stringify([nodes.map((n:any)=>[n.id,n.data.coreType,n.data.params]),edges.map((e:any)=>[e.source,e.sourceHandle,e.target,e.targetHandle])])
+    if(sig!==sigRef.current){sigRef.current=sig;onGraph(rfToCore(nodes as any,edges as any))}
+  },[nodes,edges,onGraph])
 
-  const addNode = (type: string) => {
-    const nn = newNode(type, 40 + Math.random() * 100, 30 + Math.random() * 120)
-    setNodes((nds: any) => nds.concat({ ...nn, data: { coreType: type, params: defaultParams(type), onParam, onPort } }))
+  const addNode=(type:string)=>{
+    const index=nodes.length
+    const nn=newNode(type,compact?10+(index%2)*185:70+(index%3)*210,compact?70+Math.floor(index/2)*105:70+(Math.floor(index/3)%4)*110)
+    setNodes((nds:any)=>nds.concat({...nn,data:{coreType:type,params:defaultParams(type),onParam,onPort}}))
+    setNotice(`${metaOf(type).label} 파트를 장착했습니다.`)
+    if(compact)setBayOpen(false)
   }
 
+  const ready=graphReady(nodes as any,edges as any)
+
   return (
-    <div className={'editor' + (palette.length ? '' : ' no-pal')}>
-      {palette.length > 0 && <div className="palette">
-        <div className="palette-h">노드 팔레트</div>
-        {PALETTE_CATS.map(g => {
-          const types = g.types.filter(t => palette.includes(t))
-          if (!types.length) return null
-          return (
-            <div className="pal-cat" key={g.cat}>
-              <div className="pal-cat-h" style={{ color: colorOf(types[0]) }}>{g.cat}</div>
-              <div className="pal-chips">
-                {types.map(t => (
-                  <button key={t} className={'pal-chip' + (t === highlightPalette ? ' hl' : '')} onClick={() => addNode(t)} onMouseEnter={() => setInfo(t)}
-                    style={{ borderColor: colorOf(t) }}>{metaOf(t).label}</button>
-                ))}
-              </div>
+    <div className="editor">
+      <div className="editor-mode"><span>BUILD MODE</span><b>CONTROL GRAPH</b></div>
+      {palette.length>0&&<button className={'parts-toggle'+(highlightPalette?' hl':'')} onClick={()=>setBayOpen(v=>!v)} aria-expanded={bayOpen}>
+        <span className="parts-icon">＋</span><span><small>LOADOUT</small><b>PARTS BAY</b></span><em>{palette.length}</em>
+      </button>}
+      {palette.length>0&&bayOpen&&<div className="palette parts-bay">
+        <div className="parts-head">
+          <div><span>GARAGE LOADOUT</span><b>제어 파트 장착</b></div>
+          <button aria-label="파트 베이 닫기" onClick={()=>setBayOpen(false)}>×</button>
+        </div>
+        <div className="parts-grid">
+          {PALETTE_CATS.map(g=>{
+            const types=g.types.filter(t=>palette.includes(t))
+            if(!types.length)return null
+            return <div className="pal-cat" key={g.cat}>
+              <div className="pal-cat-h" style={{color:colorOf(types[0])}}>{g.cat}</div>
+              <div className="pal-chips">{types.map(t=>
+                <button key={t} className={'pal-chip'+(t===highlightPalette?' hl':'')} onClick={()=>addNode(t)} onMouseEnter={()=>setInfo(t)}
+                  style={{['--part' as any]:colorOf(t)}}>
+                  <i>+</i><span>{metaOf(t).label}</span>
+                </button>)}</div>
             </div>
-          )
-        })}
-        <div className="pal-note">칩을 눌러 노드 추가 · <b>포트를 클릭 → 다른 포트를 클릭</b>해서 연결(드래그도 됨) · 노드 선택 후 Del 삭제</div>
+          })}
+        </div>
+        <div className="pal-note">파트 선택 → 캔버스 장착 → 신호 포트 체결</div>
       </div>}
       <div className="rf-wrap">
+        <div className={'graph-feedback '+(notice?'active':ready?'ready':'waiting')} role="status" aria-live="polite">
+          <span className="gf-dot"/>{notice||(ready?'CONTROL ONLINE · 출전 준비 완료':'CONTROL OFFLINE · 출력 링크를 완성하세요')}
+        </div>
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes}
           onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
-          onNodeClick={(_, node: any) => setInfo(node.data.coreType)}
-          onPaneClick={clearPending}
-          fitView minZoom={0.3} maxZoom={2} proOptions={{ hideAttribution: true }}>
-          <Background color="#222c38" gap={22} />
-          <Controls showInteractive={false} />
+          isValidConnection={c=>!!c.source&&!!c.sourceHandle&&!!c.target&&!!c.targetHandle&&!connectionIssue(latest.current.nodes,latest.current.edges,c.source,c.sourceHandle,c.target,c.targetHandle)}
+          onNodeClick={(_,node:any)=>setInfo(node.data.coreType)} onPaneClick={clearPending}
+          fitView minZoom={0.3} maxZoom={2} proOptions={{hideAttribution:true}}>
+          <Background color="#314052" gap={24} size={1}/>
+          <Controls showInteractive={false}/>
         </ReactFlow>
-        <div className="node-info">
-          {info ? (
-            <>
-              <div className="ni-h" style={{ color: colorOf(info) }}>{metaOf(info).label}<span className="ni-cat">{metaOf(info).cat}</span></div>
-              <p>{metaOf(info).desc || '설명 준비 중.'}</p>
-              {metaOf(info).real && <p className="ni-real">◆ {metaOf(info).real}</p>}
-              <div className="ni-ports">
-                {ins(info).length > 0 && <span>입력 <b>{ins(info).join(', ')}</b></span>}
-                {outs(info).length > 0 && <span>출력 <b>{outs(info).join(', ')}</b></span>}
-              </div>
-            </>
-          ) : <span className="ni-hint">노드를 클릭하거나 팔레트 칩에 마우스를 올리면 설명이 나와요.</span>}
-        </div>
+        {info&&<div className="node-info">
+          <button className="ni-close" aria-label="파트 정보 닫기" onClick={()=>setInfo(null)}>×</button>
+          <div className="ni-cap">PART INSPECT</div>
+          <div className="ni-h" style={{color:colorOf(info)}}>{metaOf(info).label}<span className="ni-cat">{metaOf(info).cat}</span></div>
+          <p>{metaOf(info).desc||'설명 준비 중.'}</p>
+          {metaOf(info).real&&<p className="ni-real">◆ {metaOf(info).real}</p>}
+          <div className="ni-ports">
+            {ins(info).length>0&&<span>IN <b>{ins(info).join(', ')}</b></span>}
+            {outs(info).length>0&&<span>OUT <b>{outs(info).join(', ')}</b></span>}
+          </div>
+        </div>}
       </div>
     </div>
   )
 }
 
-export function Editor(props: { initial: { nodes: RFNode[]; edges: RFEdge[] }; palette: string[]; onGraph: (g: Graph) => void; decorate?: Decorate; highlightPalette?: string }) {
-  return <ReactFlowProvider><EditorInner {...props} /></ReactFlowProvider>
+export function Editor(props:{initial:{nodes:RFNode[];edges:RFEdge[]};palette:string[];onGraph:(g:Graph)=>void;decorate?:Decorate;highlightPalette?:string}){
+  return <ReactFlowProvider><EditorInner {...props}/></ReactFlowProvider>
 }

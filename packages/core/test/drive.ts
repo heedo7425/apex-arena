@@ -30,5 +30,38 @@ import { NT } from '../src/graph/registry.ts';
 ok(!!NT['sim.predict'] && NT['sim.predict'].kind === 'builtin', 'hook: sim.predict (model-as-node) present');
 ok(!!NT['rng.uniform'] && !!NT['array.map'], 'hooks: rng + higher-order Map present');
 
+
+// 5) Graph validation prevents invalid editor programs before simulation starts.
+import { makeGraph } from '../src/graph/engine.ts';
+import { validateGraph } from '../src/graph/validate.ts';
+
+const validOutputs = makeGraph({
+  steer:{ type:'sink.steer', in:{ x:['lit', 0] } },
+  throttle:{ type:'sink.throttle', in:{ x:['lit', 0] } },
+});
+ok(validateGraph(validOutputs, NT, { requireOutputs:true }).length === 0, 'validator accepts a runnable output graph');
+
+const typeMismatch = makeGraph({
+  pose:{ type:'src.pose' },
+  throttle:{ type:'sink.throttle', in:{ x:['n', 'pose', 'pose'] } },
+});
+ok(validateGraph(typeMismatch, NT).some(i => i.code === 'type-mismatch'), 'validator rejects incompatible port types');
+
+const cycle = makeGraph({
+  a:{ type:'add', in:{ a:['n', 'b', 'v'] } },
+  b:{ type:'add', in:{ a:['n', 'a', 'v'] } },
+});
+ok(validateGraph(cycle, NT).some(i => i.code === 'cycle'), 'validator rejects graph cycles');
+
+const missingOutput = makeGraph({ steer:{ type:'sink.steer', in:{ x:['lit', 0] } } });
+ok(validateGraph(missingOutput, NT, { requireOutputs:true }).some(i => i.code === 'missing-output'), 'validator requires both control outputs');
+
+const unwiredInput = makeGraph({
+  add:{ type:'add', in:{ a:['lit', 1] } },
+  steer:{ type:'sink.steer', in:{ x:['n', 'add', 'v'] } },
+  throttle:{ type:'sink.throttle', in:{ x:['lit', 0] } },
+});
+ok(validateGraph(unwiredInput, NT, { requireOutputs:true }).some(i => i.code === 'unwired-input'), 'validator rejects incomplete active paths');
+
 console.log(failed === 0 ? '\n✅ ALL PASS — core drives deterministically' : '\n❌ ' + failed + ' FAILED');
 if (failed) process.exit(1);
