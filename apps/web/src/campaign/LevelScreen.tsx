@@ -5,7 +5,7 @@ import { Editor } from '../editor/Editor'
 import { coreToRF } from '../editor/compile'
 import { Viewport } from '../sim/Viewport'
 import { useGame, useLive, useTut } from '../store'
-import { levelById, LEVELS, L1_STEERING_ASSIST } from './levels'
+import { levelById, LEVELS, L1_STEERING_ASSIST, L2_THROTTLE_ASSIST } from './levels'
 
 const COACH: React.ReactNode[] = [
   <><b>1단계.</b> 캔버스는 비어 있습니다. PARTS BAY에서 반짝이는 <b>Const</b>를 장착하세요.</>,
@@ -30,6 +30,28 @@ const L1_STEPS: BuildStep[] = [
   { message:'속도 제어 회로 완성. 주행을 시작해 클린 랩에 도전하세요.', palette:[] },
 ]
 
+const L2_STEPS: BuildStep[] = [
+  { message:'차량 위치와 방향을 읽을 Pose 센서를 장착하세요.', palette:['src.pose'], highlight:'src.pose' },
+  { message:'주행할 중심선을 제공하는 Track 센서를 장착하세요.', palette:['src.track'], highlight:'src.track' },
+  { message:'전방 주시 거리 Ld를 정할 Const를 장착하세요.', palette:['const'], highlight:'const' },
+  { message:'트랙 앞쪽 목표점을 찾을 Lookahead point를 장착하세요.', palette:['std.lookahead'], highlight:'std.lookahead' },
+  { message:'Pose.pose를 Lookahead의 pose 입력에 연결하세요.', palette:[] },
+  { message:'Track.track을 Lookahead의 track 입력에 연결하세요.', palette:[] },
+  { message:'Const.v를 Lookahead의 Ld 입력에 연결하세요.', palette:[] },
+  { message:'목표점을 차량 기준으로 바꿀 To car frame을 장착하세요.', palette:['std.tocar'], highlight:'std.tocar' },
+  { message:'Lookahead.pt를 To car frame의 pt 입력에 연결하세요.', palette:[] },
+  { message:'Pose.pose를 To car frame의 pose 입력에 연결하세요.', palette:[] },
+  { message:'좌우 오차를 곡률로 바꿀 Pursuit curvature를 장착하세요.', palette:['std.pursuitCurv'], highlight:'std.pursuitCurv' },
+  { message:'To car frame.e를 Pursuit curvature.e에 연결하세요.', palette:[] },
+  { message:'조향 감도 gain을 정할 두 번째 Const를 장착하세요.', palette:['const'], highlight:'const' },
+  { message:'곡률을 조향 명령으로 바꿀 Steer from curv를 장착하세요.', palette:['std.steerFromCurv'], highlight:'std.steerFromCurv' },
+  { message:'Pursuit curvature.k를 Steer from curv.k에 연결하세요.', palette:[] },
+  { message:'두 번째 Const.v를 Steer from curv.gain에 연결하세요.', palette:[] },
+  { message:'차량 조향 장치인 STEER 출력을 장착하세요.', palette:['sink.steer'], highlight:'sink.steer' },
+  { message:'Steer from curv.steer를 STEER.x에 연결하세요.', palette:[] },
+  { message:'Pure Pursuit 완성. 주행을 시작해 코너를 공략하세요.', palette:[] },
+]
+
 function hasType(graph:Graph, type:string): boolean {
   return graph.order.some(id => graph.nodes[id].type === type)
 }
@@ -38,6 +60,12 @@ function wiredFrom(graph:Graph, targetType:string, port:string, sourceType:strin
     const node = graph.nodes[id], ref = node.type === targetType ? node.in?.[port] : undefined
     return !!(ref && ref[0] === 'n' && ref[2] === sourcePort && graph.nodes[ref[1] as string]?.type === sourceType)
   })
+}
+function wiredFromIndex(graph:Graph, targetType:string, port:string, sourceType:string, sourcePort:string, sourceIndex=0, targetIndex=0): boolean {
+  const sourceId = graph.order.filter(id => graph.nodes[id].type === sourceType)[sourceIndex]
+  const targetId = graph.order.filter(id => graph.nodes[id].type === targetType)[targetIndex]
+  const ref = targetId ? graph.nodes[targetId].in?.[port] : undefined
+  return !!(sourceId && ref && ref[0] === 'n' && ref[1] === sourceId && ref[2] === sourcePort)
 }
 function l1BuildStep(graph:Graph): { index:number; step:BuildStep } {
   let index = 0
@@ -54,6 +82,30 @@ function l1BuildStep(graph:Graph): { index:number; step:BuildStep } {
   return { index, step:L1_STEPS[index] }
 }
 
+function l2BuildStep(graph:Graph): { index:number; step:BuildStep } {
+  const count = (type:string) => graph.order.filter(id => graph.nodes[id].type === type).length
+  let index = 0
+  if (hasType(graph,'src.pose')) index = 1
+  if (index === 1 && hasType(graph,'src.track')) index = 2
+  if (index === 2 && count('const') >= 1) index = 3
+  if (index === 3 && hasType(graph,'std.lookahead')) index = 4
+  if (index === 4 && wiredFromIndex(graph,'std.lookahead','pose','src.pose','pose')) index = 5
+  if (index === 5 && wiredFromIndex(graph,'std.lookahead','track','src.track','track')) index = 6
+  if (index === 6 && wiredFromIndex(graph,'std.lookahead','Ld','const','v',0)) index = 7
+  if (index === 7 && hasType(graph,'std.tocar')) index = 8
+  if (index === 8 && wiredFromIndex(graph,'std.tocar','pt','std.lookahead','pt')) index = 9
+  if (index === 9 && wiredFromIndex(graph,'std.tocar','pose','src.pose','pose')) index = 10
+  if (index === 10 && hasType(graph,'std.pursuitCurv')) index = 11
+  if (index === 11 && wiredFromIndex(graph,'std.pursuitCurv','e','std.tocar','e')) index = 12
+  if (index === 12 && count('const') >= 2) index = 13
+  if (index === 13 && hasType(graph,'std.steerFromCurv')) index = 14
+  if (index === 14 && wiredFromIndex(graph,'std.steerFromCurv','k','std.pursuitCurv','k')) index = 15
+  if (index === 15 && wiredFromIndex(graph,'std.steerFromCurv','gain','const','v',1)) index = 16
+  if (index === 16 && hasType(graph,'sink.steer')) index = 17
+  if (index === 17 && wiredFromIndex(graph,'sink.steer','x','std.steerFromCurv','steer')) index = 18
+  return { index, step:L2_STEPS[index] }
+}
+
 function activeNodeTypes(graph: Graph): Set<string> {
   const active = new Set<string>()
   const visit = (id:string) => {
@@ -66,6 +118,11 @@ function activeNodeTypes(graph: Graph): Set<string> {
 }
 function throttleWired(graph: Graph): boolean {
   const sinkId = graph.order.find(n => graph.nodes[n].type === 'sink.throttle')
+  return !!(sinkId && graph.nodes[sinkId].in?.x)
+}
+
+function steerWired(graph: Graph): boolean {
+  const sinkId = graph.order.find(n => graph.nodes[n].type === 'sink.steer')
   return !!(sinkId && graph.nodes[sinkId].in?.x)
 }
 
@@ -95,8 +152,14 @@ export function LevelScreen({ id }: { id: string }) {
   const nextLevel = LEVELS.find(l => l.n === level.n + 1)
   const isTut = level.id === 'tut'
   const isL1 = level.id === 'l1'
+  const isL2 = level.id === 'l2'
+  const isGuidedBuild = isL1 || isL2
   const l1Build = isL1 ? l1BuildStep(graph) : null
-  const requiredOutputs = isTut || isL1 ? ['sink.throttle'] : undefined
+  const l2Build = isL2 ? l2BuildStep(graph) : null
+  const guidedBuild = l1Build ?? l2Build
+  const guidedSteps = isL1 ? L1_STEPS : L2_STEPS
+  const requiredOutputs = useMemo(() => isTut || isL1 ? ['sink.throttle']
+    : isL2 ? ['sink.steer'] : undefined, [isTut, isL1, isL2])
   const issues = useMemo(() => validateGraph(graph, NT, {
     requireOutputs:!requiredOutputs, requiredOutputs,
   }), [graph, requiredOutputs])
@@ -105,14 +168,15 @@ export function LevelScreen({ id }: { id: string }) {
   const requirementsMet = checks.every(c => c.ok)
   const hasConst = graph.order.some(n => graph.nodes[n].type === 'const')
   const hasThrottle = graph.order.some(n => graph.nodes[n].type === 'sink.throttle')
-  const outputReady = isTut || isL1 ? throttleWired(graph) : issues.length === 0
-  const canRun = issues.length === 0 && requirementsMet && (!(isTut || isL1) || outputReady)
-  const editorPalette = l1Build?.step.palette ?? level.palette
-  const editorHighlight = l1Build?.step.highlight ?? (isTut ? (coach === 0 ? 'const' : coach === 1 ? 'sink.throttle' : undefined) : undefined)
+  const outputReady = isTut || isL1 ? throttleWired(graph) : isL2 ? steerWired(graph) : issues.length === 0
+  const canRun = issues.length === 0 && requirementsMet && (!isGuidedBuild || outputReady) && (!isTut || outputReady)
+  const editorPalette = guidedBuild?.step.palette ?? level.palette
+  const editorHighlight = guidedBuild?.step.highlight ?? (isTut ? (coach === 0 ? 'const' : coach === 1 ? 'sink.throttle' : undefined) : undefined)
   const simGraph = useMemo(() => isL1
     ? makeGraph({ ...L1_STEERING_ASSIST.nodes, ...graph.nodes })
-    : graph, [graph, isL1])
-  const waitingMessage = isL1 ? l1Build!.step.message
+    : isL2 ? makeGraph({ ...L2_THROTTLE_ASSIST.nodes, ...graph.nodes })
+    : graph, [graph, isL1, isL2])
+  const waitingMessage = isGuidedBuild ? guidedBuild!.step.message
     : isTut && !hasConst ? '먼저 Const 동력 파트를 장착하세요.'
     : isTut && !hasThrottle ? 'THROTTLE 출력 파트를 장착하세요.'
     : isTut && !outputReady ? 'Const의 v와 THROTTLE의 x 포트를 연결하세요.'
@@ -165,6 +229,7 @@ export function LevelScreen({ id }: { id: string }) {
         <div className="mission-copy"><span className="eyebrow">MISSION</span><p>{level.teach}</p></div>
         <div className="mission-checks">
           {isL1 && <span className="done">✓ STEERING ASSIST</span>}
+          {isL2 && <span className="done">✓ THROTTLE ASSIST</span>}
           {checks.map(c => <span key={c.type} className={c.ok ? 'done' : ''}>{c.ok ? '✓' : '○'} {c.label}</span>)}
           <span className={outputReady ? 'done' : ''}>{outputReady ? '✓' : '○'} 출력 연결</span>
         </div>
@@ -182,7 +247,7 @@ export function LevelScreen({ id }: { id: string }) {
         onPointerMove={resize} onPointerUp={() => { resizing.current=false }} onPointerCancel={() => { resizing.current=false }}>
         <div className={'lv-pane editor-pane' + (pane !== 'graph' ? ' mobile-hidden' : '')}>
           <Editor key={id} initial={initial} palette={editorPalette} onGraph={handleGraph}
-            highlightPalette={editorHighlight} nodeDefaults={isL1 ? { const:{value:8} } : undefined} requiredOutputs={requiredOutputs} />
+            highlightPalette={editorHighlight} nodeDefaults={isL1 ? { const:{value:8} } : isL2 ? { const:{value:l2Build!.index === 2 ? 6 : 1} } : undefined} requiredOutputs={requiredOutputs} />
         </div>
         <button className="split-handle" aria-label="그래프와 시뮬레이션 영역 너비 조절"
           onPointerDown={(e) => { resizing.current=true; e.currentTarget.setPointerCapture(e.pointerId) }}
@@ -197,9 +262,9 @@ export function LevelScreen({ id }: { id: string }) {
               if (isTut && coach === 3 && info.speed > 2) setCoach(4)
             }}
             onLap={onLap} />
-          {(isTut || isL1) && <div className="coach">
-            <div className="coach-n">{isL1 ? 'GUIDED BUILD · '+(l1Build!.index+1)+'/'+L1_STEPS.length : 'GUIDED START · '+(coach+1)+'/'+COACH.length}</div>
-            <p>{isL1 ? l1Build!.step.message : COACH[coach]}</p>
+          {(isTut || isGuidedBuild) && <div className="coach">
+            <div className="coach-n">{isGuidedBuild ? 'GUIDED BUILD · '+(guidedBuild!.index+1)+'/'+guidedSteps.length : 'GUIDED START · '+(coach+1)+'/'+COACH.length}</div>
+            <p>{isGuidedBuild ? guidedBuild!.step.message : COACH[coach]}</p>
             {isTut && coach === COACH.length-1 && <button className="coach-go" onClick={finishTut}>레벨 1로 →</button>}
           </div>}
           <div className="lv-hud mono">

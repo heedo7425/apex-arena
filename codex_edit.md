@@ -122,3 +122,23 @@ Extend the successful blank-canvas onboarding into the first full controller mis
 - Confirmed mission completion and next-level action.
 - Confirmed desktop and 390x844 mobile layouts.
 - Aligned the editor CONTROL ONLINE state with each mission-specific output requirement.
+
+## 2026-07-20 - Level 2 guided Pure Pursuit build (complete)
+
+### Goal
+Turn the steering mission into a full blank-canvas build while keeping the already-learned speed controller out of the player workspace.
+
+### Changes
+- Replaced the Level 2 starter graph with a completely empty canvas.
+- Moved the completed PID speed controller into a hidden THROTTLE ASSIST used only by the Level 2 simulation.
+- Added a 19-stage guided Pure Pursuit build from Pose and Track through Lookahead, car-frame conversion, curvature, gain, and STEER.
+- Unlocks each part only after the prior installation or exact port connection is complete.
+- Distinguishes the two Const nodes with defaults of 6 m lookahead and 1 steering gain.
+- Uses mission-specific validation requiring a complete steer output while the assist supplies throttle.
+
+### Verification
+- Confirmed all 19 installation and connection stages.
+- Confirmed both Const defaults and exact source-node identity checks.
+- Confirmed the completed player steering graph plus throttle assist finishes a clean lap in 27.52s.
+- Confirmed mission completion, next-level action, Undo/Reset compatibility, and automatic framing.
+- Confirmed desktop and 390x844 mobile layouts.

@@ -22,16 +22,15 @@ export const L1_STEERING_ASSIST: Graph = makeGraph({
   assist_output:{type:'sink.steer',in:{x:['n','assist_steer','steer']}},
 })
 
-// L2: throttle is complete; the learner wires the Pure Pursuit chain.
-const L2: Graph = makeGraph({
-  speed:{type:'src.speed'}, vt:{type:'const',params:{value:8}},
-  verr:{type:'sub',in:{a:['n','vt','v'],b:['n','speed','v']}},
-  pid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0},in:{err:['n','verr','v']}},
-  thr:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','pid','u']}},
-  tsink:{type:'sink.throttle',in:{x:['n','thr','v']}},
-  pose:{type:'src.pose'}, track:{type:'src.track'}, Ld:{type:'const',params:{value:6}},
-  look:{type:'std.lookahead'}, e:{type:'std.tocar'}, k:{type:'std.pursuitCurv'},
-  gain:{type:'const',params:{value:1}}, steer:{type:'std.steerFromCurv'}, ssink:{type:'sink.steer'},
+// L2: Pure Pursuit is built from a blank canvas; throttle runs as a hidden assist.
+const L2: Graph = makeGraph({})
+
+export const L2_THROTTLE_ASSIST: Graph = makeGraph({
+  assist_speed:{type:'src.speed'}, assist_target:{type:'const',params:{value:8}},
+  assist_delta:{type:'sub',in:{a:['n','assist_target','v'],b:['n','assist_speed','v']}},
+  assist_pid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0},in:{err:['n','assist_delta','v']}},
+  assist_limit:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','assist_pid','u']}},
+  assist_output:{type:'sink.throttle',in:{x:['n','assist_limit','v']}},
 })
 
 // L3: steering and PID are complete; replace constant target speed with a grip-aware target.
