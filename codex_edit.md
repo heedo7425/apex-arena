@@ -176,3 +176,13 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Added viewport-aware positioning so the card flips to the open side and remains on screen.
 - Added keyboard-focus support while preserving click-to-pin PART INSPECT details and mobile node inspection.
 - Visually verified the Grip speed guide card in the live Level 3 workspace.
+
+## 2026-07-20 - Inquiry-led campaign learning (complete)
+
+- Removed the forced one-part-at-a-time guided build from Levels 1 and 2; all mission-relevant parts are now available from the start.
+- Replaced step copying with an Engineering Brief for every mission: situation, reasoning question, pre-run prediction, and a three-level optional hint ladder.
+- Hints progress from control concept to relevant parts to exact wiring only when the player asks for help.
+- Added mission-specific causal explanations for ignition, feedback speed control, localization and Pure Pursuit, curvature-aware speed planning, and LiDAR Follow-the-Gap.
+- Added post-success WHY IT WORKED takeaways so the completed behavior is tied back to the algorithm.
+- Updated First Ignition HUD to measure motion rather than a lap and reveal progression only after motion is observed.
+- Verified Level 1 exposes all six candidate parts immediately, and verified the full First Ignition discovery, motion observation, takeaway, and three-stage hint flow.

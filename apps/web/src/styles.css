@@ -381,3 +381,20 @@ button:focus-visible,.react-flow__handle:focus-visible,input:focus-visible{
 .gnode:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @keyframes tip-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 @media(hover:none){.node-tooltip{display:none}}
+
+/* Inquiry-led mission learning */
+.inquiry{padding:12px 13px;background:linear-gradient(135deg,color-mix(in srgb,var(--signal) 9%,var(--surf)),var(--surf));border-color:color-mix(in srgb,var(--signal) 30%,var(--hairS))}
+.inquiry .coach-n{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}.inquiry .coach-n b{font-size:.5rem;color:var(--faint)}
+.inquiry .brief-situation{font-size:.75rem;line-height:1.45;color:var(--mut)}
+.brief-question{margin-top:8px;padding:8px 10px;border-left:3px solid var(--gold);background:color-mix(in srgb,var(--gold) 7%,transparent);font-size:.74rem;line-height:1.45;color:var(--ink)}
+.brief-question small,.prediction>small{display:block;margin-bottom:3px;font-family:var(--mono);font-size:.45rem;letter-spacing:.13em;color:var(--gold)}
+.prediction{margin-top:9px}.prediction>b{display:block;font-size:.7rem;font-weight:650}.prediction>div{display:flex;gap:6px;margin-top:6px}
+.prediction button,.hint-btn{border:1px solid var(--hairS);border-radius:7px;background:var(--surf2);color:var(--mut);padding:6px 9px;font-size:.64rem}
+.prediction button:hover,.prediction button.picked{border-color:var(--signal);color:var(--signal)}
+.prediction>p.correct,.prediction>p.retry{margin-top:6px;font-size:.65rem;line-height:1.4}.prediction>p.correct{color:var(--good)}.prediction>p.retry{color:var(--gold)}
+.hint-stack{display:grid;gap:5px;margin-top:9px}.hint-stack p{display:grid;grid-template-columns:50px 1fr;gap:7px;padding:6px 8px;border:1px solid var(--hair);border-radius:7px;background:color-mix(in srgb,var(--bg2) 70%,transparent);font-size:.66rem;line-height:1.4;color:var(--mut)}
+.hint-stack p b{font-family:var(--mono);font-size:.48rem;letter-spacing:.08em;color:var(--signal)}
+.brief-actions{display:flex;align-items:center;gap:7px;margin-top:9px}.brief-actions .coach-go{margin:0;padding:7px 10px;font-size:.68rem}.hint-btn:disabled{opacity:.5}
+.inquiry .takeaway{margin-top:9px;padding-top:8px;border-top:1px solid var(--hair);font-size:.65rem;line-height:1.45;color:var(--good)}
+.lv-result>span em{max-width:560px;color:var(--mut);font-family:var(--sans);font-size:.68rem;line-height:1.4;font-style:normal}
+@media(max-width:620px){.prediction>div{flex-direction:column}.brief-question{font-size:.7rem}.inquiry .brief-situation{font-size:.7rem}}
