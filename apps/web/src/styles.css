@@ -293,7 +293,7 @@ button:focus-visible,.react-flow__handle:focus-visible,input:focus-visible{
 
 
 /* ---------- Game-feel pass: garage loadout and race workspace ---------- */
-.editor{display:block;position:relative;isolation:isolate;height:100%;min-height:0}
+.editor{display:flex;position:relative;isolation:isolate;height:100%;min-height:0}
 .editor-mode{position:absolute;z-index:7;right:14px;top:12px;display:flex;align-items:center;gap:9px;
   padding:6px 9px;border:1px solid color-mix(in srgb,var(--signal) 28%,var(--hairS));border-radius:7px;
   background:color-mix(in srgb,var(--surf) 86%,transparent);backdrop-filter:blur(9px)}
@@ -310,16 +310,16 @@ button:focus-visible,.react-flow__handle:focus-visible,input:focus-visible{
 .parts-toggle b{font-family:var(--mono);font-size:.63rem;letter-spacing:.06em}
 .parts-toggle em{margin-left:auto;min-width:21px;height:21px;display:grid;place-items:center;border:1px solid var(--hairS);border-radius:50%;
   font-family:var(--mono);font-size:.55rem;color:var(--gold);font-style:normal}
-.parts-bay{position:absolute!important;z-index:14!important;left:14px!important;top:60px!important;width:min(360px,calc(100% - 28px))!important;
-  max-height:min(520px,calc(100% - 76px));overflow:auto!important;padding:0!important;border:1px solid color-mix(in srgb,var(--gold) 34%,var(--hairS))!important;
-  border-radius:12px;background:color-mix(in srgb,var(--surf) 96%,transparent)!important;backdrop-filter:blur(16px);
-  box-shadow:0 26px 64px -28px rgba(0,0,0,.85)!important}
-.parts-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:12px 13px;
-  border-bottom:1px solid var(--hair);background:color-mix(in srgb,var(--surf) 96%,transparent)}
+/* docked left rail — never overlaps the canvas so there's full room to place blocks */
+.parts-bay{position:relative;z-index:5;flex:0 0 214px;align-self:stretch;display:flex;flex-direction:column;min-height:0;
+  overflow:auto;padding:0;border:0;border-right:1px solid var(--hair);border-radius:0;
+  background:var(--bg2)}
+.parts-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;
+  border-bottom:1px solid var(--hair);background:var(--bg2)}
 .parts-head>div{display:flex;flex-direction:column;gap:2px}.parts-head span{font-family:var(--mono);font-size:.48rem;letter-spacing:.15em;color:var(--gold)}
 .parts-head b{font-size:.8rem}.parts-head button{width:27px;height:27px;border:1px solid var(--hair);border-radius:6px;background:var(--surf2);color:var(--mut);font-size:1rem}
-.parts-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;padding:7px}
-.parts-bay .pal-cat{margin:0;padding:7px}.parts-bay .pal-cat-h{margin:0 0 6px;font-size:.49rem;letter-spacing:.12em}
+.parts-grid{display:flex;flex-direction:column;gap:0;padding:6px}
+.parts-bay .pal-cat{margin:0;padding:7px 6px}.parts-bay .pal-cat-h{margin:0 0 6px;font-size:.49rem;letter-spacing:.12em}
 .parts-bay .pal-chips{display:flex;flex-direction:column;gap:5px}
 .parts-bay .pal-chip{position:relative;display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:6px 8px;
   border:1px solid var(--hair);border-left:3px solid var(--part);border-radius:7px;background:var(--surf2);color:var(--ink);text-align:left}
@@ -328,7 +328,7 @@ button:focus-visible,.react-flow__handle:focus-visible,input:focus-visible{
   color:var(--part);font-style:normal;font-weight:800}.parts-bay .pal-chip span{font-size:.68rem;font-weight:650}
 .parts-bay .pal-note{display:block!important;margin:0;padding:10px 13px;border-top:1px solid var(--hair);background:var(--bg2);
   font-family:var(--mono);font-size:.53rem;letter-spacing:.02em;color:var(--faint)}
-.rf-wrap{height:100%;background-color:var(--bg);background-image:
+.rf-wrap{flex:1 1 0;min-width:0;height:100%;background-color:var(--bg);background-image:
   radial-gradient(ellipse at 68% 32%,color-mix(in srgb,var(--signal) 7%,transparent),transparent 42%),
   linear-gradient(125deg,transparent 0 46%,color-mix(in srgb,var(--gold) 4%,transparent) 46.2%,transparent 46.5%)}
 .rf-wrap>.react-flow{position:relative;z-index:1}

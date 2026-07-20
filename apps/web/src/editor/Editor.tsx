@@ -143,7 +143,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   return (
     <div className="editor">
       <div className="editor-mode"><span>BUILD MODE</span><b>CONTROL GRAPH</b></div>
-      {palette.length>0&&<button className={'parts-toggle'+(highlightPalette?' hl':'')} onClick={()=>setBayOpen(v=>!v)} aria-expanded={bayOpen}>
+      {palette.length>0&&!bayOpen&&<button className={'parts-toggle'+(highlightPalette?' hl':'')} onClick={()=>setBayOpen(true)} aria-expanded={bayOpen}>
         <span className="parts-icon">＋</span><span><small>LOADOUT</small><b>PARTS BAY</b></span><em>{palette.length}</em>
       </button>}
       {palette.length>0&&bayOpen&&<div className="palette parts-bay">
