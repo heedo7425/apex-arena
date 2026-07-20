@@ -4,7 +4,7 @@ import { portType } from '@apex/core'
 import { ins, outs, metaOf, colorOf } from './nodeMeta'
 import { useLive, usePending } from '../store'
 
-const HEADER = 26, ROWH = 22
+const ROWH = 22
 
 function fmt(v:any):string {
   if (v == null) return ''
@@ -36,7 +36,7 @@ export function GraphNode({ id, data }:{ id:string; data:any }) {
             className={sel===`${id}|${p}|target`?'armed':''}
             aria-label={`${meta.label} ${p} 입력, ${pType}`} title={`${p} · ${pType}`}
             onClick={(e)=>{e.stopPropagation();onPort?.(id,p,'target')}}
-            style={{top:HEADER+i*ROWH+ROWH/2,background:col}}/>
+            style={{top:i*ROWH+ROWH/2,background:col}}/>
         })}
         {outP.map((p,i) => {
           const pType = portType(type,p,'out') || 'unknown'
@@ -44,7 +44,7 @@ export function GraphNode({ id, data }:{ id:string; data:any }) {
             className={sel===`${id}|${p}|source`?'armed':''}
             aria-label={`${meta.label} ${p} 출력, ${pType}`} title={`${p} · ${pType}`}
             onClick={(e)=>{e.stopPropagation();onPort?.(id,p,'source')}}
-            style={{top:HEADER+i*ROWH+ROWH/2,background:col}}/>
+            style={{top:i*ROWH+ROWH/2,background:col}}/>
         })}
         <div className="io-rows">
           {Array.from({length:nRows}).map((_,i)=>(

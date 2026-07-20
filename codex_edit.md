@@ -142,3 +142,9 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Confirmed the completed player steering graph plus throttle assist finishes a clean lap in 27.52s.
 - Confirmed mission completion, next-level action, Undo/Reset compatibility, and automatic framing.
 - Confirmed desktop and 390x844 mobile layouts.
+
+## 2026-07-20 - Graph port row alignment fix (complete)
+
+- Removed a duplicate header offset from React Flow handle positioning.
+- Input and output handles now align with the vertical center of their corresponding label rows.
+- Multi-input nodes such as Sub and Lookahead inherit the corrected alignment.
