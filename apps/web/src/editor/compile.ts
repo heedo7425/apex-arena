@@ -28,7 +28,7 @@ export function coreToRF(g:Graph): { nodes:RFNode[]; edges:RFEdge[] } {
   const perCol:Record<number,number> = {}
   const nodes:RFNode[] = g.order.map(id=>{
     const n=g.nodes[id], d=depth[id]; const row=(perCol[d]=(perCol[d]??0)+1)-1
-    const pos = n.pos ? {x:n.pos[0],y:n.pos[1]} : {x:d*210, y:row*96}
+    const pos = n.pos ? {x:n.pos[0],y:n.pos[1]} : {x:d*260, y:row*132}
     return { id, type:'apex', position:pos, data:{ coreType:n.type, params:{...defaultParams(n.type), ...(n.params as any||{})} } }
   })
   const edges:RFEdge[] = []

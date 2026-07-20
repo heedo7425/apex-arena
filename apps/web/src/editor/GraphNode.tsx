@@ -4,7 +4,7 @@ import { portType } from '@apex/core'
 import { ins, outs, metaOf, colorOf } from './nodeMeta'
 import { useLive, usePending } from '../store'
 
-const ROWH = 22
+const ROWH = 28
 
 function fmt(v:any):string {
   if (v == null) return ''

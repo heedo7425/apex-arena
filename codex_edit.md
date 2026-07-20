@@ -186,3 +186,13 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Added post-success WHY IT WORKED takeaways so the completed behavior is tied back to the algorithm.
 - Updated First Ignition HUD to measure motion rather than a lap and reveal progression only after motion is observed.
 - Verified Level 1 exposes all six candidate parts immediately, and verified the full First Ignition discovery, motion observation, takeaway, and three-stage hint flow.
+
+## 2026-07-20 - Readability and open-question learning pass (complete)
+
+- Removed the multiple-choice `PREDICT BEFORE YOU RUN` quiz from every Engineering Brief.
+- Kept the open-ended `THINK` prompt so players form their own control hypothesis, with three optional progressive hints when they need support.
+- Increased mission copy, status labels, controls, HUD, result text, Parts Bay labels, and contextual guide typography across the workspace.
+- Enlarged graph nodes, signal rows, parameter inputs, and connection ports while preserving row-to-port alignment.
+- Increased automatic node spacing and the graph's minimum zoom so larger circuits stay readable instead of shrinking into an overview.
+- Expanded the default graph workspace split and Parts Bay touch targets to make building easier.
+- Visually checked Level 1 and the 16-node Level 3 circuit: the quiz is gone, the open question remains, and enlarged nodes and ports stay aligned.

@@ -10,7 +10,6 @@ import { missionVenue } from './worlds'
 
 type MissionBrief = {
   situation:string; question:string; hints:[string,string,string]
-  prediction:{ question:string; options:[string,string]; answer:number; explain:string }
   takeaway:string
 }
 const BRIEFS: Record<string,MissionBrief> = {
@@ -18,35 +17,30 @@ const BRIEFS: Record<string,MissionBrief> = {
     situation:'차량은 준비됐지만 제어 신호가 없어 모터가 움직이지 않습니다.',
     question:'숫자 하나를 차량의 가속 행동으로 전달하려면 무엇이 필요할까요?',
     hints:['값을 만드는 파트와 행동으로 보내는 파트가 필요합니다.','Const는 고정 신호를 만들고 THROTTLE은 가속 명령으로 사용합니다.','Const.v를 THROTTLE.x에 연결한 뒤 실행해 보세요.'],
-    prediction:{question:'Const 값을 키우면 차량은?',options:['더 강하게 가속한다','더 천천히 움직인다'],answer:0,explain:'Const 값이 가속 명령으로 직접 전달되므로 값이 클수록 가속력이 커집니다.'},
     takeaway:'숫자 → 연결 → 액추에이터의 흐름이 실제 차량 행동을 만들었습니다.',
   },
   l1:{
     situation:'고정 스로틀은 목표 속도를 지나쳐도 스스로 줄일 수 없습니다.',
     question:'목표 속도와 현재 속도의 차이를 계속 확인하려면 어떤 흐름이 필요할까요?',
     hints:['닫힌 고리 제어는 목표값과 측정값을 비교해 오차를 줄입니다.','Speed, Const, Sub, PID, Clamp, THROTTLE이 측정부터 행동까지 담당합니다.','Const−Speed → PID → Clamp → THROTTLE로 연결하고 Const를 8 m/s로 설정하세요.'],
-    prediction:{question:'현재 속도가 목표보다 높으면 오차의 부호는?',options:['음수','양수'],answer:0,explain:'목표−현재는 음수가 되어 PID가 스로틀을 줄이거나 제동합니다.'},
     takeaway:'피드백은 현재 상태를 다시 읽어 오차를 줄이므로 목표 속도를 유지합니다.',
   },
   l2:{
     situation:'스로틀은 준비됐지만 차량은 코너가 어디인지 몰라 직진합니다.',
     question:'차의 자세와 트랙의 미래 지점을 어떻게 조향 명령으로 바꿀까요?',
     hints:['Pose와 Track에서 앞쪽 목표점을 고른 뒤 차량 기준 좌우 오차를 계산합니다.','Pose, Track, Lookahead, To car frame, Pursuit curvature, Steer from curv, STEER가 필요합니다.','Ld≈6, gain≈1로 두고 Lookahead → To car frame → 곡률 → 조향 순서로 연결하세요.'],
-    prediction:{question:'Lookahead가 너무 짧으면 조향은?',options:['민감하고 흔들리기 쉽다','더 느리고 부드럽다'],answer:0,explain:'가까운 점의 작은 변화에도 목표 방향이 크게 바뀝니다.'},
     takeaway:'Pose와 Track을 차량 좌표계로 바꿔야 경로가 실제 조향으로 이어집니다.',
   },
   l3:{
     situation:'직선과 헤어핀을 같은 속도로 달리면 타이어의 횡그립 한계를 넘습니다.',
     question:'코너의 급함을 속도 제어기의 목표에 어떻게 반영할까요?',
     hints:['곡률이 클수록 회전 반경이 작아 안전 속도는 낮아져야 합니다.','Curvature ahead가 곡률을 읽고 Grip speed가 안전 목표 속도를 만듭니다.','Pose와 Track → Curvature ahead.k → Grip speed.v → verr.a로 연결하세요.'],
-    prediction:{question:'전방 곡률이 커지면 Grip speed 출력은?',options:['낮아진다','높아진다'],answer:0,explain:'급한 코너일수록 속도를 낮춰 횡그립 한계를 지킵니다.'},
     takeaway:'속도 계획기는 곡률을 미리 읽어 PID 목표를 바꾸므로 코너 전에 감속합니다.',
   },
   l4:{
     situation:'Track이 없는 좁은 통로에서는 LiDAR 거리만으로 열린 방향을 찾아야 합니다.',
     question:'여러 거리 빔 중 어디로 향해야 충돌 가능성이 낮을까요?',
     hints:['가장 멀리 열린 빔의 인덱스를 찾아 실제 각도로 바꿉니다.','ranges와 argmax로 빔을 고르고 da와 a0로 조향각을 복원합니다.','argmax(ranges)×scan.da + scan.a0 → clamp → STEER로 연결하세요.'],
-    prediction:{question:'argmax가 반환하는 값은?',options:['가장 긴 거리의 위치 번호','가장 가까운 벽의 거리'],answer:0,explain:'argmax는 최댓값이 있는 배열 인덱스를 반환합니다.'},
     takeaway:'Follow-the-Gap은 지도 대신 센서 공간의 열린 방향을 골라 즉시 조향합니다.',
   },
 }
@@ -88,10 +82,9 @@ export function LevelScreen({ id }: { id: string }) {
   const [hud, setHud] = useState({ speed:0, best:null as number | null, hold:0 })
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [hintLevel, setHintLevel] = useState(0)
-  const [prediction, setPrediction] = useState<number|null>(null)
   const [tutMoved, setTutMoved] = useState(false)
   const [pane, setPane] = useState<'graph'|'sim'>('graph')
-  const [split, setSplit] = useState(55)
+  const [split, setSplit] = useState(60)
   const [simKey, setSimKey] = useState(0)
   const bodyRef = useRef<HTMLDivElement>(null)
   const resizing = useRef(false)
@@ -120,7 +113,7 @@ export function LevelScreen({ id }: { id: string }) {
   const waitingMessage = hintLevel >= 3 ? wiringIssue : '회로가 아직 가설을 실행할 준비가 되지 않았어요.'
 
   useEffect(() => {
-    setGraph(level.starter); setHintLevel(0); setPrediction(null); setTutMoved(false); setPane('graph'); setResult(null)
+    setGraph(level.starter); setHintLevel(0); setTutMoved(false); setPane('graph'); setResult(null)
   }, [id, level.starter])
 
   const finishTut = () => { complete('tut', 60); useGame.getState().goLevel('l1') }
@@ -146,7 +139,7 @@ export function LevelScreen({ id }: { id: string }) {
   const resize = (e:React.PointerEvent) => {
     if (!resizing.current || !bodyRef.current) return
     const box = bodyRef.current.getBoundingClientRect()
-    setSplit(Math.max(38, Math.min(68, ((e.clientX-box.left)/box.width)*100)))
+    setSplit(Math.max(38, Math.min(72, ((e.clientX-box.left)/box.width)*100)))
   }
 
   return (
@@ -187,7 +180,7 @@ export function LevelScreen({ id }: { id: string }) {
         </div>
         <button className="split-handle" aria-label="그래프와 시뮬레이션 영역 너비 조절"
           onPointerDown={(e) => { resizing.current=true; e.currentTarget.setPointerCapture(e.pointerId) }}
-          onKeyDown={(e) => { if(e.key==='ArrowLeft') setSplit(v=>Math.max(38,v-2)); if(e.key==='ArrowRight') setSplit(v=>Math.min(68,v+2)) }}>
+          onKeyDown={(e) => { if(e.key==='ArrowLeft') setSplit(v=>Math.max(38,v-2)); if(e.key==='ArrowRight') setSplit(v=>Math.min(72,v+2)) }}>
           <span />
         </button>
         <div className={'lv-pane lv-right' + (pane !== 'sim' ? ' mobile-hidden' : '')}>
@@ -203,16 +196,6 @@ export function LevelScreen({ id }: { id: string }) {
             <div className="coach-n"><span>ENGINEERING BRIEF</span><b>{hintLevel}/3 HINTS</b></div>
             <p className="brief-situation">{brief.situation}</p>
             <div className="brief-question"><small>THINK</small>{brief.question}</div>
-            <div className="prediction">
-              <small>PREDICT BEFORE YOU RUN</small>
-              <b>{brief.prediction.question}</b>
-              <div>{brief.prediction.options.map((option,i)=>
-                <button key={option} className={prediction===i?'picked':''} onClick={()=>setPrediction(i)}>{option}</button>
-              )}</div>
-              {prediction!=null&&<p className={prediction===brief.prediction.answer?'correct':'retry'}>
-                {prediction===brief.prediction.answer?'가설 일치 · ':'다시 생각해 보기 · '}{brief.prediction.explain}
-              </p>}
-            </div>
             {hintLevel>0&&<div className="hint-stack">
               {brief.hints.slice(0,hintLevel).map((hint,i)=><p key={hint}><b>HINT {i+1}</b>{hint}</p>)}
             </div>}

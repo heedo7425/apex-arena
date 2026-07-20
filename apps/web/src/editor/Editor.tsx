@@ -18,7 +18,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   const { fitView } = useReactFlow()
   const frameBuild = () => requestAnimationFrame(() => fitView({ padding:0.2, duration:250 }))
   const compact = typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches
-  const arranged = compact ? initial.nodes.map((n,i)=>({...n,position:{x:10+(i%2)*185,y:70+Math.floor(i/2)*105}})) : initial.nodes
+  const arranged = compact ? initial.nodes.map((n,i)=>({...n,position:{x:10+(i%2)*225,y:70+Math.floor(i/2)*138}})) : initial.nodes
   const latest = useRef<{nodes:RFNode[];edges:RFEdge[]}>({nodes:arranged,edges:initial.edges})
   const [notice,setNotice] = useState<string|null>(null)
   const [bayOpen,setBayOpen] = useState(true)
@@ -109,7 +109,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   const addNode=(type:string)=>{
     remember()
     const index=nodes.length
-    const nn=newNode(type,compact?10+(index%2)*185:70+(index%3)*210,compact?70+Math.floor(index/2)*105:70+(Math.floor(index/3)%4)*110)
+    const nn=newNode(type,compact?10+(index%2)*225:70+(index%3)*260,compact?70+Math.floor(index/2)*138:70+(Math.floor(index/3)%4)*128)
     setNodes((nds:any)=>nds.concat({...nn,data:{coreType:type,params:{...defaultParams(type),...(nodeDefaults?.[type]??{})},onParam,onPort,onHover:showHover,onHoverEnd:hideHover}}))
     setNotice(`${metaOf(type).label} 파트를 장착했습니다.`)
     if(compact)setBayOpen(false)
@@ -157,7 +157,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange} onConnect={onConnect}
           isValidConnection={c=>!!c.source&&!!c.sourceHandle&&!!c.target&&!!c.targetHandle&&!connectionIssue(latest.current.nodes,latest.current.edges,c.source,c.sourceHandle,c.target,c.targetHandle)}
           onNodeClick={(_,node:any)=>{setHover(null);setInfo(node.data.coreType)}} onPaneClick={clearPending}
-          fitView minZoom={0.3} maxZoom={2} proOptions={{hideAttribution:true}}>
+          fitView minZoom={0.58} maxZoom={2} proOptions={{hideAttribution:true}}>
           <Background color="#314052" gap={24} size={1}/>
           <Controls showInteractive={false}/>
         </ReactFlow>
