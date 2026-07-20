@@ -98,3 +98,27 @@ The first mission previously opened with an almost-complete steering graph, whic
 - Confirmed Run enables only after the link is complete.
 - Confirmed the car accelerates and the guided flow reaches ignition success.
 - `pnpm --filter @apex/web build`: production build passed.
+
+## 2026-07-20 - Level 1 guided speed-control build (complete)
+
+### Goal
+Extend the successful blank-canvas onboarding into the first full controller mission without exposing a prebuilt example graph.
+
+### Changes
+- Pushed the previous game-first campaign baseline to origin/main at commit 46215c1.
+- Replaced the Level 1 starter with a completely empty player canvas.
+- Moved Pure Pursuit steering into a hidden, clearly labeled STEERING ASSIST used only by the Level 1 simulation.
+- Added an 11-stage guided build for Speed, target Const, Sub, PID, Clamp, and THROTTLE.
+- Unlocks only the next required part after the current installation or wiring objective is complete.
+- Added mission-specific graph validation so Level 1 requires a complete throttle path while later missions still require both outputs.
+- Added Undo and Reset controls for node additions, links, deletions, and parameter edits.
+- Added automatic graph framing after part installation and recovery actions.
+- Set the Level 1 target-speed Const default to 8 m/s.
+
+### Verification
+- Confirmed all 11 build stages and exact port connections.
+- Confirmed Undo returns the mission to the previous stage and Reset restores the blank canvas.
+- Confirmed completed player graph plus steering assist finishes a clean lap in 27.52s.
+- Confirmed mission completion and next-level action.
+- Confirmed desktop and 390x844 mobile layouts.
+- Aligned the editor CONTROL ONLINE state with each mission-specific output requirement.

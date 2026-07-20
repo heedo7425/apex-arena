@@ -55,7 +55,7 @@ export function arePortsCompatible(sourceType: string, sourcePort: string, targe
 export function validateGraph(
   graph: Graph,
   registry: Record<string, NodeDef>,
-  options: { requireOutputs?: boolean } = {},
+  options: { requireOutputs?: boolean; requiredOutputs?: string[] } = {},
 ): GraphIssue[] {
   const issues: GraphIssue[] = [];
   const nodes = graph.nodes;
@@ -97,7 +97,8 @@ export function validateGraph(
   };
   Object.keys(nodes).forEach(id => visit(id, []));
 
-  if (options.requireOutputs) {
+  const requiredOutputs = options.requiredOutputs ?? (options.requireOutputs ? ['sink.steer', 'sink.throttle'] : []);
+  if (requiredOutputs.length) {
     const active = new Set<string>();
     const markActive = (id: string) => {
       if (active.has(id) || !nodes[id]) return;
@@ -105,7 +106,7 @@ export function validateGraph(
       for (const ref of Object.values(nodes[id].in ?? {})) if (ref[0] === 'n') markActive(ref[1] as string);
     };
 
-    for (const type of ['sink.steer', 'sink.throttle']) {
+    for (const type of requiredOutputs) {
       const sinks = Object.entries(nodes).filter(([, node]) => node.type === type);
       if (sinks.length === 0) {
         issues.push({ code:'missing-output', message:`Missing ${type} node` });

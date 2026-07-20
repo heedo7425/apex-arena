@@ -359,3 +359,10 @@ button:focus-visible,.react-flow__handle:focus-visible,input:focus-visible{
   .editor-mode b{display:none}.editor-mode{padding:8px}.parts-toggle{min-width:126px}
   .circuit-head b{display:none}.circuit-head em{font-size:.44rem}
 }
+
+/* ---------- Editor recovery controls ---------- */
+.editor-actions{position:absolute;z-index:8;right:14px;bottom:14px;display:flex;gap:6px;padding:4px;border:1px solid var(--hair);border-radius:8px;background:color-mix(in srgb,var(--surf) 90%,transparent);backdrop-filter:blur(9px)}
+.editor-actions button{padding:6px 9px;border:1px solid var(--hair);border-radius:5px;background:var(--surf2);color:var(--mut);font-family:var(--mono);font-size:.52rem;letter-spacing:.07em}
+.editor-actions button:hover:not(:disabled){border-color:var(--signal);color:var(--signal)}
+.editor-actions button:disabled{opacity:.35;cursor:not-allowed}
+@media(max-width:900px){.editor-actions{right:8px;bottom:8px}}

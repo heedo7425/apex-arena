@@ -61,10 +61,10 @@ export function canConnect(nodes:RFNode[], edges:RFEdge[], source:string, source
   return connectionIssue(nodes, edges, source, sourceHandle, target, targetHandle) === null
 }
 
-export function graphIssues(nodes:RFNode[], edges:RFEdge[]): GraphIssue[] {
-  return validateGraph(rfToCore(nodes, edges), NT, { requireOutputs:true })
+export function graphIssues(nodes:RFNode[], edges:RFEdge[], requiredOutputs?:string[]): GraphIssue[] {
+  return validateGraph(rfToCore(nodes, edges), NT, { requireOutputs:!requiredOutputs, requiredOutputs })
 }
 
-export function graphReady(nodes:RFNode[], edges:RFEdge[]): boolean {
-  return graphIssues(nodes, edges).length === 0
+export function graphReady(nodes:RFNode[], edges:RFEdge[], requiredOutputs?:string[]): boolean {
+  return graphIssues(nodes, edges, requiredOutputs).length === 0
 }

@@ -8,17 +8,18 @@ export type Level = {
   objective:Objective; starter:Graph; requirements:Requirement[]; unlock:string
 }
 
-// L1: steering is complete; the learner wires the speed-control chain.
-const L1: Graph = makeGraph({
-  pose:{type:'src.pose'}, track:{type:'src.track'}, Ld:{type:'const',params:{value:6}},
-  look:{type:'std.lookahead',in:{pose:['n','pose','pose'],track:['n','track','track'],Ld:['n','Ld','v']}},
-  e:{type:'std.tocar',in:{pt:['n','look','pt'],pose:['n','pose','pose']}},
-  k:{type:'std.pursuitCurv',in:{e:['n','e','e']}}, gain:{type:'const',params:{value:1}},
-  steer:{type:'std.steerFromCurv',in:{k:['n','k','k'],gain:['n','gain','v']}},
-  ssink:{type:'sink.steer',in:{x:['n','steer','steer']}},
-  speed:{type:'src.speed'}, vt:{type:'const',params:{value:8}},
-  verr:{type:'sub'}, pid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0}},
-  thr:{type:'clamp',params:{lo:-1,hi:1}}, tsink:{type:'sink.throttle'},
+// L1: speed control is built from a blank canvas; steering runs as a hidden assist.
+const L1: Graph = makeGraph({})
+
+export const L1_STEERING_ASSIST: Graph = makeGraph({
+  assist_pose:{type:'src.pose'}, assist_track:{type:'src.track'},
+  assist_ld:{type:'const',params:{value:6}},
+  assist_look:{type:'std.lookahead',in:{pose:['n','assist_pose','pose'],track:['n','assist_track','track'],Ld:['n','assist_ld','v']}},
+  assist_error:{type:'std.tocar',in:{pt:['n','assist_look','pt'],pose:['n','assist_pose','pose']}},
+  assist_curve:{type:'std.pursuitCurv',in:{e:['n','assist_error','e']}},
+  assist_gain:{type:'const',params:{value:1}},
+  assist_steer:{type:'std.steerFromCurv',in:{k:['n','assist_curve','k'],gain:['n','assist_gain','v']}},
+  assist_output:{type:'sink.steer',in:{x:['n','assist_steer','steer']}},
 })
 
 // L2: throttle is complete; the learner wires the Pure Pursuit chain.

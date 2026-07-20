@@ -63,5 +63,17 @@ const unwiredInput = makeGraph({
 });
 ok(validateGraph(unwiredInput, NT, { requireOutputs:true }).some(i => i.code === 'unwired-input'), 'validator rejects incomplete active paths');
 
+const throttleOnly = makeGraph({
+  power:{ type:'const', params:{ value:1 } },
+  throttle:{ type:'sink.throttle', in:{ x:['n', 'power', 'v'] } },
+});
+ok(validateGraph(throttleOnly, NT, { requiredOutputs:['sink.throttle'] }).length === 0, 'validator supports mission-specific output requirements');
+
+const throttleIncomplete = makeGraph({
+  error:{ type:'sub', in:{ a:['lit', 1] } },
+  throttle:{ type:'sink.throttle', in:{ x:['n', 'error', 'v'] } },
+});
+ok(validateGraph(throttleIncomplete, NT, { requiredOutputs:['sink.throttle'] }).some(i => i.code === 'unwired-input'), 'mission-specific validation still rejects incomplete active paths');
+
 console.log(failed === 0 ? '\n✅ ALL PASS — core drives deterministically' : '\n❌ ' + failed + ' FAILED');
 if (failed) process.exit(1);
