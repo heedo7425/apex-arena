@@ -59,6 +59,7 @@ button{cursor:pointer;font-family:var(--sans)}
 .pal-chips{display:flex;flex-wrap:wrap;gap:5px}
 .pal-chip{font-size:.72rem;padding:4px 8px;border-radius:6px;border:1px solid var(--hairS);background:var(--surf2);color:var(--ink)}
 .pal-chip:hover{filter:brightness(1.2)}
+.pal-chip.hl{border-color:var(--gold);color:var(--gold);animation:hlpulse 1.4s ease-in-out infinite}
 .pal-note{font-family:var(--mono);font-size:.58rem;color:var(--faint);line-height:1.5;margin-top:8px}
 .rf-wrap{position:relative;min-width:0;min-height:400px;background:var(--bg)}
 .react-flow__attribution{display:none}

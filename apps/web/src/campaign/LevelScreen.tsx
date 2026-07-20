@@ -3,15 +3,16 @@ import { buildWorld } from '@apex/core'
 import type { Graph } from '@apex/core'
 
 const COACH: React.ReactNode[] = [
-  <><b>1단계.</b> 오른쪽 시뮬에서 <b>▶ 재생</b>을 눌러봐. 차가 움직이기 시작해.</>,
-  <><b>2단계.</b> 방금 이 <b>노드 그래프</b>가 차를 몬 거야. 노드 위 숫자는 실시간으로 흐르는 값. 이제 <b>목표속도 Const</b>(value 8) 노드의 숫자칸을 눌러 값을 <b>키워봐</b> → 차가 빨라져.</>,
-  <><b>다 됐어!</b> 노드 하나가 차 거동을 바꾸지? 이게 핵심이야 — <b>그래프 = 차의 두뇌, 값이 흐르고, 바꾸면 반응한다.</b> 이제 직접 만들 차례!</>,
+  <><b>1단계.</b> 지금 <b>THROTTLE</b>이 비어서 차가 못 움직여. 왼쪽 팔레트에서 <b>Const</b>(반짝이는 칩)를 눌러 노드를 하나 추가해.</>,
+  <><b>2단계.</b> 방금 만든 <b>Const</b>의 오른쪽 <b>v</b> 포트를 드래그해서 <b>▸ THROTTLE</b>의 <b>x</b> 포트에 연결해. (선이 이어져)</>,
+  <><b>3단계.</b> 이제 <b>▶ 재생</b>! 네가 이은 스로틀로 차가 움직여 — 방금 <b>노드를 이어서 차를 굴린</b> 거야. (아직 속도 제어가 없어 코너에서 나가지만 괜찮아 — 그건 레벨 1에서 만들어.)</>,
+  <><b>다 됐어!</b> 이게 그래프 코딩의 시작이야: <b>노드를 이으면 차의 행동이 생긴다.</b> 이제 속도 제어부터 직접 만들자!</>,
 ]
 import { Editor } from '../editor/Editor'
 import { coreToRF } from '../editor/compile'
 import { Viewport } from '../sim/Viewport'
 import { useGame, useLive, useTut } from '../store'
-import { levelById, LEVELS } from './levels'
+import { levelById, LEVELS, TUT_STARTER_N } from './levels'
 
 export function LevelScreen({ id }: { id: string }) {
   const level = levelById(id)
@@ -25,14 +26,12 @@ export function LevelScreen({ id }: { id: string }) {
   const nextLevel = LEVELS.find(l => l.n === level.n + 1)
   const isTut = level.id === 'tut'
   const [coach, setCoach] = useState(0)
-  // detect the player editing any node value (param change) to advance the tutorial
-  const paramsSig = (g: Graph) => JSON.stringify(g.order.map(id => g.nodes[id].params || {}))
-  const initSig = useRef<string | null>(null)
+  const throttleWired = (g: Graph) => { const id = g.order.find(n => g.nodes[n].type === 'sink.throttle'); return !!(id && g.nodes[id].in && (g.nodes[id].in as any).x) }
+  // from-scratch flow: add a node → wire it to THROTTLE → run
   useEffect(() => {
     if (!isTut) return
-    const sig = paramsSig(graph)
-    if (initSig.current === null) { initSig.current = sig; return }
-    if (coach === 1 && sig !== initSig.current) setCoach(2)
+    if (coach === 0 && graph.order.length > TUT_STARTER_N) setCoach(1)
+    else if (coach === 1 && throttleWired(graph)) setCoach(2)
   }, [graph, isTut, coach])
   const finishTut = () => { complete('tut', 60); useGame.getState().goLevel('l1'); }
 
@@ -57,10 +56,11 @@ export function LevelScreen({ id }: { id: string }) {
       <div className="lv-teach">{level.teach}</div>
       <div className="lv-body">
         <Editor key={id} initial={initial} palette={level.palette} onGraph={setGraph}
-          decorate={isTut ? { vt: { label: '목표속도 (Const)', highlight: true } } : undefined} />
+          decorate={isTut ? { tsink: { label: '▸ THROTTLE', highlight: true, tag: '여기에 연결 ↓' } } : undefined}
+          highlightPalette={isTut && coach === 0 ? 'const' : undefined} />
         <div className="lv-right">
           <Viewport world={world} graph={graph} autoplay={!isTut}
-            onValues={(vals, info) => { setVals(vals); setHud({ speed: info.speed, best: info.best }); if (isTut && coach === 0 && info.speed > 2) setCoach(1) }}
+            onValues={(vals, info) => { setVals(vals); setHud({ speed: info.speed, best: info.best }); if (isTut && coach === 2 && info.speed > 2) setCoach(3) }}
             onLap={onLap} />
           {isTut && (
             <div className="coach">

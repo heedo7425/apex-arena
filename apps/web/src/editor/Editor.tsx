@@ -9,9 +9,9 @@ import type { Graph } from '@apex/core'
 
 const nodeTypes = { apex: GraphNode }
 
-type Decorate = Record<string, { label?: string; highlight?: boolean }>
-function EditorInner({ initial, palette, onGraph, decorate }:
-  { initial: { nodes: RFNode[]; edges: RFEdge[] }; palette: string[]; onGraph: (g: Graph) => void; decorate?: Decorate }) {
+type Decorate = Record<string, { label?: string; highlight?: boolean; tag?: string }>
+function EditorInner({ initial, palette, onGraph, decorate, highlightPalette }:
+  { initial: { nodes: RFNode[]; edges: RFEdge[] }; palette: string[]; onGraph: (g: Graph) => void; decorate?: Decorate; highlightPalette?: string }) {
 
   const onParam = useCallback((id: string, key: string, val: number) => {
     setNodes((nds: any) => nds.map((n: any) => n.id === id ? { ...n, data: { ...n.data, params: { ...n.data.params, [key]: val } } } : n))
@@ -52,7 +52,7 @@ function EditorInner({ initial, palette, onGraph, decorate }:
               <div className="pal-cat-h" style={{ color: colorOf(types[0]) }}>{g.cat}</div>
               <div className="pal-chips">
                 {types.map(t => (
-                  <button key={t} className="pal-chip" onClick={() => addNode(t)} onMouseEnter={() => setInfo(t)}
+                  <button key={t} className={'pal-chip' + (t === highlightPalette ? ' hl' : '')} onClick={() => addNode(t)} onMouseEnter={() => setInfo(t)}
                     style={{ borderColor: colorOf(t) }}>{metaOf(t).label}</button>
                 ))}
               </div>
@@ -87,6 +87,6 @@ function EditorInner({ initial, palette, onGraph, decorate }:
   )
 }
 
-export function Editor(props: { initial: { nodes: RFNode[]; edges: RFEdge[] }; palette: string[]; onGraph: (g: Graph) => void; decorate?: Decorate }) {
+export function Editor(props: { initial: { nodes: RFNode[]; edges: RFEdge[] }; palette: string[]; onGraph: (g: Graph) => void; decorate?: Decorate; highlightPalette?: string }) {
   return <ReactFlowProvider><EditorInner {...props} /></ReactFlowProvider>
 }

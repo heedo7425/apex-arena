@@ -24,7 +24,7 @@ export function GraphNode({ id, data }: { id: string; data: any }) {
 
   return (
     <div className={'gnode' + (data.highlight ? ' hl' : '')} style={{ ['--accent' as any]: col }}>
-      {data.highlight && <div className="hl-tag">여기 바꿔봐 ↓</div>}
+      {data.highlight && <div className="hl-tag">{data.tag || '여기 ↓'}</div>}
       <div className="gnode-h" style={{ background: col }}>{data.label || meta.label}</div>
       <div className="gnode-io" style={{ height: nRows * ROWH }}>
         {inP.map((p, i) => (
