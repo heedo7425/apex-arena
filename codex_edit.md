@@ -148,3 +148,12 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Removed a duplicate header offset from React Flow handle positioning.
 - Input and output handles now align with the vertical center of their corresponding label rows.
 - Multi-input nodes such as Sub and Lookahead inherit the corrected alignment.
+
+## 2026-07-20 - Level 1 straight speed trial (complete)
+
+- Removed the hidden Pure Pursuit steering graph from Level 1.
+- Replaced the circuit lap objective with a flat straight proving-ground speed test.
+- Level 1 now requires the player-built throttle controller to reach 8 m/s and hold it for 2 seconds.
+- Added DYNO-specific run labels, target-speed HUD, hold-time progress, and completion feedback.
+- Kept circuit lap driving behind Level 2, where localization, track input, and steering are introduced.
+- Verified the full guided build and a successful target lock in 2.87s at 4x simulation speed.

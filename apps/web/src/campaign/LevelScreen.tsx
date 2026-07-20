@@ -5,7 +5,7 @@ import { Editor } from '../editor/Editor'
 import { coreToRF } from '../editor/compile'
 import { Viewport } from '../sim/Viewport'
 import { useGame, useLive, useTut } from '../store'
-import { levelById, LEVELS, L1_STEERING_ASSIST, L2_THROTTLE_ASSIST } from './levels'
+import { levelById, LEVELS, L2_THROTTLE_ASSIST } from './levels'
 
 const COACH: React.ReactNode[] = [
   <><b>1단계.</b> 캔버스는 비어 있습니다. PARTS BAY에서 반짝이는 <b>Const</b>를 장착하세요.</>,
@@ -27,7 +27,7 @@ const L1_STEPS: BuildStep[] = [
   { message:'PID의 u 출력을 Clamp의 x 입력에 연결하세요.', palette:[] },
   { message:'차량에 명령을 보낼 THROTTLE 출력을 장착하세요.', palette:['sink.throttle'], highlight:'sink.throttle' },
   { message:'Clamp의 v 출력을 THROTTLE의 x 입력에 연결하세요.', palette:[] },
-  { message:'속도 제어 회로 완성. 주행을 시작해 클린 랩에 도전하세요.', palette:[] },
+  { message:'속도 제어 회로 완성. 직선 시험을 시작해 8 m/s를 2초 동안 유지하세요.', palette:[] },
 ]
 
 const L2_STEPS: BuildStep[] = [
@@ -136,10 +136,18 @@ function issueLabel(issue: GraphIssue): string {
 
 export function LevelScreen({ id }: { id: string }) {
   const level = levelById(id)
-  const world = useMemo(() => buildWorld(), [])
+  const world = useMemo(() => {
+    if (id !== 'l1') return buildWorld()
+    const provingGround = buildWorld({
+      ctrl:[[0,0],[100,0],[200,0],[260,40],[200,80],[100,80],[0,80],[-60,40],[-100,0]] as [number,number][],
+      half:7,
+    })
+    provingGround.height = { at:() => 0, grad:():[number,number] => [0,0], zmin:0, zmax:0, zlo:0, zhi:0 }
+    return provingGround
+  }, [id])
   const initial = useMemo(() => coreToRF(level.starter), [id])
   const [graph, setGraph] = useState<Graph>(level.starter)
-  const [hud, setHud] = useState({ speed: 0, best: null as number | null })
+  const [hud, setHud] = useState({ speed:0, best:null as number | null, hold:0 })
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [coach, setCoach] = useState(0)
   const [pane, setPane] = useState<'graph'|'sim'>('graph')
@@ -172,10 +180,9 @@ export function LevelScreen({ id }: { id: string }) {
   const canRun = issues.length === 0 && requirementsMet && (!isGuidedBuild || outputReady) && (!isTut || outputReady)
   const editorPalette = guidedBuild?.step.palette ?? level.palette
   const editorHighlight = guidedBuild?.step.highlight ?? (isTut ? (coach === 0 ? 'const' : coach === 1 ? 'sink.throttle' : undefined) : undefined)
-  const simGraph = useMemo(() => isL1
-    ? makeGraph({ ...L1_STEERING_ASSIST.nodes, ...graph.nodes })
-    : isL2 ? makeGraph({ ...L2_THROTTLE_ASSIST.nodes, ...graph.nodes })
-    : graph, [graph, isL1, isL2])
+  const simGraph = useMemo(() => isL2
+    ? makeGraph({ ...L2_THROTTLE_ASSIST.nodes, ...graph.nodes })
+    : graph, [graph, isL2])
   const waitingMessage = isGuidedBuild ? guidedBuild!.step.message
     : isTut && !hasConst ? '먼저 Const 동력 파트를 장착하세요.'
     : isTut && !hasThrottle ? 'THROTTLE 출력 파트를 장착하세요.'
@@ -196,6 +203,12 @@ export function LevelScreen({ id }: { id: string }) {
   const finishTut = () => { complete('tut', 60); useGame.getState().goLevel('l1') }
   const handleGraph = (next:Graph) => { setGraph(next); setResult(null) }
   const retry = () => { setResult(null); setSimKey(k => k + 1) }
+
+  const onSpeedTrial = (t:number) => {
+    if (!isL1) return
+    complete(level.id, t)
+    setResult({ ok:true, msg:'8 m/s 고정 성공 · ' + t.toFixed(2) + 's' })
+  }
 
   const onLap = (t: number, dirty: boolean) => {
     if (isTut) return
@@ -228,7 +241,7 @@ export function LevelScreen({ id }: { id: string }) {
       <div className="mission-bar">
         <div className="mission-copy"><span className="eyebrow">MISSION</span><p>{level.teach}</p></div>
         <div className="mission-checks">
-          {isL1 && <span className="done">✓ STEERING ASSIST</span>}
+          {isL1 && <span className="done">✓ STRAIGHT PROVING GROUND</span>}
           {isL2 && <span className="done">✓ THROTTLE ASSIST</span>}
           {checks.map(c => <span key={c.type} className={c.ok ? 'done' : ''}>{c.ok ? '✓' : '○'} {c.label}</span>)}
           <span className={outputReady ? 'done' : ''}>{outputReady ? '✓' : '○'} 출력 연결</span>
@@ -255,10 +268,11 @@ export function LevelScreen({ id }: { id: string }) {
           <span />
         </button>
         <div className={'lv-pane lv-right' + (pane !== 'sim' ? ' mobile-hidden' : '')}>
-          <div className="circuit-head"><div><span>LIVE CIRCUIT</span><b>ON-ROAD · SECTOR 01</b></div><em><i /> TELEMETRY ONLINE</em></div>
+          <div className="circuit-head"><div><span>{isL1 ? 'SPEED LAB' : 'LIVE CIRCUIT'}</span><b>{isL1 ? 'STRAIGHT · CONTROL TEST' : 'ON-ROAD · SECTOR 01'}</b></div><em><i /> TELEMETRY ONLINE</em></div>
           <Viewport key={simKey} world={world} graph={simGraph} canRun={canRun}
+            trial={level.objective.type === 'speed' ? level.objective : undefined} onTrial={onSpeedTrial}
             onValues={(vals, info) => {
-              setVals(vals); setHud({ speed:info.speed, best:info.best })
+              setVals(vals); setHud({ speed:info.speed, best:info.best, hold:info.hold })
               if (isTut && coach === 3 && info.speed > 2) setCoach(4)
             }}
             onLap={onLap} />
@@ -269,8 +283,8 @@ export function LevelScreen({ id }: { id: string }) {
           </div>}
           <div className="lv-hud mono">
             <span><small>SPEED</small><b>{Math.round(hud.speed*3.6)}</b> km/h</span>
-            <span><small>OBJECTIVE</small><b>{level.objective.type === 'time' ? `CLEAN ≤ ${level.objective.target}s` : 'CLEAN LAP'}</b></span>
-            <span><small>SESSION BEST</small><b>{hud.best != null ? hud.best.toFixed(2)+'s' : '—'}</b></span>
+            <span><small>OBJECTIVE</small><b>{level.objective.type === 'time' ? 'CLEAN ≤ ' + level.objective.target + 's' : level.objective.type === 'speed' ? Math.round(level.objective.target*3.6) + ' km/h · ' + level.objective.hold + 's' : 'CLEAN LAP'}</b></span>
+            <span><small>{isL1 ? 'TARGET HOLD' : 'SESSION BEST'}</small><b>{isL1 ? Math.min(hud.hold, level.objective.type === 'speed' ? level.objective.hold : 0).toFixed(1) + ' / 2.0s' : hud.best != null ? hud.best.toFixed(2)+'s' : '—'}</b></span>
           </div>
           {result && <div className={'lv-result ' + (result.ok ? 'ok' : 'bad')}>
             <span><small>{result.ok ? 'MISSION COMPLETE' : 'TRY AGAIN'}</small>{result.msg}</span>

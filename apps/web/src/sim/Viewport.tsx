@@ -8,12 +8,14 @@ type Props = {
   graph: Graph
   seed?: number
   canRun?: boolean
-  onValues?: (lastVal: Record<string, any> | null, info: { speed:number; lapT:number; best:number|null }) => void
+  onValues?: (lastVal: Record<string, any> | null, info: { speed:number; lapT:number; best:number|null; hold:number }) => void
   onLap?: (t: number, dirty: boolean) => void
+  trial?: { target:number; hold:number; tolerance:number }
+  onTrial?: (t: number) => void
 }
 const CW = 1200, CH = 760
 
-export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLap }: Props) {
+export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLap, trial, onTrial }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const simRef = useRef<ReturnType<typeof makeSim> | null>(null)
   const terrainRef = useRef<HTMLCanvasElement | null>(null)
@@ -21,11 +23,13 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
   const argmaxId = useRef<string | null>(null)
   const runRef = useRef(false)
   const speedRef = useRef(1)
+  const holdRef = useRef(0)
+  const completedRef = useRef(false)
   const [running, setRunning] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [lapMsg, setLapMsg] = useState<string>('READY')
-  const onValuesRef = useRef(onValues); const onLapRef = useRef(onLap)
-  useEffect(() => { onValuesRef.current = onValues; onLapRef.current = onLap })
+  const onValuesRef = useRef(onValues); const onLapRef = useRef(onLap); const onTrialRef = useRef(onTrial)
+  useEffect(() => { onValuesRef.current = onValues; onLapRef.current = onLap; onTrialRef.current = onTrial })
 
   useEffect(() => {
     simRef.current = makeSim(world, graph, seed)
@@ -38,8 +42,10 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
   useEffect(() => {
     simRef.current = makeSim(world, graph, seed)
     argmaxId.current = graph.order.find(id => graph.nodes[id].type === 'array.argmax') || null
+    holdRef.current = 0
+    completedRef.current = false
     setRunning(false)
-    setLapMsg(canRun ? 'READY' : 'WIRE GRAPH')
+    setLapMsg(canRun ? (trial ? 'SPEED TEST READY' : 'READY') : 'WIRE GRAPH')
   }, [graph, world, seed, canRun])
 
   useEffect(() => { if (!canRun) setRunning(false) }, [canRun])
@@ -58,17 +64,27 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
           acc += dt * speedRef.current
           let g = 0, prevLaps = s.laps.length
           try { while (acc >= DT && g < 2000) { tick(s); acc -= DT; g++ } } catch (e:any) { setLapMsg('ERR: ' + (e?.message||e)); setRunning(false) }
-          if (s.laps.length > prevLaps) {
+          if (s.laps.length > prevLaps && !trial) {
             const lp = s.laps[s.laps.length - 1]
             setLapMsg((lp.dirty ? 'DIRTY ' : 'LAP ') + lp.t.toFixed(3) + 's')
             onLapRef.current?.(lp.t, lp.dirty)
+          }
+          if (trial && !completedRef.current) {
+            holdRef.current = Math.abs(s.car.vx - trial.target) <= trial.tolerance ? holdRef.current + g * DT : 0
+            if (holdRef.current >= trial.hold) {
+              completedRef.current = true
+              runRef.current = false
+              setRunning(false)
+              setLapMsg('TARGET LOCKED')
+              onTrialRef.current?.(s.lapT)
+            }
           }
         }
         const scan = castScan(s.car, world)
         const gap = argmaxId.current && s.lastVal ? s.lastVal[argmaxId.current]?.i ?? null : null
         renderSim(ctx, world, s.car, scan, gap, cam, terrainRef.current)
         valAcc += dt
-        if (valAcc > 0.1) { valAcc = 0; onValuesRef.current?.(s.lastVal, { speed: s.car.vx, lapT: s.lapT, best: s.best }) }
+        if (valAcc > 0.1) { valAcc = 0; onValuesRef.current?.(s.lastVal, { speed: s.car.vx, lapT: s.lapT, best: s.best, hold: holdRef.current }) }
       }
       raf = requestAnimationFrame(loop)
     }
@@ -79,21 +95,23 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
 
   const reset = () => {
     simRef.current = makeSim(world, graph, seed)
+    holdRef.current = 0
+    completedRef.current = false
     setRunning(false)
-    setLapMsg(canRun ? 'READY' : 'WIRE GRAPH')
+    setLapMsg(canRun ? (trial ? 'SPEED TEST READY' : 'READY') : 'WIRE GRAPH')
   }
   const stepN = () => { const s = simRef.current; if (s && canRun) { try { for (let i=0;i<12;i++) tick(s) } catch {} } }
 
   return (
     <div className="viewport">
       <div className="vp-stage">
-        <div className={'vp-tag' + (canRun ? '' : ' blocked')}><span className="dot" /> SIM · {lapMsg}</div>
+        <div className={'vp-tag' + (canRun ? '' : ' blocked')}><span className="dot" /> {trial ? 'DYNO' : 'SIM'} · {lapMsg}</div>
         <canvas ref={canvasRef} width={CW} height={CH} />
-        {!canRun && <div className="vp-lock"><b>차량 대기 중</b><span>제어 링크를 완성하면 출전할 수 있어요.</span></div>}
+        {!canRun && <div className="vp-lock"><b>차량 대기 중</b><span>{trial ? '속도 제어 링크를 완성하면 시험을 시작할 수 있어요.' : '제어 링크를 완성하면 출전할 수 있어요.'}</span></div>}
       </div>
       <div className="vp-controls">
         <button className={'run-btn' + (running ? ' on' : '')} disabled={!canRun}
-          onClick={() => setRunning(r => !r)}>{running ? '⏸ 일시정지' : '▶ 주행 시작'}</button>
+          onClick={() => setRunning(r => !r)}>{running ? '⏸ 일시정지' : trial ? '▶ 속도 시험 시작' : '▶ 주행 시작'}</button>
         <button onClick={stepN} disabled={running || !canRun}>⏭ 스텝</button>
         <button onClick={reset}>↻ 리셋</button>
         <span className="sp">배속</span>

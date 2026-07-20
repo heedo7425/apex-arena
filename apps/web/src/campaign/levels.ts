@@ -2,25 +2,15 @@ import { makeGraph } from '@apex/core'
 import type { Graph } from '@apex/core'
 
 export type Objective = { type: 'clean' } | { type: 'time'; target: number }
+  | { type: 'speed'; target: number; hold: number; tolerance: number }
 export type Requirement = { type:string; label:string }
 export type Level = {
   id:string; n:number; title:string; kicker:string; teach:string; palette:string[]
   objective:Objective; starter:Graph; requirements:Requirement[]; unlock:string
 }
 
-// L1: speed control is built from a blank canvas; steering runs as a hidden assist.
+// L1: speed control is built and tested on a straight proving ground.
 const L1: Graph = makeGraph({})
-
-export const L1_STEERING_ASSIST: Graph = makeGraph({
-  assist_pose:{type:'src.pose'}, assist_track:{type:'src.track'},
-  assist_ld:{type:'const',params:{value:6}},
-  assist_look:{type:'std.lookahead',in:{pose:['n','assist_pose','pose'],track:['n','assist_track','track'],Ld:['n','assist_ld','v']}},
-  assist_error:{type:'std.tocar',in:{pt:['n','assist_look','pt'],pose:['n','assist_pose','pose']}},
-  assist_curve:{type:'std.pursuitCurv',in:{e:['n','assist_error','e']}},
-  assist_gain:{type:'const',params:{value:1}},
-  assist_steer:{type:'std.steerFromCurv',in:{k:['n','assist_curve','k'],gain:['n','assist_gain','v']}},
-  assist_output:{type:'sink.steer',in:{x:['n','assist_steer','steer']}},
-})
 
 // L2: Pure Pursuit is built from a blank canvas; throttle runs as a hidden assist.
 const L2: Graph = makeGraph({})
@@ -68,8 +58,9 @@ export const LEVELS: Level[] = [
     teach:'빈 캔버스에 동력과 출력을 직접 장착해, 네 첫 제어 신호로 차량을 움직여라.',
     palette:['const','sink.throttle'], objective:{type:'clean'}, starter:TUT, requirements:[], unlock:'Const · THROTTLE' },
   { id:'l1', n:1, title:'속도를 붙잡아라', kicker:'THROTTLE CONTROL',
-    teach:'목표속도에서 현재속도를 빼고 PID와 Clamp를 거쳐 THROTTLE까지 연결하세요.',
-    palette:['const','sub','ctrl.pid','clamp','src.speed','sink.throttle'], objective:{type:'clean'}, starter:L1,
+    teach:'직선 성능시험장에서 목표속도 8 m/s를 만들고 2초 동안 안정적으로 유지하세요.',
+    palette:['const','sub','ctrl.pid','clamp','src.speed','sink.throttle'],
+    objective:{type:'speed',target:8,hold:2,tolerance:0.45}, starter:L1,
     requirements:[{type:'sub',label:'속도 오차 계산'},{type:'ctrl.pid',label:'PID 제어'},{type:'clamp',label:'출력 제한'}], unlock:'PID · Clamp' },
   { id:'l2', n:2, title:'코너를 읽어라', kicker:'PURE PURSUIT',
     teach:'Pose와 Track에서 목표점을 찾고, 차 좌표계와 곡률을 거쳐 STEER까지 연결하세요.',
