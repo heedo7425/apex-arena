@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { makeGraph, NT, validateGraph } from '@apex/core'
+import { NT, validateGraph } from '@apex/core'
 import type { Graph, GraphIssue } from '@apex/core'
 import { Editor } from '../editor/Editor'
 import { coreToRF } from '../editor/compile'
 import { Viewport } from '../sim/Viewport'
 import { useGame, useLive, useTut } from '../store'
-import { levelById, LEVELS, L2_THROTTLE_ASSIST } from './levels'
+import { levelById, LEVELS } from './levels'
 import { missionVenue } from './worlds'
 
 type MissionBrief = {
@@ -26,10 +26,10 @@ const BRIEFS: Record<string,MissionBrief> = {
     takeaway:'피드백은 현재 상태를 다시 읽어 오차를 줄이므로 목표 속도를 유지합니다.',
   },
   l2:{
-    situation:'스로틀은 준비됐지만 차량은 코너가 어디인지 몰라 직진합니다.',
-    question:'차의 자세와 트랙의 미래 지점을 어떻게 조향 명령으로 바꿀까요?',
-    hints:['Pose와 Track에서 앞쪽 목표점을 고른 뒤 차량 기준 좌우 오차를 계산합니다.','Pose, Track, Lookahead, To car frame, Pursuit curvature, Steer from curv, STEER가 필요합니다.','Ld≈6, gain≈1로 두고 Lookahead → To car frame → 곡률 → 조향 순서로 연결하세요.'],
-    takeaway:'Pose와 Track을 차량 좌표계로 바꿔야 경로가 실제 조향으로 이어집니다.',
+    situation:'속도 제어기는 이미 장착돼 차를 굴리고 있지만, 차량은 코너가 어디인지 몰라 직진합니다.',
+    question:'앞쪽 목표점의 좌우 오차를 어떻게 회전 곡률과 조향으로 바꿀까요?',
+    hints:['앞쪽 목표점을 차량 좌표계로 옮기면 좌우 오차 y가 나옵니다. Pure Pursuit의 조향은 이 y에서 나와요.','Pure Pursuit 곡률 법칙: k = 2·y / Ld². vec.xy로 y를 꺼내고 ÷로 나눕니다. steer = clamp(k × gain).','Lookahead → To car frame → vec.xy(y)·vec.len(Ld) → (2×y) ÷ (Ld×Ld) = k → ×gain(≈5) → clamp → STEER. Ld는 6으로.'],
+    takeaway:'Pure Pursuit의 곡률 법칙 k=2y/Ld²을 직접 노드로 짜서 목표점을 조향으로 바꿨습니다.',
   },
   l3:{
     situation:'직선과 헤어핀을 같은 속도로 달리면 타이어의 횡그립 한계를 넘습니다.',
@@ -57,11 +57,6 @@ function activeNodeTypes(graph: Graph): Set<string> {
 }
 function throttleWired(graph: Graph): boolean {
   const sinkId = graph.order.find(n => graph.nodes[n].type === 'sink.throttle')
-  return !!(sinkId && graph.nodes[sinkId].in?.x)
-}
-
-function steerWired(graph: Graph): boolean {
-  const sinkId = graph.order.find(n => graph.nodes[n].type === 'sink.steer')
   return !!(sinkId && graph.nodes[sinkId].in?.x)
 }
 
@@ -95,20 +90,18 @@ export function LevelScreen({ id }: { id: string }) {
   const isL1 = level.id === 'l1'
   const isL2 = level.id === 'l2'
   const requiredOutputs = useMemo(() => isTut || isL1 ? ['sink.throttle']
-    : isL2 ? ['sink.steer'] : undefined, [isTut, isL1, isL2])
+    : undefined, [isTut, isL1])
   const issues = useMemo(() => validateGraph(graph, NT, {
     requireOutputs:!requiredOutputs, requiredOutputs,
   }), [graph, requiredOutputs])
   const activeTypes = useMemo(() => activeNodeTypes(graph), [graph])
   const checks = level.requirements.map(req => ({ ...req, ok:activeTypes.has(req.type) }))
   const requirementsMet = checks.every(c => c.ok)
-  const outputReady = isTut || isL1 ? throttleWired(graph) : isL2 ? steerWired(graph) : issues.length === 0
+  const outputReady = isTut || isL1 ? throttleWired(graph) : issues.length === 0
   const canRun = issues.length === 0 && requirementsMet && outputReady
   const brief = BRIEFS[level.id]
   const editorPalette = level.palette
-  const simGraph = useMemo(() => isL2
-    ? makeGraph({ ...L2_THROTTLE_ASSIST.nodes, ...graph.nodes })
-    : graph, [graph, isL2])
+  const simGraph = graph
   const wiringIssue = issueLabel(issues[0] ?? { code:'unwired-input', message:'필수 노드를 출력 경로에 연결하세요.' })
   const waitingMessage = hintLevel >= 3 ? wiringIssue : '회로가 아직 가설을 실행할 준비가 되지 않았어요.'
 
@@ -158,7 +151,7 @@ export function LevelScreen({ id }: { id: string }) {
         <div className="mission-copy"><span className="eyebrow">MISSION</span><p>{level.teach}</p></div>
         <div className="mission-checks">
           {isL1 && <span className="done">✓ STRAIGHT PROVING GROUND</span>}
-          {isL2 && <span className="done">✓ THROTTLE ASSIST</span>}
+          {isL2 && <span className="done">✓ 속도 제어기 제공됨</span>}
           {checks.map(c => <span key={c.type} className={c.ok ? 'done' : ''}>{c.ok ? '✓' : '○'} {c.label}</span>)}
           <span className={outputReady ? 'done' : ''}>{outputReady ? '✓' : '○'} 출력 연결</span>
         </div>
@@ -176,7 +169,7 @@ export function LevelScreen({ id }: { id: string }) {
         onPointerMove={resize} onPointerUp={() => { resizing.current=false }} onPointerCancel={() => { resizing.current=false }}>
         <div className={'lv-pane editor-pane' + (pane !== 'graph' ? ' mobile-hidden' : '')}>
           <Editor key={id} initial={initial} palette={editorPalette} onGraph={handleGraph}
-            nodeDefaults={isL1 ? { const:{value:8} } : isL2 ? { const:{value:1} } : undefined} requiredOutputs={requiredOutputs} />
+            nodeDefaults={isL1 ? { const:{value:8} } : undefined} requiredOutputs={requiredOutputs} />
         </div>
         <button className="split-handle" aria-label="그래프와 시뮬레이션 영역 너비 조절"
           onPointerDown={(e) => { resizing.current=true; e.currentTarget.setPointerCapture(e.pointerId) }}

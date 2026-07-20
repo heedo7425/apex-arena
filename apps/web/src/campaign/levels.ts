@@ -12,15 +12,14 @@ export type Level = {
 // L1: speed control is built and tested on a straight proving ground.
 const L1: Graph = makeGraph({})
 
-// L2: Pure Pursuit is built from a blank canvas; throttle runs as a hidden assist.
-const L2: Graph = makeGraph({})
-
-export const L2_THROTTLE_ASSIST: Graph = makeGraph({
-  assist_speed:{type:'src.speed'}, assist_target:{type:'const',params:{value:8}},
-  assist_delta:{type:'sub',in:{a:['n','assist_target','v'],b:['n','assist_speed','v']}},
-  assist_pid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0},in:{err:['n','assist_delta','v']}},
-  assist_limit:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','assist_pid','u']}},
-  assist_output:{type:'sink.throttle',in:{x:['n','assist_limit','v']}},
+// L2: the speed controller built last mission is provided (visible) so the car actually
+// moves; the player builds the Pure Pursuit steering law themselves.
+const L2: Graph = makeGraph({
+  sp:{type:'src.speed'}, tgt:{type:'const',params:{value:8}},
+  verr:{type:'sub',in:{a:['n','tgt','v'],b:['n','sp','v']}},
+  spid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0},in:{err:['n','verr','v']}},
+  sthr:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','spid','u']}},
+  tsink:{type:'sink.throttle',in:{x:['n','sthr','v']}},
 })
 
 // L3: steering and PID are complete; replace constant target speed with a grip-aware target.
@@ -29,9 +28,12 @@ const L3: Graph = makeGraph({
   Ld:{type:'const',params:{value:6}},
   look:{type:'std.lookahead',in:{pose:['n','pose','pose'],track:['n','track','track'],Ld:['n','Ld','v']}},
   e:{type:'std.tocar',in:{pt:['n','look','pt'],pose:['n','pose','pose']}},
-  k:{type:'std.pursuitCurv',in:{e:['n','e','e']}}, gain:{type:'const',params:{value:1}},
-  steer:{type:'std.steerFromCurv',in:{k:['n','k','k'],gain:['n','gain','v']}},
-  ssink:{type:'sink.steer',in:{x:['n','steer','steer']}},
+  comp:{type:'vec.xy',in:{e:['n','e','e']}}, dist:{type:'vec.len',in:{e:['n','e','e']}},
+  two:{type:'const',params:{value:2}}, twoY:{type:'mul',in:{a:['n','two','v'],b:['n','comp','y']}},
+  dsq:{type:'mul',in:{a:['n','dist','v'],b:['n','dist','v']}}, k:{type:'div',in:{a:['n','twoY','v'],b:['n','dsq','v']}},
+  gain:{type:'const',params:{value:5.2}}, sraw:{type:'mul',in:{a:['n','k','v'],b:['n','gain','v']}},
+  steer:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','sraw','v']}},
+  ssink:{type:'sink.steer',in:{x:['n','steer','v']}},
   curve:{type:'std.curvAhead'}, grip:{type:'std.gripSpeed',params:{vmax:13,margin:0.85}},
   verr:{type:'sub',in:{b:['n','speed','v']}},
   pid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0},in:{err:['n','verr','v']}},
@@ -64,8 +66,8 @@ export const LEVELS: Level[] = [
     requirements:[{type:'sub',label:'속도 오차 계산'},{type:'ctrl.pid',label:'PID 제어'},{type:'clamp',label:'출력 제한'}], unlock:'PID · Clamp' },
   { id:'l2', n:2, title:'코너를 읽어라', kicker:'PURE PURSUIT',
     teach:'Pose와 Track에서 목표점을 찾고, 차 좌표계와 곡률을 거쳐 STEER까지 연결하세요.',
-    palette:['const','src.pose','src.track','std.lookahead','std.tocar','std.pursuitCurv','std.steerFromCurv','sink.steer'], objective:{type:'clean'}, starter:L2,
-    requirements:[{type:'std.lookahead',label:'전방 목표점'},{type:'std.tocar',label:'차 좌표 변환'},{type:'std.pursuitCurv',label:'추종 곡률'}], unlock:'Pure Pursuit' },
+    palette:['const','src.pose','src.track','std.lookahead','std.tocar','vec.xy','vec.len','mul','div','clamp','sink.steer'], objective:{type:'clean'}, starter:L2,
+    requirements:[{type:'std.lookahead',label:'전방 목표점'},{type:'std.tocar',label:'차 좌표 변환'},{type:'vec.xy',label:'횡오차 y 추출'},{type:'div',label:'곡률 k 계산'}], unlock:'Pure Pursuit' },
   { id:'l3', n:3, title:'그립의 한계', kicker:'CORNER SPEED',
     teach:'전방 곡률로 안전 속도를 계산해 PID의 목표속도로 넣고 32초 안에 완주하세요.',
     palette:['sub','ctrl.pid','clamp','src.speed','src.pose','src.track','std.curvAhead','std.gripSpeed','sink.throttle'], objective:{type:'time',target:32}, starter:L3,

@@ -47,10 +47,9 @@ export const NT: Record<string, NodeDef> = {
     const dx=i.pt.x-i.pose.x, dy=i.pt.y-i.pose.y, cs=Math.cos(i.pose.yaw), sn=Math.sin(i.pose.yaw);
     return { e:{ x:cs*dx+sn*dy, y:-sn*dx+cs*dy } };
   } },
-  'std.pursuitCurv': { kind:'std', cat:'Control', ins:['e'], outs:['k'], fn:(i)=>{ const Ld=Math.max(1,Math.hypot(i.e.x,i.e.y)); return { k:2*i.e.y/(Ld*Ld) }; } },
-  'std.steerFromCurv': { kind:'std', cat:'Control', ins:['k','gain'], outs:['steer'], fn:(i,p,s,c)=>{
-    const L=c.world.vp.L, MS=c.world.vp.MAXSTEER; return { steer:Math.max(-1,Math.min(1,Math.atan(L*i.k)*i.gain/MS)) };
-  } },
+  // vec2 decomposition — reusable geometry primitives so any car-frame vector can be opened
+  'vec.xy':  { kind:'prim', cat:'Geometry', ins:['e'], outs:['x','y'], fn:(i)=>({ x:i.e.x, y:i.e.y }) },
+  'vec.len': { kind:'prim', cat:'Geometry', ins:['e'], outs:['v'], fn:(i)=>({ v:Math.hypot(i.e.x,i.e.y) }) },
   'std.curvAhead': { kind:'std', cat:'Geometry', ins:['pose','track'], outs:['k'], fn:(i,p,s,c)=>{
     const idx=nearestIndex(c.world.track,i.pose.x,i.pose.y,undefined).i; return { k:curvAheadAt(c.world.track,idx,18) };
   } },
