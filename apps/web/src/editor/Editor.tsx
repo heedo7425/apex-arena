@@ -24,6 +24,9 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   const [bayOpen,setBayOpen] = useState(true)
   const [info,setInfo]=useState<string|null>(null)
   const [hover,setHover]=useState<HoverInfo|null>(null)
+  const trashRef = useRef<HTMLDivElement>(null)
+  const [draggingNode,setDraggingNode] = useState(false)
+  const [trashHot,setTrashHot] = useState(false)
   const history = useRef<{nodes:RFNode[];edges:RFEdge[]}[]>([])
   const [undoCount,setUndoCount] = useState(0)
   const remember = () => {
@@ -41,6 +44,19 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     // eslint-disable-next-line
   },[])
   const pending = useRef<{node:string;handle:string;kind:'source'|'target'}|null>(null)
+  const deleteNode = useCallback((id:string, save=true)=>{
+    if(save)remember()
+    setNodes((nds:any)=>nds.filter((n:any)=>n.id!==id))
+    setEdges((eds:any)=>eds.filter((e:any)=>e.source!==id&&e.target!==id))
+    if(pending.current?.node===id){pending.current=null;usePending.getState().setSel(null)}
+    setInfo(null);setHover(null);setNotice("블록과 연결선을 제거했습니다. UNDO로 되돌릴 수 있어요.")
+    // eslint-disable-next-line
+  },[])
+  const isOverTrash = (event:any) => {
+    const point = event.changedTouches?.[0] ?? event.touches?.[0] ?? event
+    const box = trashRef.current?.getBoundingClientRect()
+    return !!box && point.clientX >= box.left && point.clientX <= box.right && point.clientY >= box.top && point.clientY <= box.bottom
+  }
   const onPort = useCallback((node:string,handle:string,kind:'source'|'target')=>{
     const p=pending.current
     if(p&&p.kind!==kind&&p.node!==node){
@@ -149,7 +165,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
             </div>
           })}
         </div>
-        <div className="pal-note">파트 선택 → 캔버스 장착 → 신호 포트 체결</div>
+        <div className="pal-note">파트 선택 → 캔버스 장착 → 신호 포트 체결 · 블록을 휴지통에 드롭</div>
       </div>}
       <div className="rf-wrap">
         <div className="editor-actions">
@@ -159,7 +175,12 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
         <div className={'graph-feedback '+(notice?'active':ready?'ready':'waiting')} role="status" aria-live="polite">
           <span className="gf-dot"/>{notice||(ready?'CONTROL ONLINE · 출전 준비 완료':'CONTROL OFFLINE · 출력 링크를 완성하세요')}
         </div>
-        <ReactFlow nodes={renderedNodes} edges={edges} nodeTypes={nodeTypes}
+        <div ref={trashRef} className={`trash-drop${draggingNode?" dragging":""}${trashHot?" hot":""}`} aria-label="블록 삭제 영역">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg><span>{trashHot?"놓아서 삭제":"여기로 끌어 삭제"}</span>
+        </div>
+        <ReactFlow nodes={renderedNodes} edges={edges} nodeTypes={nodeTypes} deleteKeyCode={["Backspace","Delete"]}
+          onNodeDragStart={()=>{remember();setDraggingNode(true)}} onNodeDrag={e=>setTrashHot(isOverTrash(e))}
+          onNodeDragStop={(e,node)=>{const remove=isOverTrash(e);setDraggingNode(false);setTrashHot(false);if(remove)deleteNode(node.id,false)}}
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange} onConnect={onConnect}
           isValidConnection={c=>!!c.source&&!!c.sourceHandle&&!!c.target&&!!c.targetHandle&&!connectionIssue(latest.current.nodes,latest.current.edges,c.source,c.sourceHandle,c.target,c.targetHandle)}
           onNodeClick={(_,node:any)=>{setHover(null);setInfo(node.data.coreType)}} onPaneClick={clearPending}

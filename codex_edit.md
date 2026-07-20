@@ -203,3 +203,12 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - When a Const is connected to one input, its output now shows the signal destination, such as `value → Ld` or `value → gain`.
 - Kept the internal `v` port key unchanged so existing graphs, validation, and simulation behavior remain compatible.
 - Confirmed the Level 3 preset renders both `value → Ld` and `value → gain` correctly.
+
+## 2026-07-20 - Drag-to-trash block deletion (complete)
+
+- Added a persistent trash target at the bottom of the graph workspace with a clear `여기로 끌어 삭제` label.
+- The trash target becomes red and expands while a block is dragged over it, then removes the block and all attached links on drop.
+- Captured the pre-drag graph state so `UNDO` restores a deleted block to its original position together with its links.
+- Explicitly enabled both `Delete` and `Backspace` as keyboard alternatives.
+- Updated the Parts Bay instruction to teach the drag-to-trash gesture.
+- Verified in Level 1 that dragging Const to the trash changes the node count from 1 to 0 and that `UNDO` restores it at the original position.

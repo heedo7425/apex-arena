@@ -412,3 +412,11 @@ body{font-size:16px}
 .lv-hud span{padding:12px 13px;font-size:.78rem}.lv-hud small{font-size:.59rem}.lv-result{font-size:.95rem}.lv-result>span em{font-size:.78rem}
 @media(max-width:900px){.editor-pane .palette.parts-bay{width:min(420px,calc(100% - 16px))!important}.lv-pane{min-height:520px}}
 @media(max-width:620px){.gnode{width:196px}.gnode-h{font-size:13px}.io-row{font-size:12px}.mission-copy p{font-size:.8rem}.inquiry .brief-situation{font-size:.82rem}.brief-question{font-size:.84rem}}
+
+
+/* Drag-to-delete target */
+.trash-drop{position:absolute;z-index:9;left:50%;bottom:14px;display:flex;align-items:center;gap:8px;transform:translate(-50%,10px);pointer-events:none;padding:9px 14px;border:1px dashed var(--hairS);border-radius:10px;background:color-mix(in srgb,var(--surf) 92%,transparent);color:var(--faint);font-family:var(--mono);font-size:.64rem;letter-spacing:.04em;opacity:.78;box-shadow:0 8px 24px rgba(0,0,0,.28);transition:opacity .16s,transform .16s,border-color .16s,background .16s,color .16s}
+.trash-drop svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.trash-drop.dragging{opacity:1;transform:translate(-50%,0);border-color:var(--bad);color:var(--bad);background:color-mix(in srgb,var(--bad) 8%,var(--surf))}
+.trash-drop.hot{transform:translate(-50%,-2px) scale(1.06);border-style:solid;background:color-mix(in srgb,var(--bad) 22%,var(--surf));color:#fff;box-shadow:0 0 24px color-mix(in srgb,var(--bad) 35%,transparent)}
+@media(max-width:900px){.trash-drop{bottom:10px}.trash-drop:not(.dragging){opacity:.6}}
