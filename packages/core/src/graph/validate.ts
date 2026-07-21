@@ -35,6 +35,38 @@ const PORTS: Record<string, PortShape> = {
   'rng.gauss': { outs:{ v:'num' } },
   'sim.predict': { ins:{ steer:'num', throttle:'num' }, outs:{ x:'num', y:'num', v:'num' } },
   'sink.steer': { ins:{ x:'num' } }, 'sink.throttle': { ins:{ x:'num' } },
+
+  // P-a L0 expansion — math
+  'neg': { ins:{ x:'num' }, outs:{ v:'num' } }, 'sign': { ins:{ x:'num' }, outs:{ v:'num' } },
+  'mod': { ins:{ a:'num', b:'num' }, outs:{ v:'num' } }, 'pow': { ins:{ a:'num', b:'num' }, outs:{ v:'num' } },
+  'sqrt': { ins:{ x:'num' }, outs:{ v:'num' } }, 'min': { ins:{ a:'num', b:'num' }, outs:{ v:'num' } },
+  'max': { ins:{ a:'num', b:'num' }, outs:{ v:'num' } }, 'lerp': { ins:{ a:'num', b:'num', t:'num' }, outs:{ v:'num' } },
+  'sin': { ins:{ x:'num' }, outs:{ v:'num' } }, 'cos': { ins:{ x:'num' }, outs:{ v:'num' } },
+  'atan2': { ins:{ y:'num', x:'num' }, outs:{ v:'num' } }, 'hypot': { ins:{ a:'num', b:'num' }, outs:{ v:'num' } },
+  'wrapAngle': { ins:{ x:'num' }, outs:{ v:'num' } },
+  // logic
+  'gt': { ins:{ a:'num', b:'num' }, outs:{ v:'bool' } }, 'le': { ins:{ a:'num', b:'num' }, outs:{ v:'bool' } },
+  'ge': { ins:{ a:'num', b:'num' }, outs:{ v:'bool' } }, 'eq': { ins:{ a:'num', b:'num' }, outs:{ v:'bool' } },
+  'ne': { ins:{ a:'num', b:'num' }, outs:{ v:'bool' } }, 'and': { ins:{ a:'bool', b:'bool' }, outs:{ v:'bool' } },
+  'or': { ins:{ a:'bool', b:'bool' }, outs:{ v:'bool' } }, 'not': { ins:{ x:'bool' }, outs:{ v:'bool' } },
+  // vector (vec2 = 'point')
+  'vec.make': { ins:{ x:'num', y:'num' }, outs:{ e:'point' } }, 'vec.xy': { ins:{ e:'point' }, outs:{ x:'num', y:'num' } },
+  'vec.len': { ins:{ e:'point' }, outs:{ v:'num' } }, 'vec.scale': { ins:{ e:'point', s:'num' }, outs:{ e:'point' } },
+  'vec.add': { ins:{ a:'point', b:'point' }, outs:{ e:'point' } }, 'vec.sub': { ins:{ a:'point', b:'point' }, outs:{ e:'point' } },
+  'vec.dot': { ins:{ a:'point', b:'point' }, outs:{ v:'num' } }, 'vec.normalize': { ins:{ e:'point' }, outs:{ e:'point' } },
+  'vec.rotate': { ins:{ e:'point', th:'num' }, outs:{ e:'point' } }, 'vec.angle': { ins:{ e:'point' }, outs:{ v:'num' } },
+  'vec.dist': { ins:{ a:'point', b:'point' }, outs:{ v:'num' } },
+  // array & iteration
+  'arg2': { outs:{ v:'any' } }, 'argacc': { outs:{ v:'any' } },
+  'array.filter': { ins:{ arr:'any' }, outs:{ v:'any' } }, 'array.reduce': { ins:{ arr:'any', init:'any' }, outs:{ v:'any' } },
+  'array.zipWith': { ins:{ a:'any', b:'any' }, outs:{ v:'any' } }, 'array.get': { ins:{ arr:'any', i:'num' }, outs:{ v:'any' } },
+  'array.slice': { ins:{ arr:'any', i:'num', j:'num' }, outs:{ v:'any' } }, 'array.window': { ins:{ arr:'any', i:'num', w:'num' }, outs:{ v:'any' } },
+  'array.range': { ins:{ n:'num' }, outs:{ v:'array<num>' } }, 'array.diff': { ins:{ arr:'array<num>' }, outs:{ v:'array<num>' } },
+  'array.argmin': { ins:{ arr:'array<num>' }, outs:{ i:'num' } }, 'array.min': { ins:{ arr:'array<num>' }, outs:{ v:'num' } },
+  'array.sum': { ins:{ arr:'array<num>' }, outs:{ v:'num' } }, 'array.mean': { ins:{ arr:'array<num>' }, outs:{ v:'num' } },
+  // stateful
+  'st.delay': { ins:{ x:'num' }, outs:{ v:'num' } }, 'st.accum': { ins:{ x:'num' }, outs:{ v:'num' } },
+  'st.lowpass': { ins:{ x:'num' }, outs:{ v:'num' } }, 'st.rateLimit': { ins:{ x:'num' }, outs:{ v:'num' } },
 };
 
 export type GraphIssueCode =

@@ -18,7 +18,9 @@ export type EvalCtx = {
   world: World;
   car: CarState;
   dt: number;
-  __arg?: unknown;
+  __arg?: unknown;    // higher-order lambda: current element
+  __arg2?: unknown;   // zipWith: paired element
+  __argAcc?: unknown; // reduce: accumulator
 };
 export type NodeDef = {
   kind: NodeKind; cat: string; label?: string;

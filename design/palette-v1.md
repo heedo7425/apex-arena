@@ -83,3 +83,11 @@ Follow-the-Gap `argmax→각도` · 완성 속도정책. (2026-07-21 `std.pursui
 - **P-c · Path + Model** — 웨이포인트 생성 노드 + `sim.rollout`(MPPI 샘플 궤적 시각화).
 
 각 웨이브 합격 = 기존 랩 결정론 유지 + 대표 알고리즘 1개가 새 노드로 재구성됨.
+
+### 진행
+- **P-a ✅ 완료(2026-07-21)** — L0 확장 구현: Math(neg·sign·mod·pow·sqrt·min·max·lerp·sin·cos·atan2·hypot·wrapAngle) ·
+  Logic(gt·le·ge·eq·ne·and·or·not) · Vector(make·scale·add·sub·dot·normalize·rotate·angle·dist) ·
+  Array(get·slice·window·range·diff·argmin·min·sum·mean + 고차 filter/reduce/zipWith) · State(delay·accum·lowpass·rateLimit).
+  registry+validate(포트타입)+nodeMeta(마스터 카탈로그) 일괄. 단위검증 `test/prims.ts`(20 assert) + 기존 랩 결정론 유지.
+  고차(map/filter/reduce/zipWith)는 core엔 있으나 **에디터 람다 저작 UI 전까지 팔레트 미노출**. Struct(make.waypoint/get.field)는 P-c(Path)와 함께.
+- **P-b ⏳ 다음** — std.* opaque → composite 전환(열기/fork) + 신규 L1.
