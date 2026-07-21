@@ -51,5 +51,15 @@ ok(inl.bestClean === blk.bestClean, 'blocks lap === inline lap (behavior-preserv
 const a = runFor(world, BLOCKS, 42, 40), b = runFor(world, BLOCKS, 42, 40);
 ok(a.bestClean === b.bestClean, 'composite graph deterministic (same seed → identical)');
 
+// fork (inline) both blocks -> must still drive identically to the block version
+import { inlineComposite } from '../src/graph/inline.ts';
+let forked = inlineComposite(BLOCKS, 'steerctl', NT);
+forked = inlineComposite(forked, 'speedctl', NT);
+const noBlocks = Object.values(forked.nodes).every(n => n.type !== 'blk.pursuit' && n.type !== 'blk.speedPid' && n.type !== 'cin');
+ok(noBlocks, 'fork inlines blocks away (no blk.* / cin left)');
+const fk = runFor(world, forked, 1, 70);
+console.log('FORKED:', 'bestClean=' + (fk.bestClean?.toFixed(4) ?? '--'));
+ok(fk.bestClean === blk.bestClean, 'forked (inlined) lap === block lap (fork preserves behavior)');
+
 console.log(failed ? `\n❌ ${failed} FAILED` : '\n✅ ALL PASS — composite blocks preserve behavior');
 process.exit(failed ? 1 : 0);

@@ -3,12 +3,35 @@ import { ReactFlow, ReactFlowProvider, Background, Controls, addEdge,
   useNodesState, useEdgesState, useReactFlow, type Connection } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { GraphNode } from './GraphNode'
-import { connectionIssue, graphReady, newNode, rfToCore, type RFNode, type RFEdge } from './compile'
+import { connectionIssue, graphReady, newNode, rfToCore, coreToRF, type RFNode, type RFEdge } from './compile'
 import { defaultParams, metaOf, colorOf, ins, outs, PALETTE_CATS } from './nodeMeta'
 import { usePending } from '../store'
-import type { Graph } from '@apex/core'
+import { NT, inlineComposite, type Graph } from '@apex/core'
 
 const nodeTypes = { apex: GraphNode }
+
+// Read-only drill-in view of a composite block's inner sub-graph.
+function InnerView({ node, onClose, onFork }: { node:{id:string;type:string}; onClose:()=>void; onFork:()=>void }) {
+  const g = React.useMemo(() => coreToRF(NT[node.type].sub!), [node.type])
+  return (
+    <div className="inner-view">
+      <div className="inner-bar">
+        <button className="iv-close" onClick={onClose}>← 닫기</button>
+        <span className="iv-title">{metaOf(node.type).label} <em>· 내부 (읽기전용)</em></span>
+        <button className="iv-fork" onClick={onFork} title="이 블록을 풀어서 내 그래프에 붙여넣기">펼쳐서 내 그래프로 ⤢</button>
+      </div>
+      <div className="inner-flow">
+        <ReactFlowProvider>
+          <ReactFlow nodes={g.nodes as any} edges={g.edges as any} nodeTypes={nodeTypes}
+            fitView minZoom={0.4} maxZoom={2} nodesDraggable={false} nodesConnectable={false}
+            elementsSelectable={false} proOptions={{ hideAttribution:true }}>
+            <Background color="#314052" gap={24} size={1} />
+          </ReactFlow>
+        </ReactFlowProvider>
+      </div>
+    </div>
+  )
+}
 
 type Decorate = Record<string, { label?: string; highlight?: boolean; tag?: string }>
 type HoverInfo = { type:string; x:number; y:number }
@@ -23,6 +46,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   const [notice,setNotice] = useState<string|null>(null)
   const [bayOpen,setBayOpen] = useState(true)
   const [info,setInfo]=useState<string|null>(null)
+  const [openNode,setOpenNode]=useState<{id:string;type:string}|null>(null)
   const [hover,setHover]=useState<HoverInfo|null>(null)
   const trashRef = useRef<HTMLDivElement>(null)
   const [draggingNode,setDraggingNode] = useState(false)
@@ -122,6 +146,14 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     if(sig!==sigRef.current){sigRef.current=sig;onGraph(rfToCore(nodes as any,edges as any))}
   },[nodes,edges,onGraph])
 
+  const forkOpen = () => {
+    if(!openNode) return
+    const core = rfToCore(latest.current.nodes as any, latest.current.edges as any)
+    const inlined = inlineComposite(core, openNode.id, NT)
+    const rf = coreToRF(inlined)
+    remember(); setNodes(withCb(rf.nodes) as any); setEdges(rf.edges as any)
+    setOpenNode(null); setNotice('블록을 펼쳐 내 그래프에 붙였어요.'); frameBuild()
+  }
   const addNode=(type:string)=>{
     remember()
     const index=nodes.length
@@ -184,6 +216,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange} onConnect={onConnect}
           isValidConnection={c=>!!c.source&&!!c.sourceHandle&&!!c.target&&!!c.targetHandle&&!connectionIssue(latest.current.nodes,latest.current.edges,c.source,c.sourceHandle,c.target,c.targetHandle)}
           onNodeClick={(_,node:any)=>{setHover(null);setInfo(node.data.coreType)}} onPaneClick={clearPending}
+          onNodeDoubleClick={(_,node:any)=>{ if(NT[node.data.coreType]?.sub) setOpenNode({id:node.id,type:node.data.coreType}) }}
           fitView minZoom={0.58} maxZoom={2} proOptions={{hideAttribution:true}}>
           <Background color="#314052" gap={24} size={1}/>
           <Controls showInteractive={false}/>
@@ -199,6 +232,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
             {outs(info).length>0&&<span>OUT <b>{outs(info).join(', ')}</b></span>}
           </div>
         </div>}
+        {openNode&&<InnerView node={openNode} onClose={()=>setOpenNode(null)} onFork={forkOpen} />}
       </div>
       {hover&&<div className="node-tooltip" role="tooltip" style={{left:hover.x,top:hover.y,['--tip' as any]:colorOf(hover.type)}}>
         <div className="nt-cap">{metaOf(hover.type).cat} · PART GUIDE</div>

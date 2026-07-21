@@ -1,6 +1,6 @@
 import React from 'react'
 import { Handle, Position } from '@xyflow/react'
-import { portType } from '@apex/core'
+import { portType, NT } from '@apex/core'
 import { ins, outs, metaOf, colorOf } from './nodeMeta'
 import { useLive, usePending } from '../store'
 
@@ -26,6 +26,7 @@ export function GraphNode({ id, data }:{ id:string; data:any }) {
   const onHover = data.onHover as ((type:string,el:HTMLElement)=>void)|undefined
   const onHoverEnd = data.onHoverEnd as (()=>void)|undefined
   const nRows = Math.max(inP.length, outP.length, 1)
+  const isComposite = !!NT[type]?.sub
   const outputLabel = (port:string) => data.outputLabels?.[port] ?? (type === "const" && port === "v" ? "value" : port)
 
   return (
@@ -33,7 +34,7 @@ export function GraphNode({ id, data }:{ id:string; data:any }) {
       onMouseEnter={e=>onHover?.(type,e.currentTarget)} onMouseLeave={onHoverEnd}
       onFocus={e=>onHover?.(type,e.currentTarget)} onBlur={onHoverEnd}>
       {data.highlight && <div className="hl-tag">{data.tag || '여기 ↓'}</div>}
-      <div className="gnode-h" style={{ background:col }}>{data.label || meta.label}</div>
+      <div className={'gnode-h'+(isComposite?' composite':'')} style={{ background:col }}>{data.label || meta.label}{isComposite&&<span className="gnode-open">더블클릭 ▸ 열기</span>}</div>
       <div className="gnode-io" style={{ height:nRows*ROWH }}>
         {inP.map((p,i) => {
           const pType = portType(type,p,'in') || 'unknown'

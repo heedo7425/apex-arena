@@ -10,7 +10,7 @@ function argmaxArr(a: number[]): number { let bi = 0, bv = -Infinity; for (let i
 // ---- composite node: a shipped/user block = an inner sub-graph (openable, forkable) ----
 // Inner nodes read the block's inputs via `cin` (composite-in); state is namespaced per instance.
 function composite(cat: string, ins: string[], outs: string[], sub: Graph, outMap: Record<string, [string, string]>): NodeDef {
-  return { kind:'composite', cat, ins, outs, sub, fn:(inv,p,st,ctx)=>{
+  return { kind:'composite', cat, ins, outs, sub, outMap, fn:(inv,p,st,ctx)=>{
     const savedCin=ctx.__cin, savedState=ctx.state;
     ctx.__cin=inv; ctx.state=(st.__inner ||= {});
     const v=evalGraph(sub,ctx,NT);

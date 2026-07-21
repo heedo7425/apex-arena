@@ -27,6 +27,7 @@ export type NodeDef = {
   kind: NodeKind; cat: string; label?: string;
   ins?: string[]; outs?: string[];
   sub?: Graph; // composite: inner sub-graph (openable / forkable)
+  outMap?: Record<string, [string, string]>; // composite: output port -> [innerNodeId, innerPort]
   fn: (inv: Record<string, any>, params: any, st: any, ctx: EvalCtx) => Record<string, any>;
 };
 
