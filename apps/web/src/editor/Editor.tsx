@@ -6,18 +6,19 @@ import { GraphNode } from './GraphNode'
 import { connectionIssue, graphReady, newNode, rfToCore, coreToRF, type RFNode, type RFEdge } from './compile'
 import { defaultParams, metaOf, colorOf, ins, outs, PALETTE_CATS } from './nodeMeta'
 import { usePending } from '../store'
-import { NT, inlineComposite, type Graph } from '@apex/core'
+import { NT, inlineComposite, encapsulate, type Graph } from '@apex/core'
 
 const nodeTypes = { apex: GraphNode }
 
+type OpenNode = { id:string; type:string; label:string; sub:Graph }
 // Read-only drill-in view of a composite block's inner sub-graph.
-function InnerView({ node, onClose, onFork }: { node:{id:string;type:string}; onClose:()=>void; onFork:()=>void }) {
-  const g = React.useMemo(() => coreToRF(NT[node.type].sub!), [node.type])
+function InnerView({ node, onClose, onFork }: { node:OpenNode; onClose:()=>void; onFork:()=>void }) {
+  const g = React.useMemo(() => coreToRF(node.sub), [node.sub])
   return (
     <div className="inner-view">
       <div className="inner-bar">
         <button className="iv-close" onClick={onClose}>← 닫기</button>
-        <span className="iv-title">{metaOf(node.type).label} <em>· 내부 (읽기전용)</em></span>
+        <span className="iv-title">{node.label} <em>· 내부 (읽기전용)</em></span>
         <button className="iv-fork" onClick={onFork} title="이 블록을 풀어서 내 그래프에 붙여넣기">펼쳐서 내 그래프로 ⤢</button>
       </div>
       <div className="inner-flow">
@@ -46,7 +47,9 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   const [notice,setNotice] = useState<string|null>(null)
   const [bayOpen,setBayOpen] = useState(true)
   const [info,setInfo]=useState<string|null>(null)
-  const [openNode,setOpenNode]=useState<{id:string;type:string}|null>(null)
+  const [openNode,setOpenNode]=useState<OpenNode|null>(null)
+  const [selectedIds,setSelectedIds]=useState<string[]>([])
+  const blockUid=useRef(1)
   const [hover,setHover]=useState<HoverInfo|null>(null)
   const trashRef = useRef<HTMLDivElement>(null)
   const [draggingNode,setDraggingNode] = useState(false)
@@ -154,6 +157,24 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     remember(); setNodes(withCb(rf.nodes) as any); setEdges(rf.edges as any)
     setOpenNode(null); setNotice('블록을 펼쳐 내 그래프에 붙였어요.'); frameBuild()
   }
+  const openBlock = (id:string, type:string) => {
+    const rfNode = latest.current.nodes.find(n=>n.id===id) as any
+    const sub = (NT[type]?.sub ?? rfNode?.data?.params?.sub) as Graph | undefined
+    if(!sub) return
+    const label = rfNode?.data?.label || (type==='blk.user' ? (rfNode?.data?.params?.label || '▣ 내 블록') : metaOf(type).label)
+    setOpenNode({ id, type, label, sub })
+  }
+  const groupSelected = () => {
+    const ids = selectedIds.filter(id => latest.current.nodes.some(n=>n.id===id))
+    if(ids.length < 2) return
+    const core = rfToCore(latest.current.nodes as any, latest.current.edges as any)
+    const blockId = `blk_${blockUid.current++}`
+    const grouped = encapsulate(core, ids, blockId, NT)
+    if(grouped.nodes[blockId] === undefined){ setNotice('이 노드들은 블록으로 묶을 수 없어요.'); return }
+    const rf = coreToRF(grouped)
+    remember(); setNodes(withCb(rf.nodes) as any); setEdges(rf.edges as any)
+    setSelectedIds([]); setNotice(`${ids.length}개 노드를 블록으로 묶었어요. (더블클릭해 열기)`); frameBuild()
+  }
   const addNode=(type:string)=>{
     remember()
     const index=nodes.length
@@ -197,10 +218,11 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
             </div>
           })}
         </div>
-        <div className="pal-note">파트 선택 → 캔버스 장착 → 신호 포트 체결 · 블록을 휴지통에 드롭</div>
+        <div className="pal-note">파트 선택 → 캔버스 장착 → 신호 포트 체결 · 빈 곳 드래그로 여러 노드 선택 → <b>블록으로 묶기</b> · 블록을 휴지통에 드롭</div>
       </div>}
       <div className="rf-wrap">
         <div className="editor-actions">
+          {selectedIds.length>=2 && <button className="group-btn" onClick={groupSelected} aria-label="선택한 노드를 블록으로 묶기">▣ 블록으로 묶기 ({selectedIds.length})</button>}
           <button onClick={undo} disabled={undoCount === 0} aria-label="마지막 변경 되돌리기">↶ UNDO</button>
           <button onClick={resetBuild} aria-label="미션 그래프 초기화">↻ RESET</button>
         </div>
@@ -214,9 +236,11 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
           onNodeDragStart={()=>{remember();setDraggingNode(true)}} onNodeDrag={e=>setTrashHot(isOverTrash(e))}
           onNodeDragStop={(e,node)=>{const remove=isOverTrash(e);setDraggingNode(false);setTrashHot(false);if(remove)deleteNode(node.id,false)}}
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange} onConnect={onConnect}
+          onSelectionChange={({nodes:sel}:any)=>setSelectedIds(sel.map((n:any)=>n.id))}
+          selectionOnDrag panOnDrag={[1,2]} selectionKeyCode={null} multiSelectionKeyCode={["Shift","Meta"]}
           isValidConnection={c=>!!c.source&&!!c.sourceHandle&&!!c.target&&!!c.targetHandle&&!connectionIssue(latest.current.nodes,latest.current.edges,c.source,c.sourceHandle,c.target,c.targetHandle)}
           onNodeClick={(_,node:any)=>{setHover(null);setInfo(node.data.coreType)}} onPaneClick={clearPending}
-          onNodeDoubleClick={(_,node:any)=>{ if(NT[node.data.coreType]?.sub) setOpenNode({id:node.id,type:node.data.coreType}) }}
+          onNodeDoubleClick={(_,node:any)=>openBlock(node.id,node.data.coreType)}
           fitView minZoom={0.58} maxZoom={2} proOptions={{hideAttribution:true}}>
           <Background color="#314052" gap={24} size={1}/>
           <Controls showInteractive={false}/>

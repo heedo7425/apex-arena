@@ -65,7 +65,12 @@ export const META: Record<string, Meta> = {
   'blk.pursuit':{label:'▣ Pursuit 조향',cat:'Module',desc:'L2에서 만든 Pure Pursuit 조향 전체를 한 블록으로 묶은 것. Pose·Track을 스스로 읽어 steer를 냄. (곧 더블클릭해 열어보기·fork 지원)'},
   'blk.speedPid':{label:'▣ Speed PID',cat:'Module',desc:'L1에서 만든 속도 PID 제어기. 목표속도(target)를 받아 throttle을 냄. (곧 열어보기·fork 지원)'},
   'cin':{label:'in',cat:'Composite',desc:'블록 내부에서 바깥 입력을 받는 자리표.'},
+  'blk.user':{label:'▣ 내 블록',cat:'Module',desc:'네가 노드들을 묶어 만든 블록. 더블클릭해 열어보거나 fork로 풀 수 있어.'},
 }
+
+// dynamic ports for user blocks (per-instance); everything else reads NT.
+export function insOf(type:string, data?:any):string[]{ return type==='blk.user' ? (data?.params?.inPorts??[]).map((p:any)=>p.name) : ins(type) }
+export function outsOf(type:string, data?:any):string[]{ return type==='blk.user' ? (data?.params?.outPorts??[]).map((p:any)=>p.name) : outs(type) }
 
 export function ins(type:string):string[]{ return NT[type]?.ins ?? [] }
 export function outs(type:string):string[]{ return NT[type]?.outs ?? [] }

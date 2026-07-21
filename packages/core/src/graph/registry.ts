@@ -159,6 +159,16 @@ export const NT: Record<string, NodeDef> = {
   // ---- Modules: prior-mission controllers provided as openable blocks (P-b) ----
   'blk.pursuit': composite('Module', [], ['steer'], PURSUIT_SUB, { steer:['steer','v'] }),
   'blk.speedPid': composite('Module', ['target'], ['throttle'], SPEEDPID_SUB, { throttle:['thr','v'] }),
+  // user-made block (encapsulation): inner sub-graph + outMap carried on params
+  'blk.user': { kind:'composite', cat:'Module', fn:(inv,p,st,ctx)=>{
+    const sub:Graph=p.sub, outMap:Record<string,[string,string]>=p.outMap||{};
+    const savedCin=ctx.__cin, savedState=ctx.state;
+    ctx.__cin=inv; ctx.state=(st.__inner ||= {});
+    const v=evalGraph(sub,ctx,NT);
+    ctx.__cin=savedCin; ctx.state=savedState;
+    const o:Record<string,any>={}; for (const k in outMap) o[k]=v[outMap[k][0]]?.[outMap[k][1]];
+    return o;
+  } },
 
   // ---- hooks (reserved for MPPI/MPC/RL) ----
   'rng.uniform': { kind:'prim', cat:'Random', ins:['lo','hi'], outs:['v'], fn:(i,p,s,c)=>({ v:uniform(c.rng, i.lo??0, i.hi??1) }) },

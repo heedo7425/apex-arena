@@ -58,6 +58,8 @@ export function evalGraph(g: Graph, ctx: EvalCtx, NT: Record<string, NodeDef>): 
     if (!nt) throw new Error('unknown node type: ' + n.type);
     const inv: Record<string, any> = {};
     if (nt.ins) for (const port of nt.ins) inv[port] = resolveRef(n.in?.[port], val);
+    // dynamic composites (blk.user) declare no static ins — resolve any extra wired inputs
+    if (n.in) for (const port in n.in) if (!(port in inv)) inv[port] = resolveRef(n.in[port], val);
     const st = ctx.state[id] || (ctx.state[id] = {});
     val[id] = nt.fn(inv, n.params || {}, st, ctx) || {};
   }

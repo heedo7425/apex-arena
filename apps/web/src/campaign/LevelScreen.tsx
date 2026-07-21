@@ -82,6 +82,8 @@ export function LevelScreen({ id }: { id: string }) {
   const [split, setSplit] = useState(60)
   const [simKey, setSimKey] = useState(0)
   const bodyRef = useRef<HTMLDivElement>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (result) resultRef.current?.scrollIntoView({ behavior:'smooth', block:'nearest' }) }, [result])
   const resizing = useRef(false)
   const setVals = useLive((s) => s.setVals)
   const { complete, goMap, best } = useGame()
@@ -207,7 +209,7 @@ export function LevelScreen({ id }: { id: string }) {
             <span><small>OBJECTIVE</small><b>{isTut ? 'CREATE MOTION' : level.objective.type === 'time' ? 'CLEAN ≤ ' + level.objective.target + 's' : level.objective.type === 'speed' ? Math.round(level.objective.target*3.6) + ' km/h · ' + level.objective.hold + 's' : 'CLEAN LAP'}</b></span>
             <span><small>{isTut ? 'OBSERVATION' : isL1 ? 'TARGET HOLD' : 'SESSION BEST'}</small><b>{isTut ? (tutMoved ? 'MOTION DETECTED' : 'NO MOTION') : isL1 ? Math.min(hud.hold, level.objective.type === 'speed' ? level.objective.hold : 0).toFixed(1) + ' / 2.0s' : hud.best != null ? hud.best.toFixed(2)+'s' : '—'}</b></span>
           </div>
-          {result && <div className={'lv-result ' + (result.ok ? 'ok' : 'bad')}>
+          {result && <div ref={resultRef} className={'lv-result ' + (result.ok ? 'ok' : 'bad')}>
             <span><small>{result.ok ? 'MISSION COMPLETE' : 'TRY AGAIN'}</small>{result.msg}{result.ok&&<em>{brief.takeaway}</em>}</span>
             {!result.ok && <button onClick={retry}>↻ 다시 시작</button>}
             {result.ok && nextLevel && <button onClick={() => useGame.getState().goLevel(nextLevel.id)}>다음 레벨 →</button>}

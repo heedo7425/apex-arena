@@ -61,5 +61,22 @@ const fk = runFor(world, forked, 1, 70);
 console.log('FORKED:', 'bestClean=' + (fk.bestClean?.toFixed(4) ?? '--'));
 ok(fk.bestClean === blk.bestClean, 'forked (inlined) lap === block lap (fork preserves behavior)');
 
+// encapsulation: collapse PURSUIT's steering nodes into a user block -> same lap; fork back -> same lap
+import { encapsulate } from '../src/graph/inline.ts';
+import { PURSUIT } from '../src/graph/presets.ts';
+const purBase = runFor(world, PURSUIT, 7, 60);
+const steerIds = ['Ld','look','e','comp','dist','two','twoY','dsq','k','gain','sraw','steer'];
+const grouped = encapsulate(PURSUIT, steerIds, 'myblock', NT);
+const gm = grouped.nodes['myblock'];
+ok(!!gm && gm.type === 'blk.user', 'encapsulate creates a blk.user node');
+ok((gm.params as any).inPorts.length === 2, 'block has 2 inputs (pose, track)'); // deduped external sources
+ok((gm.params as any).outPorts.length === 1, 'block has 1 output (steer)');
+const pg = runFor(world, grouped, 7, 60);
+console.log('PURSUIT base:', purBase.bestClean?.toFixed(4), '| grouped:', pg.bestClean?.toFixed(4));
+ok(purBase.bestClean === pg.bestClean, 'encapsulated graph lap === original (group preserves behavior)');
+const regrouped = inlineComposite(grouped, 'myblock', NT);
+const rg = runFor(world, regrouped, 7, 60);
+ok(purBase.bestClean === rg.bestClean, 'encapsulate → fork round-trip preserves behavior');
+
 console.log(failed ? `\n❌ ${failed} FAILED` : '\n✅ ALL PASS — composite blocks preserve behavior');
 process.exit(failed ? 1 : 0);

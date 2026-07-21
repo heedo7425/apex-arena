@@ -1,7 +1,7 @@
 import React from 'react'
 import { Handle, Position } from '@xyflow/react'
 import { portType, NT } from '@apex/core'
-import { ins, outs, metaOf, colorOf } from './nodeMeta'
+import { insOf, outsOf, metaOf, colorOf } from './nodeMeta'
 import { useLive, usePending } from '../store'
 
 const ROWH = 28
@@ -18,7 +18,7 @@ function fmt(v:any):string {
 export function GraphNode({ id, data }:{ id:string; data:any }) {
   const type = data.coreType as string
   const meta = metaOf(type), col = colorOf(type)
-  const inP = ins(type), outP = outs(type)
+  const inP = insOf(type, data), outP = outsOf(type, data)
   const live = useLive((s) => (s.vals ? s.vals[id] : null))
   const sel = usePending((s) => s.sel)
   const setParam = data.onParam as ((id:string,key:string,v:number)=>void)|undefined
@@ -26,7 +26,8 @@ export function GraphNode({ id, data }:{ id:string; data:any }) {
   const onHover = data.onHover as ((type:string,el:HTMLElement)=>void)|undefined
   const onHoverEnd = data.onHoverEnd as (()=>void)|undefined
   const nRows = Math.max(inP.length, outP.length, 1)
-  const isComposite = !!NT[type]?.sub
+  const isComposite = !!NT[type]?.sub || !!data.params?.sub
+  const headLabel = data.label || (type === 'blk.user' ? (data.params?.label || '▣ 내 블록') : meta.label)
   const outputLabel = (port:string) => data.outputLabels?.[port] ?? (type === "const" && port === "v" ? "value" : port)
 
   return (
@@ -34,7 +35,7 @@ export function GraphNode({ id, data }:{ id:string; data:any }) {
       onMouseEnter={e=>onHover?.(type,e.currentTarget)} onMouseLeave={onHoverEnd}
       onFocus={e=>onHover?.(type,e.currentTarget)} onBlur={onHoverEnd}>
       {data.highlight && <div className="hl-tag">{data.tag || '여기 ↓'}</div>}
-      <div className={'gnode-h'+(isComposite?' composite':'')} style={{ background:col }}>{data.label || meta.label}{isComposite&&<span className="gnode-open">더블클릭 ▸ 열기</span>}</div>
+      <div className={'gnode-h'+(isComposite?' composite':'')} style={{ background:col }}>{headLabel}{isComposite&&<span className="gnode-open">더블클릭 ▸ 열기</span>}</div>
       <div className="gnode-io" style={{ height:nRows*ROWH }}>
         {inP.map((p,i) => {
           const pType = portType(type,p,'in') || 'unknown'

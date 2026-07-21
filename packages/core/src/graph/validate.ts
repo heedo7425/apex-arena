@@ -79,6 +79,7 @@ export type GraphIssueCode =
 export type GraphIssue = { code: GraphIssueCode; message: string; nodeId?: string; port?: string };
 
 export function portType(nodeType: string, port: string, direction: 'in' | 'out'): PortType | undefined {
+  if (nodeType === 'blk.user') return 'any'; // user block ports are dynamic (per-instance)
   return direction === 'in' ? PORTS[nodeType]?.ins?.[port] : PORTS[nodeType]?.outs?.[port];
 }
 
@@ -156,7 +157,10 @@ export function validateGraph(
 
     for (const id of active) {
       const node = nodes[id];
-      for (const input of Object.keys(PORTS[node.type]?.ins ?? {})) {
+      const insList = node.type === 'blk.user'
+        ? (((node.params?.inPorts as any[]) ?? []).map(p => p.name))
+        : Object.keys(PORTS[node.type]?.ins ?? {});
+      for (const input of insList) {
         if (!node.in?.[input]) issues.push({ code:'unwired-input', nodeId:id, port:input, message:`${id}.${input} must be wired` });
       }
     }
