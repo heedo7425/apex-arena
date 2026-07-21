@@ -71,6 +71,10 @@
 
 **완성 알고리즘 = 예제 그래프(팔레트 노드 아님):** Pure Pursuit · Follow-the-Gap · Grip-limited speed … → 불러와서 열고 fork.
 
+> **v1 팔레트 확정 = `design/palette-v1.md`.** 왼쪽에 존재하는 노드 어휘 전체를 못 박음(레벨은 부분집합만 노출).
+> 결정(2026-07-21): L1은 넉넉하되 전부 `composite`(열림). 위 Control의 `Pursuit curvature`/`Steer from curvature`는
+> **L1에서 내려 예제 그래프로만** — 알고리즘의 시그니처 결정규칙이라 유저가 조립(오늘 registry에서 제거함).
+
 ## 4. 실행 · 비용
 - 매 tick **위상 정렬 평가**. ⏱ 노드는 이전-tick 상태 읽고 새 상태 씀. 리셋 = ⏱ 상태 0.
 - 각 노드 **compute-cost 가중치** → 그래프 총합 = 예산 지표(fast vs cheap vs robust 다중지표).
