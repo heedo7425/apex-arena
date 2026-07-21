@@ -8,6 +8,7 @@ export type Meta = { label:string; cat:string; params?:ParamSpec[]; desc?:string
 export const CAT_COLOR: Record<string,string> = {
   Sensors:'#6FA8DC', Math:'#9AA6B4', Logic:'#E4736A', Array:'#B58BE0', Vector:'#67C88A', State:'#D69A57',
   Geometry:'#E7B24C', Planning:'#E7B24C', Control:'#1FDDC9', Random:'#c98bff', Model:'#8fd6c9', Output:'#1FDDC9',
+  Module:'#8C7CF0', Composite:'#8C7CF0',
 }
 
 export const META: Record<string, Meta> = {
@@ -61,6 +62,9 @@ export const META: Record<string, Meta> = {
   'sim.predict':{label:'predict (model)',cat:'Model',desc:'차량 모델로 다음 상태를 예측. MPPI·MPC가 미래를 굴려볼 때.'},
   'sink.steer':{label:'▸ STEER',cat:'Output',desc:'최종 조향 출력 (−1 왼쪽 ~ +1 오른쪽). 그래프의 결과 중 하나.'},
   'sink.throttle':{label:'▸ THROTTLE',cat:'Output',desc:'최종 스로틀 출력 (−1 제동 ~ +1 가속). 차를 움직이려면 반드시 연결.'},
+  'blk.pursuit':{label:'▣ Pursuit 조향',cat:'Module',desc:'L2에서 만든 Pure Pursuit 조향 전체를 한 블록으로 묶은 것. Pose·Track을 스스로 읽어 steer를 냄. (곧 더블클릭해 열어보기·fork 지원)'},
+  'blk.speedPid':{label:'▣ Speed PID',cat:'Module',desc:'L1에서 만든 속도 PID 제어기. 목표속도(target)를 받아 throttle을 냄. (곧 열어보기·fork 지원)'},
+  'cin':{label:'in',cat:'Composite',desc:'블록 내부에서 바깥 입력을 받는 자리표.'},
 }
 
 export function ins(type:string):string[]{ return NT[type]?.ins ?? [] }
@@ -85,5 +89,6 @@ export const PALETTE_CATS: {cat:string; types:string[]}[] = [
   {cat:'Control',  types:['ctrl.pid']},
   {cat:'Planning', types:['std.gripSpeed']},
   {cat:'Model',    types:['sim.predict','rng.uniform','rng.gauss']},
+  {cat:'Module',   types:['blk.pursuit','blk.speedPid']},
   {cat:'Output',   types:['sink.steer','sink.throttle']},
 ]

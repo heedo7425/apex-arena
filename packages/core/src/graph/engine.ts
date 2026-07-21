@@ -21,10 +21,12 @@ export type EvalCtx = {
   __arg?: unknown;    // higher-order lambda: current element
   __arg2?: unknown;   // zipWith: paired element
   __argAcc?: unknown; // reduce: accumulator
+  __cin?: Record<string, unknown>; // composite node: inputs by port name
 };
 export type NodeDef = {
   kind: NodeKind; cat: string; label?: string;
   ins?: string[]; outs?: string[];
+  sub?: Graph; // composite: inner sub-graph (openable / forkable)
   fn: (inv: Record<string, any>, params: any, st: any, ctx: EvalCtx) => Record<string, any>;
 };
 

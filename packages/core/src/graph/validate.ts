@@ -67,6 +67,10 @@ const PORTS: Record<string, PortShape> = {
   // stateful
   'st.delay': { ins:{ x:'num' }, outs:{ v:'num' } }, 'st.accum': { ins:{ x:'num' }, outs:{ v:'num' } },
   'st.lowpass': { ins:{ x:'num' }, outs:{ v:'num' } }, 'st.rateLimit': { ins:{ x:'num' }, outs:{ v:'num' } },
+  // composite / modules
+  'cin': { outs:{ v:'any' } },
+  'blk.pursuit': { outs:{ steer:'num' } },
+  'blk.speedPid': { ins:{ target:'num' }, outs:{ throttle:'num' } },
 };
 
 export type GraphIssueCode =

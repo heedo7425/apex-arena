@@ -1,11 +1,43 @@
 // Node registry: L0 primitives, L1 standard library, sources/sinks,
 // plus reserved hooks (rng.uniform, sim.predict) for MPPI/MPC/RL.
-import { type NodeDef, type EvalCtx, type Graph, evalGraph } from './engine.ts';
+import { type NodeDef, type EvalCtx, type Graph, evalGraph, makeGraph } from './engine.ts';
 import { nearestIndex, curvAheadAt, G } from '../sim/world.ts';
 import { stepDynamics } from '../sim/vehicle.ts';
 import { uniform, gaussian } from '../rng.ts';
 
 function argmaxArr(a: number[]): number { let bi = 0, bv = -Infinity; for (let i = 0; i < a.length; i++) if (a[i] > bv) { bv = a[i]; bi = i; } return bi; }
+
+// ---- composite node: a shipped/user block = an inner sub-graph (openable, forkable) ----
+// Inner nodes read the block's inputs via `cin` (composite-in); state is namespaced per instance.
+function composite(cat: string, ins: string[], outs: string[], sub: Graph, outMap: Record<string, [string, string]>): NodeDef {
+  return { kind:'composite', cat, ins, outs, sub, fn:(inv,p,st,ctx)=>{
+    const savedCin=ctx.__cin, savedState=ctx.state;
+    ctx.__cin=inv; ctx.state=(st.__inner ||= {});
+    const v=evalGraph(sub,ctx,NT);
+    ctx.__cin=savedCin; ctx.state=savedState;
+    const o:Record<string,any>={}; for (const k in outMap) o[k]=v[outMap[k][0]]?.[outMap[k][1]];
+    return o;
+  } };
+}
+
+// Inner sub-graph: Pure Pursuit steering (what the player builds in L2) → steer.
+const PURSUIT_SUB: Graph = makeGraph({
+  pose:{ type:'src.pose' }, track:{ type:'src.track' }, Ld:{ type:'const', params:{ value:6 } },
+  look:{ type:'std.lookahead', in:{ pose:['n','pose','pose'], track:['n','track','track'], Ld:['n','Ld','v'] } },
+  e:{ type:'std.tocar', in:{ pt:['n','look','pt'], pose:['n','pose','pose'] } },
+  comp:{ type:'vec.xy', in:{ e:['n','e','e'] } }, dist:{ type:'vec.len', in:{ e:['n','e','e'] } },
+  two:{ type:'const', params:{ value:2 } }, twoY:{ type:'mul', in:{ a:['n','two','v'], b:['n','comp','y'] } },
+  dsq:{ type:'mul', in:{ a:['n','dist','v'], b:['n','dist','v'] } }, k:{ type:'div', in:{ a:['n','twoY','v'], b:['n','dsq','v'] } },
+  gain:{ type:'const', params:{ value:5.2 } }, sraw:{ type:'mul', in:{ a:['n','k','v'], b:['n','gain','v'] } },
+  steer:{ type:'clamp', params:{ lo:-1, hi:1 }, in:{ x:['n','sraw','v'] } },
+});
+// Inner sub-graph: speed PID (what the player builds in L1). target → throttle.
+const SPEEDPID_SUB: Graph = makeGraph({
+  sp:{ type:'src.speed' }, tgt:{ type:'cin', params:{ port:'target' } },
+  verr:{ type:'sub', in:{ a:['n','tgt','v'], b:['n','sp','v'] } },
+  pid:{ type:'ctrl.pid', params:{ kp:0.6, ki:0.06, kd:0 }, in:{ err:['n','verr','v'] } },
+  thr:{ type:'clamp', params:{ lo:-1, hi:1 }, in:{ x:['n','pid','u'] } },
+});
 
 export const NT: Record<string, NodeDef> = {
   // ---- sources (read observation) ----
@@ -120,6 +152,13 @@ export const NT: Record<string, NodeDef> = {
   'st.accum': { kind:'std', cat:'State', ins:['x'], outs:['v'], fn:(i,p,s,c)=>{ s.acc=(s.acc||0)+i.x*c.dt; return { v:s.acc }; } },
   'st.lowpass': { kind:'std', cat:'State', ins:['x'], outs:['v'], fn:(i,p,s)=>{ const a=p.alpha??0.1; s.y=(s.y==null)?i.x:a*i.x+(1-a)*s.y; return { v:s.y }; } },
   'st.rateLimit': { kind:'std', cat:'State', ins:['x'], outs:['v'], fn:(i,p,s,c)=>{ const lim=(p.rate??1)*c.dt; const prev=s.y==null?i.x:s.y; s.y=prev+Math.max(-lim,Math.min(lim,i.x-prev)); return { v:s.y }; } },
+
+  // ---- composite input placeholder (used only inside block sub-graphs) ----
+  'cin': { kind:'prim', cat:'Composite', outs:['v'], fn:(i,p,s,c)=>({ v:(c.__cin||{})[p.port] }) },
+
+  // ---- Modules: prior-mission controllers provided as openable blocks (P-b) ----
+  'blk.pursuit': composite('Module', [], ['steer'], PURSUIT_SUB, { steer:['steer','v'] }),
+  'blk.speedPid': composite('Module', ['target'], ['throttle'], SPEEDPID_SUB, { throttle:['thr','v'] }),
 
   // ---- hooks (reserved for MPPI/MPC/RL) ----
   'rng.uniform': { kind:'prim', cat:'Random', ins:['lo','hi'], outs:['v'], fn:(i,p,s,c)=>({ v:uniform(c.rng, i.lo??0, i.hi??1) }) },

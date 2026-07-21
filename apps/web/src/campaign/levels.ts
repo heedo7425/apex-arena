@@ -12,33 +12,20 @@ export type Level = {
 // L1: speed control is built and tested on a straight proving ground.
 const L1: Graph = makeGraph({})
 
-// L2: the speed controller built last mission is provided (visible) so the car actually
-// moves; the player builds the Pure Pursuit steering law themselves.
+// L2: the speed controller built in L1 is provided as one openable block (▣ Speed PID)
+// so the car moves; the player builds the Pure Pursuit steering law themselves.
 const L2: Graph = makeGraph({
-  sp:{type:'src.speed'}, tgt:{type:'const',params:{value:8}},
-  verr:{type:'sub',in:{a:['n','tgt','v'],b:['n','sp','v']}},
-  spid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0},in:{err:['n','verr','v']}},
-  sthr:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','spid','u']}},
-  tsink:{type:'sink.throttle',in:{x:['n','sthr','v']}},
+  cruise:{type:'const',params:{value:8}},
+  speedctl:{type:'blk.speedPid',in:{target:['n','cruise','v']}},
+  tsink:{type:'sink.throttle',in:{x:['n','speedctl','throttle']}},
 })
 
-// L3: steering and PID are complete; replace constant target speed with a grip-aware target.
+// L3: prior missions are provided as two openable blocks (▣ Pursuit 조향, ▣ Speed PID).
+// The player builds only this level's new concept: a grip-aware target speed that feeds
+// the speed block. Steering block drives itself; throttle waits for the built target.
 const L3: Graph = makeGraph({
-  pose:{type:'src.pose'}, track:{type:'src.track'}, speed:{type:'src.speed'},
-  Ld:{type:'const',params:{value:6}},
-  look:{type:'std.lookahead',in:{pose:['n','pose','pose'],track:['n','track','track'],Ld:['n','Ld','v']}},
-  e:{type:'std.tocar',in:{pt:['n','look','pt'],pose:['n','pose','pose']}},
-  comp:{type:'vec.xy',in:{e:['n','e','e']}}, dist:{type:'vec.len',in:{e:['n','e','e']}},
-  two:{type:'const',params:{value:2}}, twoY:{type:'mul',in:{a:['n','two','v'],b:['n','comp','y']}},
-  dsq:{type:'mul',in:{a:['n','dist','v'],b:['n','dist','v']}}, k:{type:'div',in:{a:['n','twoY','v'],b:['n','dsq','v']}},
-  gain:{type:'const',params:{value:5.2}}, sraw:{type:'mul',in:{a:['n','k','v'],b:['n','gain','v']}},
-  steer:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','sraw','v']}},
-  ssink:{type:'sink.steer',in:{x:['n','steer','v']}},
-  curve:{type:'std.curvAhead'}, grip:{type:'std.gripSpeed',params:{vmax:13,margin:0.85}},
-  verr:{type:'sub',in:{b:['n','speed','v']}},
-  pid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0},in:{err:['n','verr','v']}},
-  thr:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','pid','u']}},
-  tsink:{type:'sink.throttle',in:{x:['n','thr','v']}},
+  steerctl:{type:'blk.pursuit'}, ssink:{type:'sink.steer',in:{x:['n','steerctl','steer']}},
+  speedctl:{type:'blk.speedPid'}, tsink:{type:'sink.throttle',in:{x:['n','speedctl','throttle']}},
 })
 
 // L4: throttle is complete; build angle = a0 + argmax(ranges) * da.
@@ -69,8 +56,8 @@ export const LEVELS: Level[] = [
     palette:['const','src.pose','src.track','std.lookahead','std.tocar','vec.xy','vec.len','mul','div','clamp','sink.steer'], objective:{type:'clean'}, starter:L2,
     requirements:[{type:'std.lookahead',label:'전방 목표점'},{type:'std.tocar',label:'차 좌표 변환'},{type:'vec.xy',label:'횡오차 y 추출'},{type:'div',label:'곡률 k 계산'}], unlock:'Pure Pursuit' },
   { id:'l3', n:3, title:'그립의 한계', kicker:'CORNER SPEED',
-    teach:'전방 곡률로 안전 속도를 계산해 PID의 목표속도로 넣고 32초 안에 완주하세요.',
-    palette:['sub','ctrl.pid','clamp','src.speed','src.pose','src.track','std.curvAhead','std.gripSpeed','sink.throttle'], objective:{type:'time',target:32}, starter:L3,
+    teach:'조향·속도 블록은 제공돼. 전방 곡률로 안전 속도를 만들어 속도 블록의 target에 넣고 32초 안에 완주하세요.',
+    palette:['src.pose','src.track','std.curvAhead','std.gripSpeed'], objective:{type:'time',target:32}, starter:L3,
     requirements:[{type:'std.curvAhead',label:'전방 곡률'},{type:'std.gripSpeed',label:'그립 속도'}], unlock:'곡률 기반 속도 계획' },
   { id:'l4', n:4, title:'보이지 않는 길', kicker:'FOLLOW THE GAP',
     teach:'LiDAR 거리 배열의 가장 넓은 빔을 찾아 각도로 바꾸고 STEER까지 연결하세요.',

@@ -32,10 +32,10 @@ const BRIEFS: Record<string,MissionBrief> = {
     takeaway:'Pure Pursuit의 곡률 법칙 k=2y/Ld²을 직접 노드로 짜서 목표점을 조향으로 바꿨습니다.',
   },
   l3:{
-    situation:'직선과 헤어핀을 같은 속도로 달리면 타이어의 횡그립 한계를 넘습니다.',
-    question:'코너의 급함을 속도 제어기의 목표에 어떻게 반영할까요?',
-    hints:['곡률이 클수록 회전 반경이 작아 안전 속도는 낮아져야 합니다.','Curvature ahead가 곡률을 읽고 Grip speed가 안전 목표 속도를 만듭니다.','Pose와 Track → Curvature ahead.k → Grip speed.v → verr.a로 연결하세요.'],
-    takeaway:'속도 계획기는 곡률을 미리 읽어 PID 목표를 바꾸므로 코너 전에 감속합니다.',
+    situation:'조향·속도 블록은 제공됐지만, 속도 블록의 target이 비어 있어 차가 아직 못 나갑니다. 직선·헤어핀을 같은 속도로 달리면 그립 한계를 넘습니다.',
+    question:'코너의 급함을 속도 블록의 목표속도에 어떻게 반영할까요?',
+    hints:['곡률이 클수록 회전 반경이 작아 안전 속도는 낮아져야 합니다.','Curvature ahead가 곡률을 읽고 Grip speed가 안전 목표 속도를 만듭니다.','Pose·Track → Curvature ahead.k → Grip speed.v → ▣ Speed PID의 target으로 연결하세요.'],
+    takeaway:'속도 계획기는 곡률을 미리 읽어 속도 목표를 바꾸므로 코너 전에 감속합니다.',
   },
   l4:{
     situation:'Track이 없는 좁은 통로에서는 LiDAR 거리만으로 열린 방향을 찾아야 합니다.',
@@ -89,6 +89,7 @@ export function LevelScreen({ id }: { id: string }) {
   const isTut = level.id === 'tut'
   const isL1 = level.id === 'l1'
   const isL2 = level.id === 'l2'
+  const isL3 = level.id === 'l3'
   const requiredOutputs = useMemo(() => isTut || isL1 ? ['sink.throttle']
     : undefined, [isTut, isL1])
   const issues = useMemo(() => validateGraph(graph, NT, {
@@ -151,7 +152,8 @@ export function LevelScreen({ id }: { id: string }) {
         <div className="mission-copy"><span className="eyebrow">MISSION</span><p>{level.teach}</p></div>
         <div className="mission-checks">
           {isL1 && <span className="done">✓ STRAIGHT PROVING GROUND</span>}
-          {isL2 && <span className="done">✓ 속도 제어기 제공됨</span>}
+          {isL2 && <span className="done">✓ ▣ Speed PID 블록 제공됨</span>}
+          {isL3 && <span className="done">✓ ▣ 조향·속도 블록 제공됨</span>}
           {checks.map(c => <span key={c.type} className={c.ok ? 'done' : ''}>{c.ok ? '✓' : '○'} {c.label}</span>)}
           <span className={outputReady ? 'done' : ''}>{outputReady ? '✓' : '○'} 출력 연결</span>
         </div>
