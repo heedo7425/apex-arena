@@ -39,7 +39,8 @@ Follow-the-Gap `argmax→각도` · 완성 속도정책. (2026-07-21 `std.pursui
 `vec.dot +` `vec.normalize +` `vec.rotate +`(v,θ) · `vec.angle +`(angleOf) · `vec.dist +`
 
 ### 4. Struct · L0  (커스텀 노드·웨이포인트 생성 전제)
-`make.waypoint +` · `make.command +` · `get.field +`(.x/.y/.s/.kappa/.vref …)
+`pose.parts ✓`(x/y/yaw) · `wpt.parts ✓`(x/y/s/kappa/psi/vref) ·
+`make.waypoint +` · `make.command +`
 
 ### 5. Array & Iteration · L0  (핵심 enabler)
 `array.len ✓` `array.get +`(index) `array.slice +` `array.window +`(닫힌트랙 wrap) `array.range +` `array.diff +` ·
@@ -56,8 +57,8 @@ Follow-the-Gap `argmax→각도` · 완성 속도정책. (2026-07-21 `std.pursui
 ### 8. L1 — LiDAR  (composite, 열림)
 `lidar.preprocess +`(bubble) · `lidar.widestGap +` · `lidar.freeAhead +`
 
-### 9. L1 — Planning / Path  (composite, 열림; 웨이포인트 직접 생성)
-`std.gripSpeed ✓`(Grip speed) · `path.nearestIndex +` · `path.advanceByDist +` ·
+### 9. Planning / Path  (L1 composite + L0 경계 프리미티브)
+`std.gripSpeed ✓`(Grip speed) · `path.nearestIndex ✓` · `path.advanceByDist ✓` ·
 `path.midpoints +`(bounds→센터라인) · `path.resample +`(ds)
 
 ### 10. L1 — Control  (composite, 열림)
@@ -89,5 +90,6 @@ Follow-the-Gap `argmax→각도` · 완성 속도정책. (2026-07-21 `std.pursui
   Logic(gt·le·ge·eq·ne·and·or·not) · Vector(make·scale·add·sub·dot·normalize·rotate·angle·dist) ·
   Array(get·slice·window·range·diff·argmin·min·sum·mean + 고차 filter/reduce/zipWith) · State(delay·accum·lowpass·rateLimit).
   registry+validate(포트타입)+nodeMeta(마스터 카탈로그) 일괄. 단위검증 `test/prims.ts`(20 assert) + 기존 랩 결정론 유지.
-  고차(map/filter/reduce/zipWith)는 core엔 있으나 **에디터 람다 저작 UI 전까지 팔레트 미노출**. Struct(make.waypoint/get.field)는 P-c(Path)와 함께.
+  고차(map/filter/reduce/zipWith)는 core엔 있으나 **에디터 람다 저작 UI 전까지 팔레트 미노출**. Struct 생성(make.waypoint/make.command)은 P-c(Path)와 함께.
 - **P-b 🔶 진행중(2026-07-21)** — composite 실행 엔진 구현(내부 서브그래프 + `cin` 입력 + 상태 네임스페이싱, engine `composite` kind). 첫 블록: `blk.pursuit`(L2 조향 전체)·`blk.speedPid`(L1 속도 PID) = 이전 미션 결과물을 **재사용 노드 하나**로. **왜**: L3가 pursuit 13노드+PID를 통짜로 깔아 "이미 다 되어있다"(사용자 지적) → L3를 블록 2개+새 grip 부분(4노드)로 정리, L2도 blk.speedPid로. 검증 `test/blocks.ts`: 블록 랩 === 인라인 랩(20.175s, 결정론). ✅ **열기/fork/캡슐화 완료(2026-07-21)**: (1)블록 더블클릭→내부 읽기전용 뷰(InnerView) (2)"펼쳐서 내 그래프로"→`inlineComposite`로 인라인(cin=외부입력, outMap=출력 재배선) (3)★캡슐화: 여러 노드 마퀴선택(selectionOnDrag)→"블록으로 묶기"→`encapsulate`가 `blk.user`(sub/outMap을 params에 실은 동적 composite) 생성. 동적포트=insOf/outsOf(data). evalGraph가 정적 nt.ins 없어도 n.in 전부 resolve. 검증 `test/blocks.ts`: fork후 랩===블록랩(20.175s), 캡슐화후 랩===원본(PURSUIT 21.083s), encapsulate↔fork 왕복 보존. 브라우저: 마퀴9선택→묶기→내블록→열기 확인, 에러0. **남은 것**: std.* L1(lookahead·tocar·curvAhead·gripSpeed)도 composite化(현재 opaque fn) + 신규 L1(crossTrack·headingErr·widestGap·nearestWpt).
+  ✅ **Geometry 1차 전환(2026-07-22)**: `pose.parts`·`wpt.parts`와 `path.nearestIndex`·`path.advanceByDist`를 enabler로 추가하고 `std.lookahead`·`std.tocar`를 내부 L0 그래프로 전환. PURSUIT `bestClean=21.0833s` 완전 동일 + fork 동일. **남은 것**: `std.curvAhead`·`std.gripSpeed` composite化 + 신규 L1(crossTrack·headingErr·widestGap·nearestWpt).

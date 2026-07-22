@@ -45,7 +45,8 @@
 
 **Vector / Geometry:** `Vec2(x,y)` · `X Y` · `+v −v scale dot length normalize rotate(v,θ) angleOf(v)` · `distance(a,b)` · `toLocal(pt, pose)`(월드→차프레임) · `toWorld(pt, pose)`.
 
-**Struct:** `Make pose|waypoint|twist|command` · `Get .field`.
+**Struct:** `Pose parts(pose)→x,y,yaw` · `Waypoint parts(wpt)→x,y,s,kappa,psi,vref`.
+문자열 파라미터 UI가 생기기 전까지 범용 `Get .field` 대신 타입별 분해 노드를 사용. 생성은 `Make waypoint|command`.
 
 **Array & Iteration ← 핵심 enabler:**
 - 기본: `Length` · `Index(arr,i)` · `Slice(arr,i,j)` · `Window(arr,i,W)`(닫힌트랙 wrap) · `Range(n)` · `Diff(arr)` · `Concat`.
@@ -92,7 +93,7 @@ ds   = ZipWith(Slice(P,0,-1), Slice(P,1,-0), (a,b) → distance(a,b))
 → Max(Map(κ, abs))            # 이 서브그래프를 선택 → "노드로 만들기: Curvature ahead"
 
 # Lookahead point(pose, path, Ld) → pt      (Ld 자체도 서브그래프: Const 또는 1.2·speed+3)
-i = NearestIndex(path, Vec2(pose.x, pose.y));  (pt,_) = AdvanceByDist(path, i, Ld)
+(x,y,_) = PoseParts(pose);  i = NearestIndex(path, Vec2(x,y));  (pt,_) = AdvanceByDist(path, i, Ld)
 
 # Pure Pursuit steer(pose, pt, L, gain) → steer
 e = toLocal(pt, pose);  κ = 2·Y(e) / length(e)²;  δ = atan(L·κ)·gain;  clamp(δ/δmax, −1, 1)

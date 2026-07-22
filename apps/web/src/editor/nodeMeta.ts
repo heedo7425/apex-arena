@@ -7,7 +7,7 @@ export type Meta = { label:string; cat:string; params?:ParamSpec[]; desc?:string
 // category colors (lane-ish)
 export const CAT_COLOR: Record<string,string> = {
   Sensors:'#6FA8DC', Math:'#9AA6B4', Logic:'#E4736A', Array:'#B58BE0', Vector:'#67C88A', State:'#D69A57',
-  Geometry:'#E7B24C', Planning:'#E7B24C', Control:'#1FDDC9', Random:'#c98bff', Model:'#8fd6c9', Output:'#1FDDC9',
+  Struct:'#6FA8DC', Path:'#E7B24C', Geometry:'#E7B24C', Planning:'#E7B24C', Control:'#1FDDC9', Random:'#c98bff', Model:'#8fd6c9', Output:'#1FDDC9',
   Module:'#8C7CF0', Composite:'#8C7CF0',
 }
 
@@ -37,6 +37,10 @@ export const META: Record<string, Meta> = {
   'vec.dot':{label:'dot',cat:'Vector',desc:'내적 a·b (스칼라).'},'vec.normalize':{label:'norm',cat:'Vector',desc:'단위벡터로 정규화(길이 1).'},
   'vec.rotate':{label:'rotate',cat:'Vector',desc:'벡터를 각도 θ만큼 회전.'},'vec.angle':{label:'∠v',cat:'Vector',desc:'벡터의 방향각 atan2(y,x).'},
   'vec.dist':{label:'dist',cat:'Vector',desc:'두 점 사이 거리.'},
+  'pose.parts':{label:'Pose parts',cat:'Struct',desc:'Pose 구조체를 위치 x·y와 방향각 yaw 숫자로 분해.'},
+  'wpt.parts':{label:'Waypoint parts',cat:'Struct',desc:'웨이포인트를 x·y·누적거리 s·곡률 kappa·방향 psi·목표속도 vref로 분해.'},
+  'path.nearestIndex':{label:'Nearest waypoint',cat:'Path',desc:'트랙 중심선에서 입력 점 pt와 가장 가까운 웨이포인트 인덱스 i를 찾음.'},
+  'path.advanceByDist':{label:'Advance by distance',cat:'Path',desc:'트랙 인덱스 i에서 거리 d만큼 전진한 목표점 pt와 새 인덱스 i2를 계산.'},
   'st.delay':{label:'z⁻¹',cat:'State',desc:'한 tick 이전 값을 냄(지연). 피드백 고리는 반드시 이 노드 경유.'},
   'st.accum':{label:'∫',cat:'State',desc:'값을 dt 간격으로 누적 Σx·dt (적분).'},
   'st.lowpass':{label:'lowpass',cat:'State',desc:'저역통과 필터로 부드럽게. α가 클수록 반응 빠름.',params:[{key:'alpha',label:'α',min:0.01,max:1,step:0.01,def:0.15}]},
@@ -88,7 +92,9 @@ export const PALETTE_CATS: {cat:string; types:string[]}[] = [
   {cat:'Math',     types:['const','add','sub','mul','div','abs','neg','sign','mod','pow','sqrt','min','max','clamp','lerp','sin','cos','atan2','hypot','wrapAngle']},
   {cat:'Logic',    types:['lt','gt','le','ge','eq','ne','and','or','not','select']},
   {cat:'Vector',   types:['vec.make','vec.xy','vec.len','vec.scale','vec.add','vec.sub','vec.dot','vec.normalize','vec.rotate','vec.angle','vec.dist']},
+  {cat:'Struct',   types:['pose.parts','wpt.parts']},
   {cat:'Array',    types:['array.get','array.slice','array.window','array.range','array.diff','array.argmax','array.argmin','array.max','array.min','array.sum','array.mean','array.len']},
+  {cat:'Path',     types:['path.nearestIndex','path.advanceByDist']},
   {cat:'State',    types:['st.delay','st.accum','st.lowpass','st.rateLimit']},
   {cat:'Geometry', types:['std.lookahead','std.tocar','std.curvAhead']},
   {cat:'Control',  types:['ctrl.pid']},

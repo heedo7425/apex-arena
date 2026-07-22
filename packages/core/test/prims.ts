@@ -32,6 +32,31 @@ ok(near(one({ v:{ type:'vec.make', in:{ x:L(3), y:L(4) } }, n:{ type:'vec.len', 
 { const r = one({ v:{ type:'vec.rotate', in:{ e:L({x:1,y:0}), th:L(Math.PI/2) } } }, 'v', 'e'); ok(near(r.x,0)&&near(r.y,1), 'rotate((1,0),90°)=(0,1)'); }
 ok(near(one({ n:{ type:'vec.dot', in:{ a:L({x:1,y:2}), b:L({x:3,y:4}) } } }, 'n', 'v'), 11), 'dot=11');
 
+// --- struct decomposition ---
+{ const pose = {x:3.5,y:-2.25,yaw:0.75}; const g=makeGraph({ n:{type:'pose.parts',in:{pose:L(pose)}} }); const v=evalGraph(g,ctx(),NT).n;
+  ok(v.x===pose.x&&v.y===pose.y&&v.yaw===pose.yaw, 'pose.parts exposes x/y/yaw'); }
+{ const waypoint = {x:1,y:2,s:3,kappa:0.04,psi:0.5,vref:8}; const g=makeGraph({ n:{type:'wpt.parts',in:{waypoint:L(waypoint)}} }); const v=evalGraph(g,ctx(),NT).n;
+  ok(v.x===1&&v.y===2&&v.s===3&&v.kappa===0.04&&v.psi===0.5&&v.vref===8, 'wpt.parts exposes waypoint fields'); }
+
+// --- path primitives over the provided closed centerline ---
+{ const T=world.track, sourceIndex=7, pt={x:T.pts[sourceIndex][0],y:T.pts[sourceIndex][1]};
+  const nearest=one({ n:{type:'path.nearestIndex',in:{track:L(T),pt:L(pt)}} },'n','i');
+  ok(nearest===sourceIndex, 'path.nearestIndex finds exact centerline point');
+  const distance=6, advanced=one({ n:{type:'path.advanceByDist',in:{track:L(T),i:L(nearest),d:L(distance)}} },'n','pt');
+  const target=(sourceIndex+Math.max(1,Math.round(distance/T.spacing)))%T.N;
+  ok(advanced.x===T.pts[target][0]&&advanced.y===T.pts[target][1], 'path.advanceByDist matches track spacing'); }
+
+// --- shipped L1 geometry is openable and numerically equivalent to the old formulas ---
+ok(NT['std.lookahead'].kind==='composite'&&!!NT['std.lookahead'].sub, 'std.lookahead is an openable composite');
+ok(NT['std.tocar'].kind==='composite'&&!!NT['std.tocar'].sub, 'std.tocar is an openable composite');
+{ const pose={x:world.track.pts[5][0]+0.2,y:world.track.pts[5][1]-0.1,yaw:0.37}, Ld=6;
+  const g=makeGraph({ look:{type:'std.lookahead',in:{pose:L(pose),track:L(world.track),Ld:L(Ld)}} }); const v=evalGraph(g,ctx(),NT).look;
+  const nearest=one({n:{type:'path.nearestIndex',in:{track:L(world.track),pt:L({x:pose.x,y:pose.y})}}},'n','i');
+  const target=(nearest+Math.max(1,Math.round(Ld/world.track.spacing)))%world.track.N;
+  ok(v.idx===nearest&&v.pt.x===world.track.pts[target][0]&&v.pt.y===world.track.pts[target][1], 'lookahead composite preserves point/index formula');
+  const e=one({n:{type:'std.tocar',in:{pt:L(v.pt),pose:L(pose)}}},'n','e'), dx=v.pt.x-pose.x, dy=v.pt.y-pose.y, cs=Math.cos(pose.yaw), sn=Math.sin(pose.yaw);
+  ok(e.x===cs*dx+sn*dy&&e.y===-sn*dx+cs*dy, 'to-car composite preserves coordinate formula exactly'); }
+
 // --- array ---
 ok(near(one({ n:{ type:'array.sum', in:{ arr:L([1,2,3,4]) } } }, 'n', 'v'), 10), 'sum=10');
 ok(one({ n:{ type:'array.argmin', in:{ arr:L([5,2,9,1,7]) } } }, 'n', 'i') === 3, 'argmin idx=3');

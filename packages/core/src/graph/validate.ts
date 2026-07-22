@@ -2,7 +2,7 @@
 import type { Graph, NodeDef } from './engine.ts';
 
 export type PortType =
-  | 'num' | 'bool' | 'pose' | 'track' | 'scan' | 'point'
+  | 'num' | 'bool' | 'pose' | 'waypoint' | 'track' | 'scan' | 'point'
   | 'array<num>' | 'any';
 
 type PortShape = { ins?: Record<string, PortType>; outs?: Record<string, PortType> };
@@ -24,10 +24,12 @@ const PORTS: Record<string, PortShape> = {
   'array.argmax': { ins:{ arr:'array<num>' }, outs:{ i:'num' } },
   'array.len': { ins:{ arr:'any' }, outs:{ v:'num' } },
   'array.max': { ins:{ arr:'array<num>' }, outs:{ v:'num' } },
+  'pose.parts': { ins:{ pose:'pose' }, outs:{ x:'num', y:'num', yaw:'num' } },
+  'wpt.parts': { ins:{ waypoint:'waypoint' }, outs:{ x:'num', y:'num', s:'num', kappa:'num', psi:'num', vref:'num' } },
+  'path.nearestIndex': { ins:{ track:'track', pt:'point' }, outs:{ i:'num' } },
+  'path.advanceByDist': { ins:{ track:'track', i:'num', d:'num' }, outs:{ pt:'point', i2:'num' } },
   'std.lookahead': { ins:{ pose:'pose', track:'track', Ld:'num' }, outs:{ pt:'point', idx:'num' } },
   'std.tocar': { ins:{ pt:'point', pose:'pose' }, outs:{ e:'point' } },
-  'vec.xy': { ins:{ e:'point' }, outs:{ x:'num', y:'num' } },
-  'vec.len': { ins:{ e:'point' }, outs:{ v:'num' } },
   'std.curvAhead': { ins:{ pose:'pose', track:'track' }, outs:{ k:'num' } },
   'std.gripSpeed': { ins:{ k:'num' }, outs:{ v:'num' } },
   'ctrl.pid': { ins:{ err:'num' }, outs:{ u:'num' } },

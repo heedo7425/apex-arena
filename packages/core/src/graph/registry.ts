@@ -20,6 +20,24 @@ function composite(cat: string, ins: string[], outs: string[], sub: Graph, outMa
   } };
 }
 
+// Shipped L1 geometry blocks are expressed only with visible L0/boundary nodes.
+const LOOKAHEAD_SUB: Graph = makeGraph({
+  poseIn:{ type:'cin', params:{ port:'pose' } }, trackIn:{ type:'cin', params:{ port:'track' } }, distanceIn:{ type:'cin', params:{ port:'Ld' } },
+  poseParts:{ type:'pose.parts', in:{ pose:['n','poseIn','v'] } },
+  posePoint:{ type:'vec.make', in:{ x:['n','poseParts','x'], y:['n','poseParts','y'] } },
+  nearest:{ type:'path.nearestIndex', in:{ track:['n','trackIn','v'], pt:['n','posePoint','e'] } },
+  ahead:{ type:'path.advanceByDist', in:{ track:['n','trackIn','v'], i:['n','nearest','i'], d:['n','distanceIn','v'] } },
+});
+
+const TOCAR_SUB: Graph = makeGraph({
+  pointIn:{ type:'cin', params:{ port:'pt' } }, poseIn:{ type:'cin', params:{ port:'pose' } },
+  poseParts:{ type:'pose.parts', in:{ pose:['n','poseIn','v'] } },
+  posePoint:{ type:'vec.make', in:{ x:['n','poseParts','x'], y:['n','poseParts','y'] } },
+  delta:{ type:'vec.sub', in:{ a:['n','pointIn','v'], b:['n','posePoint','e'] } },
+  negYaw:{ type:'neg', in:{ x:['n','poseParts','yaw'] } },
+  local:{ type:'vec.rotate', in:{ e:['n','delta','e'], th:['n','negYaw','v'] } },
+});
+
 // Inner sub-graph: Pure Pursuit steering (what the player builds in L2) → steer.
 const PURSUIT_SUB: Graph = makeGraph({
   pose:{ type:'src.pose' }, track:{ type:'src.track' }, Ld:{ type:'const', params:{ value:6 } },
@@ -117,15 +135,20 @@ export const NT: Record<string, NodeDef> = {
   'array.sum': { kind:'prim', cat:'Array', ins:['arr'], outs:['v'], fn:(i)=>({ v:i.arr.reduce((a:number,b:number)=>a+b,0) }) },
   'array.mean': { kind:'prim', cat:'Array', ins:['arr'], outs:['v'], fn:(i)=>({ v:i.arr.length?i.arr.reduce((a:number,b:number)=>a+b,0)/i.arr.length:0 }) },
 
-  // ---- L1 standard library (shipped composites; here as builtins for now) ----
-  'std.lookahead': { kind:'std', cat:'Geometry', ins:['pose','track','Ld'], outs:['pt','idx'], fn:(i,p,s,c)=>{
-    const T=c.world.track, idx=nearestIndex(T,i.pose.x,i.pose.y,undefined).i, steps=Math.max(1,Math.round(i.Ld/T.spacing)), t=(idx+steps)%T.N;
-    return { pt:{x:T.pts[t][0],y:T.pts[t][1]}, idx };
+  // ---- L0 primitives: struct decomposition ----
+  'pose.parts': { kind:'prim', cat:'Struct', ins:['pose'], outs:['x','y','yaw'], fn:(i)=>({ x:i.pose.x, y:i.pose.y, yaw:i.pose.yaw }) },
+  'wpt.parts': { kind:'prim', cat:'Struct', ins:['waypoint'], outs:['x','y','s','kappa','psi','vref'], fn:(i)=>({
+    x:i.waypoint.x, y:i.waypoint.y, s:i.waypoint.s, kappa:i.waypoint.kappa, psi:i.waypoint.psi, vref:i.waypoint.vref,
+  }) },
+
+  // ---- L0/L1 boundary: deterministic operations over the provided centerline ----
+  'path.nearestIndex': { kind:'prim', cat:'Path', ins:['track','pt'], outs:['i'], fn:(i)=>({ i:nearestIndex(i.track,i.pt.x,i.pt.y,undefined).i }) },
+  'path.advanceByDist': { kind:'prim', cat:'Path', ins:['track','i','d'], outs:['pt','i2'], fn:(i)=>{
+    const T=i.track, steps=Math.max(1,Math.round(i.d/T.spacing));
+    const i2=((Math.round(i.i)+steps)%T.N+T.N)%T.N;
+    return { pt:{x:T.pts[i2][0],y:T.pts[i2][1]}, i2 };
   } },
-  'std.tocar': { kind:'std', cat:'Geometry', ins:['pt','pose'], outs:['e'], fn:(i)=>{
-    const dx=i.pt.x-i.pose.x, dy=i.pt.y-i.pose.y, cs=Math.cos(i.pose.yaw), sn=Math.sin(i.pose.yaw);
-    return { e:{ x:cs*dx+sn*dy, y:-sn*dx+cs*dy } };
-  } },
+
   // vec2 decomposition — reusable geometry primitives so any car-frame vector can be opened
   'vec.make': { kind:'prim', cat:'Vector', ins:['x','y'], outs:['e'], fn:(i)=>({ e:{ x:i.x, y:i.y } }) },
   'vec.xy':  { kind:'prim', cat:'Vector', ins:['e'], outs:['x','y'], fn:(i)=>({ x:i.e.x, y:i.e.y }) },
@@ -138,6 +161,10 @@ export const NT: Record<string, NodeDef> = {
   'vec.rotate': { kind:'prim', cat:'Vector', ins:['e','th'], outs:['e'], fn:(i)=>{ const c=Math.cos(i.th), s=Math.sin(i.th); return { e:{ x:c*i.e.x-s*i.e.y, y:s*i.e.x+c*i.e.y } }; } },
   'vec.angle': { kind:'prim', cat:'Vector', ins:['e'], outs:['v'], fn:(i)=>({ v:Math.atan2(i.e.y,i.e.x) }) },
   'vec.dist': { kind:'prim', cat:'Vector', ins:['a','b'], outs:['v'], fn:(i)=>({ v:Math.hypot(i.a.x-i.b.x,i.a.y-i.b.y) }) },
+
+  // ---- L1 standard library: shipped, openable composites ----
+  'std.lookahead': composite('Geometry', ['pose','track','Ld'], ['pt','idx'], LOOKAHEAD_SUB, { pt:['ahead','pt'], idx:['nearest','i'] }),
+  'std.tocar': composite('Geometry', ['pt','pose'], ['e'], TOCAR_SUB, { e:['local','e'] }),
   'std.curvAhead': { kind:'std', cat:'Geometry', ins:['pose','track'], outs:['k'], fn:(i,p,s,c)=>{
     const idx=nearestIndex(c.world.track,i.pose.x,i.pose.y,undefined).i; return { k:curvAheadAt(c.world.track,idx,18) };
   } },

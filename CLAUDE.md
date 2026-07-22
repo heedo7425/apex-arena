@@ -40,6 +40,7 @@ git add -A && git commit && git push origin main                                
 - **사용자는 항상 원격**: 이 머신에서 GUI 창을 띄우면 사용자 화면에 뜬다. 로컬 크롬/브라우저 실행 금지(헤드리스도 DISPLAY 있으면 창 뜸). 결과는 채팅 텍스트 + 배포 URL로.
 - public repo `heedo7425/apex-arena`, `main`에 직접 푸시(이 세션의 확립된 플로우). 커밋 메시지에 백틱 쓰지 말 것(bash가 실행해버림).
 
-## 현재 상태 (2026-07-22, HEAD e305f63)
+## 현재 상태 (2026-07-22)
 - Codex UX 오버홀 + 내 후속 작업 반영: Parts Bay 좌측 레일, Pure Pursuit 프리미티브 조립화, L2/L3 블록 제공, **P-a 완료**(L0 어휘), **P-b 열기/fork/캡슐화 완료**, 반응형(상단바 겹침·sim 높이) 수정.
-- **다음**: P-b 잔여 — shipped `std.*` L1(lookahead·tocar·curvAhead·gripSpeed)도 opaque fn→`composite`로 전환(열면 내부 보이게) + 신규 L1(crossTrack·headingErr·widestGap·nearestWpt). 이후 **P-c**: Path(웨이포인트 생성) + `sim.rollout`(MPPI). 상세는 `design/palette-v1.md`.
+- **P-b Geometry 1차 완료**: `pose.parts`·`wpt.parts`와 `path.nearestIndex`·`path.advanceByDist` 추가. shipped `std.lookahead`·`std.tocar`는 opaque fn이 아닌 열기/fork 가능한 L0 서브그래프이며 PURSUIT 랩이 동일하다.
+- **다음**: P-b 잔여 — `std.curvAhead`·`std.gripSpeed` composite 전환 + 신규 L1(crossTrack·headingErr·widestGap·nearestWpt). 이후 **P-c**: Path(웨이포인트 생성) + `sim.rollout`(MPPI). 상세는 `design/palette-v1.md`.

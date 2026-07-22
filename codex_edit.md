@@ -212,3 +212,27 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Explicitly enabled both `Delete` and `Backspace` as keyboard alternatives.
 - Updated the Parts Bay instruction to teach the drag-to-trash gesture.
 - Verified in Level 1 that dragging Const to the trash changes the node count from 1 to 0 and that `UNDO` restores it at the original position.
+
+## 2026-07-22 - Openable geometry enablers (complete)
+
+### Why
+- `std.lookahead` and `std.tocar` were opaque shipped functions, so opening them could not teach or expose the L0 geometry that produces their outputs.
+- Typed decomposition avoids the editor's unsupported string parameter UI while keeping the three-layer node vocabulary intact.
+
+### Changes
+- Added deterministic `pose.parts` and `wpt.parts` struct decomposition primitives.
+- Added `path.nearestIndex` and `path.advanceByDist` centerline primitives with typed ports and Korean Parts Bay descriptions.
+- Rebuilt `std.lookahead` and `std.tocar` as shipped composites using visible struct, path, vector, and math nodes.
+- Added primitive formula tests, composite structure checks, fork checks, and an exact PURSUIT behavior regression assertion.
+- Rebuilt the committed `app/` production bundle.
+
+### Verification
+- `drive.ts`, `prims.ts`, and `blocks.ts` all pass.
+- PURSUIT seed 7 keeps exact `bestClean=21.083333333332778` (`21.0833s`).
+- TypeScript validation and the production web build pass.
+- Headless Playwright opened and forked both shipped composites in Level 2 with no application resource errors.
+- Captured offscreen open/fork screenshots for both geometry nodes under `/tmp/apex-*.png`.
+
+### Next
+- Convert `std.curvAhead` and `std.gripSpeed` to openable composites.
+- Add the remaining P-b L1 geometry/LiDAR methods without exposing turnkey algorithm decisions.

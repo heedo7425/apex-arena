@@ -38,6 +38,12 @@ const BLOCKS = makeGraph({
 
 ok(NT['blk.pursuit'].kind === 'composite' && !!NT['blk.pursuit'].sub, 'blk.pursuit is an openable composite (has .sub)');
 ok(NT['blk.speedPid'].kind === 'composite' && !!NT['blk.speedPid'].sub, 'blk.speedPid is an openable composite (has .sub)');
+ok(NT['std.lookahead'].kind === 'composite' && !!NT['std.lookahead'].sub, 'std.lookahead is an openable composite (has .sub)');
+ok(NT['std.tocar'].kind === 'composite' && !!NT['std.tocar'].sub, 'std.tocar is an openable composite (has .sub)');
+const lookTypes = new Set(Object.values(NT['std.lookahead'].sub!.nodes).map(n => n.type));
+const tocarTypes = new Set(Object.values(NT['std.tocar'].sub!.nodes).map(n => n.type));
+ok(lookTypes.has('pose.parts')&&lookTypes.has('path.nearestIndex')&&lookTypes.has('path.advanceByDist'), 'lookahead inner graph uses struct/path enablers');
+ok(tocarTypes.has('pose.parts')&&tocarTypes.has('vec.sub')&&tocarTypes.has('vec.rotate'), 'to-car inner graph uses visible L0 nodes');
 
 const inl = runFor(world, INLINE, 1, 70);
 const blk = runFor(world, BLOCKS, 1, 70);
@@ -65,6 +71,12 @@ ok(fk.bestClean === blk.bestClean, 'forked (inlined) lap === block lap (fork pre
 import { encapsulate } from '../src/graph/inline.ts';
 import { PURSUIT } from '../src/graph/presets.ts';
 const purBase = runFor(world, PURSUIT, 7, 60);
+ok(purBase.bestClean === 21.083333333332778, 'PURSUIT bestClean remains exactly 21.0833s');
+let openedGeometry = inlineComposite(PURSUIT, 'look', NT);
+openedGeometry = inlineComposite(openedGeometry, 'e', NT);
+ok(Object.values(openedGeometry.nodes).every(n => n.type !== 'std.lookahead' && n.type !== 'std.tocar' && n.type !== 'cin'), 'fork inlines lookahead/to-car composites away');
+const openedRun = runFor(world, openedGeometry, 7, 60);
+ok(openedRun.bestClean === purBase.bestClean, 'forked geometry lap === shipped composite lap');
 const steerIds = ['Ld','look','e','comp','dist','two','twoY','dsq','k','gain','sraw','steer'];
 const grouped = encapsulate(PURSUIT, steerIds, 'myblock', NT);
 const gm = grouped.nodes['myblock'];
