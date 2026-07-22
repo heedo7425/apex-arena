@@ -4,6 +4,13 @@ import { type NodeDef, type EvalCtx, type Graph, evalGraph, makeGraph } from './
 import { nearestIndex, curvAheadAt, G } from '../sim/world.ts';
 import { stepDynamics } from '../sim/vehicle.ts';
 import { uniform, gaussian } from '../rng.ts';
+import {
+  makeVehicleObject, makeStaticObject, relativeObject, nearestObject, objectsInRadius,
+  corridorFromTrack, spaceFromTrack, blockObject, spaceContains, currentState,
+  rolloutTrajectory, predictConstantVelocity, trajectoryClearance, trajectoryProgress,
+  predictionClearance, selectMinTrajectory, makeIntent, requestFromIntent, evaluateTrajectory,
+  type CostTerm, type Constraint,
+} from '../planning/types.ts';
 
 function argmaxArr(a: number[]): number { let bi = 0, bv = -Infinity; for (let i = 0; i < a.length; i++) if (a[i] > bv) { bv = a[i]; bi = i; } return bi; }
 
@@ -124,6 +131,7 @@ export const NT: Record<string, NodeDef> = {
   'src.track': { kind:'source', cat:'Sensors', outs:['track'], fn:(i,p,s,c)=>({ track:c.obs.track }) },
   'src.surface': { kind:'source', cat:'Sensors', outs:['mu','g'], fn:(i,p,s,c)=>({ mu:c.world.mu, g:G }) },
 
+  'src.vehicleState': { kind:'source', cat:'Sensors', outs:['state'], fn:(i,p,s,c)=>({ state:currentState(c.car) }) },
   // ---- L0 primitives: math ----
   'const': { kind:'prim', cat:'Math', outs:['v'], fn:(i,p)=>({ v:p.value }) },
   'add': { kind:'prim', cat:'Math', ins:['a','b'], outs:['v'], fn:(i)=>({ v:i.a+i.b }) },
@@ -228,6 +236,74 @@ export const NT: Record<string, NodeDef> = {
     k:curvAheadAt(i.track,Math.round(i.i),i.d),
   }) },
 
+  // ---- shared scene model for rules, learned policies, and optimizers ----
+  'object.vehicle': { kind:'prim', cat:'Scene', ins:['pose','velocity','length','width'], outs:['object'], fn:(i)=>({ object:makeVehicleObject(i.pose,i.velocity,Math.max(0,i.length),Math.max(0,i.width)) }) },
+  'object.static': { kind:'prim', cat:'Scene', ins:['pose','length','width'], outs:['object'], fn:(i)=>({ object:makeStaticObject(i.pose,Math.max(0,i.length),Math.max(0,i.width)) }) },
+  'object.parts': { kind:'prim', cat:'Scene', ins:['object'], outs:['pose','velocity','length','width','speed','dynamic'], fn:(i)=>({
+    pose:i.object.pose, velocity:i.object.velocity, length:i.object.shape.length, width:i.object.shape.width,
+    speed:Math.hypot(i.object.velocity.x,i.object.velocity.y), dynamic:i.object.kind==='vehicle',
+  }) },
+  'object.relative': { kind:'prim', cat:'Scene', ins:['object','pose'], outs:['e','d'], fn:(i)=>relativeObject(i.object,i.pose) },
+  'objects.empty': { kind:'prim', cat:'Scene', outs:['objects'], fn:()=>({ objects:[] }) },
+  'objects.append': { kind:'prim', cat:'Scene', ins:['objects','object'], outs:['objects'], fn:(i)=>({ objects:[...i.objects,i.object] }) },
+  'objects.nearest': { kind:'prim', cat:'Scene', ins:['objects','pose'], outs:['object','d','found'], fn:(i)=>nearestObject(i.objects,i.pose) },
+  'objects.inRadius': { kind:'prim', cat:'Scene', ins:['objects','pose','radius'], outs:['objects'], fn:(i)=>({ objects:objectsInRadius(i.objects,i.pose,Math.max(0,i.radius)) }) },
+
+  // ---- drivable-space representation: track bounds minus obstacle occupancy ----
+  'corridor.fromTrack': { kind:'prim', cat:'Space', ins:['track','speedLimit'], outs:['corridor'], fn:(i)=>({ corridor:corridorFromTrack(i.track,Math.max(0,i.speedLimit)) }) },
+  'space.fromTrack': { kind:'prim', cat:'Space', ins:['track','speedLimit'], outs:['space'], fn:(i)=>({ space:spaceFromTrack(i.track,Math.max(0,i.speedLimit)) }) },
+  'space.blockObject': { kind:'prim', cat:'Space', ins:['space','object','margin'], outs:['space'], fn:(i)=>({ space:blockObject(i.space,i.object,Math.max(0,i.margin)) }) },
+  'space.contains': { kind:'prim', cat:'Space', ins:['space','pt'], outs:['inside'], fn:(i)=>({ inside:spaceContains(i.space,i.pt) }) },
+
+  // ---- state and trajectory candidates ----
+  'state.parts': { kind:'prim', cat:'Struct', ins:['state'], outs:['pose','velocity','speed','yawRate','onTrack'], fn:(i)=>({
+    pose:{x:i.state.x,y:i.state.y,yaw:i.state.yaw}, velocity:{x:i.state.vx,y:i.state.vy}, speed:i.state.v, yawRate:i.state.r, onTrack:i.state.onTrack,
+  }) },
+  'command.make': { kind:'prim', cat:'Struct', ins:['steer','throttle'], outs:['command'], fn:(i)=>({ command:{steer:Math.max(-1,Math.min(1,i.steer)),throttle:Math.max(-1,Math.min(1,i.throttle))} }) },
+  'trajectory.rollout': { kind:'prim', cat:'Trajectory', ins:['state','command','horizon','step'], outs:['trajectory'], fn:(i,p,s,c)=>({ trajectory:rolloutTrajectory(i.state,i.command,Math.max(0,i.horizon),Math.max(1/240,i.step),c.world) }) },
+  'trajectory.parts': { kind:'prim', cat:'Trajectory', ins:['trajectory'], outs:['duration','length','valid'], fn:(i)=>({ duration:i.trajectory.duration, length:i.trajectory.points.length, valid:i.trajectory.valid }) },
+  'trajectory.clearance': { kind:'prim', cat:'Trajectory', ins:['trajectory','objects'], outs:['d'], fn:(i)=>({ d:trajectoryClearance(i.trajectory,i.objects) }) },
+  'trajectory.progress': { kind:'prim', cat:'Trajectory', ins:['trajectory','track'], outs:['d'], fn:(i)=>({ d:trajectoryProgress(i.trajectory,i.track) }) },
+  'trajectory.collides': { kind:'prim', cat:'Trajectory', ins:['trajectory','objects','margin'], outs:['collision'], fn:(i)=>({ collision:trajectoryClearance(i.trajectory,i.objects)<Math.max(0,i.margin) }) },
+  'trajectories.empty': { kind:'prim', cat:'Trajectory', outs:['trajectories'], fn:()=>({ trajectories:[] }) },
+  'trajectories.append': { kind:'prim', cat:'Trajectory', ins:['trajectories','trajectory'], outs:['trajectories'], fn:(i)=>({ trajectories:[...i.trajectories,i.trajectory] }) },
+  'trajectories.selectMin': { kind:'prim', cat:'Trajectory', ins:['trajectories','costs'], outs:['trajectory','i'], fn:(i)=>selectMinTrajectory(i.trajectories,i.costs) },
+
+  // ---- short-horizon prediction remains separate from planning ----
+  'predict.constantVelocity': { kind:'prim', cat:'Prediction', ins:['object','horizon','step'], outs:['prediction'], fn:(i)=>({ prediction:predictConstantVelocity(i.object,Math.max(0,i.horizon),Math.max(1/30,i.step)) }) },
+  'predictions.empty': { kind:'prim', cat:'Prediction', outs:['predictions'], fn:()=>({ predictions:[] }) },
+  'predictions.append': { kind:'prim', cat:'Prediction', ins:['predictions','prediction'], outs:['predictions'], fn:(i)=>({ predictions:[...i.predictions,i.prediction] }) },
+  'prediction.clearance': { kind:'prim', cat:'Prediction', ins:['trajectory','predictions'], outs:['d'], fn:(i)=>({ d:predictionClearance(i.trajectory,i.predictions) }) },
+
+  // ---- behavior intent: named decisions, not turnkey driving algorithms ----
+  'intent.follow': { kind:'prim', cat:'Behavior', ins:['targetSpeed','offset','commit'], outs:['intent'], fn:(i)=>({ intent:makeIntent('follow',Math.max(0,i.targetSpeed),i.offset,Math.max(0,i.commit)) }) },
+  'intent.avoid': { kind:'prim', cat:'Behavior', ins:['target','targetSpeed','offset','commit'], outs:['intent'], fn:(i)=>({ intent:makeIntent('avoid',Math.max(0,i.targetSpeed),i.offset,Math.max(0,i.commit),i.target) }) },
+  'intent.passLeft': { kind:'prim', cat:'Behavior', ins:['target','targetSpeed','offset','commit'], outs:['intent'], fn:(i)=>({ intent:makeIntent('pass-left',Math.max(0,i.targetSpeed),Math.abs(i.offset),Math.max(0,i.commit),i.target) }) },
+  'intent.passRight': { kind:'prim', cat:'Behavior', ins:['target','targetSpeed','offset','commit'], outs:['intent'], fn:(i)=>({ intent:makeIntent('pass-right',Math.max(0,i.targetSpeed),-Math.abs(i.offset),Math.max(0,i.commit),i.target) }) },
+  'intent.emergency': { kind:'prim', cat:'Behavior', ins:['commit'], outs:['intent'], fn:(i)=>({ intent:makeIntent('emergency-stop',0,0,Math.max(0,i.commit)) }) },
+  'intent.parts': { kind:'prim', cat:'Behavior', ins:['intent'], outs:['mode','targetSpeed','offset','commit','priority'], fn:(i)=>({ mode:i.intent.mode, targetSpeed:i.intent.targetSpeed, offset:i.intent.targetOffset, commit:i.intent.commitUntil, priority:i.intent.priority }) },
+
+
+  // ---- composable objective and feasibility terms for local planning ----
+  'cost.progress': { kind:'prim', cat:'Cost', ins:['weight'], outs:['cost'], fn:(i)=>({ cost:{kind:'progress',weight:i.weight,params:{}} as CostTerm }) },
+  'cost.collision': { kind:'prim', cat:'Cost', ins:['weight','margin'], outs:['cost'], fn:(i)=>({ cost:{kind:'collision',weight:i.weight,params:{margin:Math.max(0,i.margin)}} as CostTerm }) },
+  'cost.clearance': { kind:'prim', cat:'Cost', ins:['weight','floor'], outs:['cost'], fn:(i)=>({ cost:{kind:'clearance',weight:i.weight,params:{floor:Math.max(0.01,i.floor)}} as CostTerm }) },
+  'cost.tracking': { kind:'prim', cat:'Cost', ins:['weight'], outs:['cost'], fn:(i)=>({ cost:{kind:'tracking',weight:i.weight,params:{}} as CostTerm }) },
+  'cost.smoothness': { kind:'prim', cat:'Cost', ins:['weight'], outs:['cost'], fn:(i)=>({ cost:{kind:'smoothness',weight:i.weight,params:{}} as CostTerm }) },
+  'cost.control': { kind:'prim', cat:'Cost', ins:['weight'], outs:['cost'], fn:(i)=>({ cost:{kind:'control',weight:i.weight,params:{}} as CostTerm }) },
+  'costs.empty': { kind:'prim', cat:'Cost', outs:['costs'], fn:()=>({ costs:[] }) },
+  'costs.append': { kind:'prim', cat:'Cost', ins:['costs','cost'], outs:['costs'], fn:(i)=>({ costs:[...i.costs,i.cost] }) },
+  'constraint.track': { kind:'prim', cat:'Constraint', ins:['margin'], outs:['constraint'], fn:(i)=>({ constraint:{kind:'track',hard:true,params:{margin:Math.max(0,i.margin)}} as Constraint }) },
+  'constraint.collision': { kind:'prim', cat:'Constraint', ins:['margin'], outs:['constraint'], fn:(i)=>({ constraint:{kind:'collision',hard:true,params:{margin:Math.max(0,i.margin)}} as Constraint }) },
+  'constraint.speed': { kind:'prim', cat:'Constraint', ins:['max'], outs:['constraint'], fn:(i)=>({ constraint:{kind:'speed',hard:true,params:{max:Math.max(0,i.max)}} as Constraint }) },
+  'constraint.steer': { kind:'prim', cat:'Constraint', ins:['max'], outs:['constraint'], fn:(i)=>({ constraint:{kind:'steer',hard:true,params:{max:Math.max(0,i.max)}} as Constraint }) },
+  'constraints.empty': { kind:'prim', cat:'Constraint', outs:['constraints'], fn:()=>({ constraints:[] }) },
+  'constraints.append': { kind:'prim', cat:'Constraint', ins:['constraints','constraint'], outs:['constraints'], fn:(i)=>({ constraints:[...i.constraints,i.constraint] }) },
+  'request.make': { kind:'prim', cat:'Behavior', ins:['intent','track','costs','constraints'], outs:['request'], fn:(i)=>({ request:requestFromIntent(i.intent,i.track,i.costs,i.constraints) }) },
+  'request.parts': { kind:'prim', cat:'Behavior', ins:['request'], outs:['targetSpeed','offset','costs','constraints'], fn:(i)=>({
+    targetSpeed:i.request.targetSpeed, offset:i.request.preferredOffset, costs:i.request.costs, constraints:i.request.constraints,
+  }) },
+  'trajectory.evaluate': { kind:'prim', cat:'Cost', ins:['trajectory','request','objects','predictions'], outs:['cost','valid','clearance'], fn:(i)=>evaluateTrajectory(i.trajectory,i.request,i.objects,i.predictions) },
 
   // vec2 decomposition — reusable geometry primitives so any car-frame vector can be opened
   'vec.make': { kind:'prim', cat:'Vector', ins:['x','y'], outs:['e'], fn:(i)=>({ e:{ x:i.x, y:i.y } }) },

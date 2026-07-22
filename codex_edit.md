@@ -288,3 +288,31 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 ### Next
 - Add run scrubber and A/B experiment presets.
 - Add Vec2/Pose/Path/Trajectory track overlays, followed by ObjectSet/PredictionSet/DrivableSpace overlays in P-c/P-d.
+
+## 2026-07-22 - Shared planning blocks for rules, RL, and MPC (complete)
+
+### Why
+- Overtaking, static avoidance, and local planning need shared scene, free-space, prediction, behavior, trajectory, cost, and constraint data instead of algorithm-specific turnkey nodes.
+- Rule-based, RL, and MPC should differ in how they produce decisions and candidates while remaining interoperable at explicit graph boundaries.
+
+### Changes
+- Added deterministic planning contracts and operations for SceneObject/ObjectSet, Corridor/DrivableSpace, VehicleState/Command, TrajectorySet, PredictionSet, BehaviorIntent, PlanningRequest, CostTerm, and Constraint.
+- Added scene object construction/query, track corridor and obstacle blocking, state decomposition, command construction, deterministic trajectory rollout, trajectory metrics, candidate collection/selection, and constant-velocity prediction nodes.
+- Added follow, avoid, pass-left, pass-right, and emergency intent nodes without hiding path generation or control decisions inside them.
+- Added independent progress, collision, clearance, tracking, smoothness, and control costs plus track, collision, speed, and steering hard constraints.
+- Added typed port schemas for every planning data boundary and Korean Parts Bay descriptions/categories in the master palette.
+- Kept turnkey Overtake, StaticAvoidance, LocalPlanner, MPPI, PPO, and SAC nodes out of the registry.
+- Added `test/planning.ts` and updated the authoritative planning, palette, node-spec, and repository workflow documents.
+- Rebuilt the committed `app/` production bundle.
+
+### Verification
+- `planning.ts` passes scene queries, closed-track space membership, obstacle blocking, deterministic rollout, prediction, behavior intent, hard constraints, candidate selection, typed ports, and architecture checks.
+- `drive.ts`, `prims.ts`, and `blocks.ts` all pass.
+- PURSUIT remains exactly `bestClean=21.083333333332778` (`21.0833s`).
+- The production web build passes and emits `index-CVURLOIv.js`.
+- Offscreen Chrome loaded the rebuilt Pages path and captured `/tmp/apex-planning-smoke.png` at 1440×1000 without opening a display window.
+
+### Next
+- Build the first static-avoidance example graph and obstacle mission from these enablers.
+- Add a moving-opponent overtaking mission using PredictionSet and pass intent.
+- Complete Path construction primitives and spatial VISUALIZE overlays without changing simulation behavior.

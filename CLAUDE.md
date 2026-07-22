@@ -8,7 +8,7 @@
   ⚠️ 타입 전용 import는 반드시 `import type`/inline `type` 표시(아니면 런타임 에러).
   - `src/sim/` — world(트랙·높이필드·차량파라미터), vehicle(`stepDynamics` 동역학 single-track = 모델노드), runner(makeSim/tick/runFor/medal).
   - `src/graph/` — `engine.ts`(makeGraph 위상정렬 + `evalGraph` 매tick 순수평가, `EvalCtx`), `registry.ts`(`NT` 노드레지스트리: L0 프리미티브·L1 std·composite 블록·rng/predict 훅·sink), `validate.ts`(포트타입 스키마 + 그래프 검증), `inline.ts`(`inlineComposite`=fork, `encapsulate`=group), `presets.ts`(FTG/PURSUIT 예제 그래프 = 데이터).
-  - `test/*.ts` — 헤드리스 검증. **`node packages/core/test/drive.ts`**(랩·결정론), `prims.ts`(L0 수치), `blocks.ts`(composite/캡슐화 behavior 보존). 변경 후 3개 다 통과해야 함.
+  - `test/*.ts` — 헤드리스 검증. **`drive.ts`**(랩·결정론), `prims.ts`(L0 수치), `blocks.ts`(composite/캡슐화 behavior 보존), `planning.ts`(Scene/Space/Trajectory/Prediction/Intent/Cost/Constraint). 변경 후 관련 테스트와 기존 3개가 모두 통과해야 함.
 - **`apps/web/`** — Vite + React 18 + zustand + @xyflow/react(React Flow) 에디터/게임 UI. `@apex/core`는 workspace 의존.
   - `src/editor/` — Editor(React Flow 래퍼, 팔레트, 클릭·드래그 연결, 다중선택→블록으로 묶기, 블록 더블클릭 열기/fork), GraphNode(커스텀 노드), compile(rfToCore/coreToRF 왕복), nodeMeta(META·PALETTE_CATS·insOf/outsOf).
   - `src/campaign/` — levels(레벨 그래프·팔레트·목표·요구조건), LevelScreen(에디터+뷰포트+브리핑+HUD+결과), worlds(레벨별 트랙), CampaignMap.
@@ -46,4 +46,5 @@ git add -A && git commit && git push origin main                                
 - **P-b 완료**: 경로 접근자와 센서 배열 프리미티브를 추가하고 `std.lookahead`·`std.tocar`·`std.curvAhead`·`std.gripSpeed` 및 geometry/LiDAR L1 노드를 모두 열기/fork 가능한 composite로 전환했다. PURSUIT 랩은 정확히 동일하다.
 - composite 내부는 breadcrumb, 파트 설명, live signal, 자동 배치 fork를 제공한다. 유저 블록은 Parts Bay 보관함에 저장되어 모든 미션에서 재사용할 수 있고 그래프 오류는 해당 블록·포트 단위로 안내된다.
 - 에디터 VISUALIZE는 출력 신호를 읽기 전용으로 수집한다. simulation 시간만 사용하며 graph 계산·랩 결과에 영향을 주면 안 된다.
-- **다음**: **P-c** Path(웨이포인트 생성) + `sim.rollout`(MPPI), 이후 P-d Scene/Prediction/Local Planning. 상세는 `design/palette-v1.md`와 `design/planning-types-v1.md`.
+- **P-c 일부/P-d enabler 완료**: vehicle state 기반 결정론 trajectory rollout과 Scene ObjectSet, DrivableSpace, PredictionSet, Intent, PlanningRequest, Cost/Constraint 블록이 registry·typed validation·master palette에 구현됐다. turnkey planner/알고리즘 노드는 금지한다.
+- **다음**: static avoidance 예제 그래프·장애물 미션으로 공통 블록 조합을 증명하고, 이후 moving opponent prediction을 쓰는 overtaking 미션을 만든다. Path 생성(`midpoints`·`resample`·make waypoint)도 별도 P-c 패스로 남아 있다.

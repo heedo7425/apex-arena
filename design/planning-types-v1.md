@@ -147,6 +147,20 @@ Control     → Command
 - RL은 intent, request, trajectory 또는 command 중 명시된 한 계층만 출력한다.
 - `Overtake`, `StaticAvoidance`, `LocalPlanner`, `MPPI`, `PPO`, `SAC` turnkey 노드는 팔레트에 두지 않는다.
 
+### 8.1 구현 상태 (2026-07-22)
+
+- `packages/core/src/planning/types.ts`에 v1 공통 타입과 결정론 연산을 구현했다.
+- Scene: 동적/정적 객체 생성, 분해, 상대 위치, 최근접, 반경 필터, ObjectSet 조립.
+- Space: Track→Corridor/DrivableSpace, 객체 occupancy 차단, point drivable 판정.
+- Trajectory: vehicle state + command rollout, progress/clearance/collision, 후보 집합과 최소 비용 선택.
+- Prediction: constant-velocity trajectory와 시간별 box occupancy, PredictionSet 조립과 미래 clearance.
+- Behavior: follow/avoid/pass-left/pass-right/emergency intent, intent→PlanningRequest 변환.
+- Objective: progress/collision/clearance/tracking/smoothness/control 비용과 track/collision/speed/steer 제약, trajectory 평가.
+- 모든 타입은 `validate.ts`의 서로 다른 포트 타입으로 검사되며 `nodeMeta.ts` 마스터 팔레트에 한국어 설명과 함께 노출된다.
+- 현재 shape 생성 노드는 box 기반이다. polygon 생성/불확실성 팽창은 후속 perception·prediction 웨이브에서 추가한다.
+- 현재 rollout은 일정 command 후보용 기본 enabler다. sampling lattice, MPC 반복 최적화, RL policy는 이 타입 위에 별도 그래프로 구성한다.
+- `test/planning.ts`가 전체 데이터 흐름, 결정론, hard constraint, 최소 비용 선택, turnkey 노드 부재를 검증한다.
+
 ## 9. VISUALIZE contract
 
 VISUALIZE는 graph output을 읽기만 하며 시뮬레이션 결과에 영향을 주지 않는다.

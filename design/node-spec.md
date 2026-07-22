@@ -40,7 +40,7 @@
 | `constraint` / `constraints` | hard/soft 주행 제약 | red |
 | `cost` / `costs` | 독립 가중 비용 항 | amber |
 
-- 위 확장 타입은 v1 계약을 먼저 고정한 것이며 registry 노출은 P-c 이후 구현 웨이브에서 진행한다.
+- 위 확장 타입은 registry·포트 검증·마스터 팔레트에 구현됐다. 레벨은 학습 목표에 맞는 부분집합만 노출한다.
 
 - **제네릭**: `array<T>` 는 원소 타입까지 매칭돼야 연결(`array<num>`↔`array<num>`).
 - **구조체**: `Make X` 로 생성, `Get .field` 로 접근.
@@ -71,6 +71,21 @@
 **Path / Waypoint:** `NearestIndex(path, pt)→i` · `At(path,i)→waypoint` · `AdvanceByDist(path, i, d)→(pt, i2)` · `MaxCurvature(path,i,d)→κ` · `Resample(path, ds)` · `Midpoints(left, right)→path` · `MinCurvStep(path, bounds)→path`(레이싱라인 1스텝, Loop로 반복).
 
 **Stateful (결정론, 리셋시 0) — ⏱ 표시:** `Delay z⁻¹(x)→prev` · `Accumulate(x)→Σx·dt` · `PID(err, kp,ki,kd)→u`(=Delay/Acc 합성) · `LowPass(x, α)` · `RateLimit(x, rate)`. **사이클은 반드시 ⏱ 노드 경유.**
+
+**Scene / Space:** `Vehicle object` · `Static object` · `Object parts/relative` · `Objects empty/append/nearest/inRadius` ·
+`Track corridor` · `Drivable space` · `Block obstacle` · `Point is drivable`.
+
+**Trajectory / Prediction:** `Vehicle state` · `Control command` · `Rollout trajectory` · `Trajectory parts/clearance/progress/collides` ·
+`Trajectories empty/append/selectMin` · `Constant velocity prediction` · `Predictions empty/append` · `Future clearance`.
+
+**Behavior:** `Follow` · `Avoid` · `Pass left/right` · `Emergency stop` intent와 `Planning request`.
+Intent는 목적만 표현하며 경로 생성·후보 선택·제어를 내부에서 수행하지 않는다.
+
+**Cost / Constraint:** progress·collision·clearance·tracking·smoothness·control 비용 항과 track·collision·speed·steer 하드 제약.
+`Trajectory evaluate`가 독립 항을 합산하고, `selectMin`이 후보를 고른다.
+
+> 금지: `Overtake`, `StaticAvoidance`, `LocalPlanner`, `MPPI`, `PPO`, `SAC` 같은 turnkey 노드.
+> Rule-based/RL/MPC는 위 공통 데이터 경계를 사용하되 의사결정과 후보 생성 방식을 그래프로 드러낸다.
 
 ## 3.5 Layer 1 — 표준 라이브러리 (기본 작업 어휘, 전부 열리는 합성)
 컨트롤러는 이걸 배선해 만든다. 각 노드는 L0 프리미티브의 합성 = 열어서 보고 fork 가능. **"애매한 선"이 사는 곳.**
