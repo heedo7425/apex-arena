@@ -1,5 +1,5 @@
 // Canvas render for the sim viewport — reads the core World + CarState (proven draw code).
-import type { World, CarState, Scan } from '@apex/core'
+import type { World, CarState, Scan, SceneObject } from '@apex/core'
 
 export type Cam = { minx:number; miny:number; maxx:number; maxy:number; s:number; slant:number; zk:number; ox:number; oy:number }
 const LIGHT = [-0.5, -0.7, 0.6]
@@ -31,7 +31,7 @@ export function buildTerrain(world:World, CW:number, CH:number): HTMLCanvasEleme
 }
 function rr(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,h:number,r:number){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
 
-export function renderSim(ctx:CanvasRenderingContext2D, world:World, car:CarState, scan:Scan|null, gapBeam:number|null, cam:Cam, terrain:HTMLCanvasElement|null){
+export function renderSim(ctx:CanvasRenderingContext2D, world:World, car:CarState, scan:Scan|null, gapBeam:number|null, cam:Cam, terrain:HTMLCanvasElement|null, objects:SceneObject[]=[], overlays:unknown[]=[]){
   const CW=ctx.canvas.width, CH=ctx.canvas.height, T=world.track, H=world.height
   if(terrain) ctx.drawImage(terrain,0,0); else {ctx.fillStyle='#0c1620';ctx.fillRect(0,0,CW,CH)}
   // ribbon (verge + asphalt)
@@ -45,6 +45,39 @@ export function renderSim(ctx:CanvasRenderingContext2D, world:World, car:CarStat
   // racing line (centerline)
   ctx.beginPath();for(let i=0;i<=T.N;i++){const idx=i%T.N,p=T.pts[idx],s=W2S(cam,p[0],p[1],H.at(p[0],p[1])+0.15);i===0?ctx.moveTo(s[0],s[1]):ctx.lineTo(s[0],s[1])}ctx.strokeStyle='#E7B24C';ctx.globalAlpha=0.4;ctx.lineWidth=2;ctx.stroke();ctx.globalAlpha=1
   // scan
+  // Mission objects are part of the same world model consumed by src.objects and LiDAR.
+  for(const object of objects){
+    const p=object.pose,z=H.at(p.x,p.y)+0.2,s=W2S(cam,p.x,p.y,z)
+    const len=object.shape.length*cam.s,wid=object.shape.width*cam.s
+    ctx.save();ctx.translate(s[0],s[1]);ctx.rotate(p.yaw)
+    ctx.fillStyle=object.kind==='vehicle'?'#F06449':'#E7B24C'
+    ctx.strokeStyle='rgba(255,255,255,.8)';ctx.lineWidth=2
+    rr(ctx,-len/2,-wid/2,len,wid,Math.min(8,wid*.2));ctx.fill();ctx.stroke()
+    ctx.restore()
+    ctx.fillStyle='#EDF6F5';ctx.font='700 13px ui-monospace,monospace';ctx.textAlign='center'
+    ctx.fillText(object.kind==='vehicle'?'RIVAL':'HAZARD',s[0],s[1]-wid*.8-6)
+    ctx.textAlign='start'
+  }
+  // Spatial Visualize signals: trajectories and drivable/blocked polygons.
+  const drawTrajectory=(trajectory:any,color:string)=>{
+    if(!trajectory?.points?.length)return
+    ctx.beginPath()
+    trajectory.points.forEach((point:any,i:number)=>{
+      const state=point.state??point,p=W2S(cam,state.x,state.y,H.at(state.x,state.y)+0.45)
+      i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])
+    })
+    ctx.strokeStyle=color;ctx.lineWidth=3;ctx.setLineDash([8,5]);ctx.stroke();ctx.setLineDash([])
+  }
+  for(const value of overlays){
+    const item:any=value
+    if(item?.points)drawTrajectory(item,'#69AEEB')
+    if(Array.isArray(item))for(const candidate of item)if(candidate?.points)drawTrajectory(candidate,'rgba(105,174,235,.45)')
+    if(item?.hypotheses)for(const h of item.hypotheses)drawTrajectory(h.trajectory,'#E78FD0')
+    for(const polygon of item?.blocked??[]){
+      ctx.beginPath();polygon.forEach((point:any,i:number)=>{const p=W2S(cam,point.x,point.y,H.at(point.x,point.y)+0.35);i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])})
+      ctx.closePath();ctx.fillStyle='rgba(240,100,73,.28)';ctx.fill();ctx.strokeStyle='#F06449';ctx.stroke()
+    }
+  }
   if(scan){const o=W2S(cam,car.x,car.y,car.nz)
     for(let b=0;b<scan.ranges.length;b++){const ang=car.yaw+scan.a0+b*scan.da,r=scan.ranges[b],ex=car.x+Math.cos(ang)*r,ey=car.y+Math.sin(ang)*r,e=W2S(cam,ex,ey,H.at(ex,ey)+0.2);ctx.strokeStyle='rgba(31,221,201,.20)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(o[0],o[1]);ctx.lineTo(e[0],e[1]);ctx.stroke();ctx.fillStyle='rgba(31,221,201,.5)';ctx.beginPath();ctx.arc(e[0],e[1],2,0,7);ctx.fill()}
     if(gapBeam!=null){const ang=car.yaw+scan.a0+gapBeam*scan.da,r=scan.ranges[gapBeam],ex=car.x+Math.cos(ang)*r,ey=car.y+Math.sin(ang)*r,e=W2S(cam,ex,ey,H.at(ex,ey)+0.3);ctx.strokeStyle='#E7B24C';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(o[0],o[1]);ctx.lineTo(e[0],e[1]);ctx.stroke();ctx.fillStyle='#E7B24C';ctx.beginPath();ctx.arc(e[0],e[1],5,0,7);ctx.fill()}}

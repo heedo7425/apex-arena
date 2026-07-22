@@ -17,6 +17,7 @@ const PORTS: Record<string, PortShape> = {
   'src.track': { outs:{ track:'track' } }, 'const': { outs:{ v:'num' } },
   'src.surface': { outs:{ mu:'num', g:'num' } },
   'src.vehicleState': { outs:{ state:'state' } },
+  'src.objects': { outs:{ objects:'objects' } },
   'object.vehicle': { ins:{ pose:'pose', velocity:'point', length:'num', width:'num' }, outs:{ object:'object' } },
   'object.static': { ins:{ pose:'pose', length:'num', width:'num' }, outs:{ object:'object' } },
   'object.parts': { ins:{ object:'object' }, outs:{ pose:'pose', velocity:'point', length:'num', width:'num', speed:'num', dynamic:'bool' } },

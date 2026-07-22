@@ -18,6 +18,8 @@ export type SceneObject = {
   yawRate:number
   shape:ObjectShape
   confidence:number
+  trackIndex?:number
+  trackSpeed?:number
 }
 export type ObjectSet = SceneObject[]
 

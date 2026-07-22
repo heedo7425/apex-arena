@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { makeSim, tick, castScan, DT } from '@apex/core'
 import type { World, Graph } from '@apex/core'
 import { computeCam, buildTerrain, renderSim, type Cam } from './render'
+import { useVisualization } from '../store'
 
 type Props = {
   world: World
@@ -20,7 +21,7 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
   const simRef = useRef<ReturnType<typeof makeSim> | null>(null)
   const terrainRef = useRef<HTMLCanvasElement | null>(null)
   const camRef = useRef<Cam | null>(null)
-  const argmaxId = useRef<string | null>(null)
+  const gapId = useRef<string | null>(null)
   const runRef = useRef(false)
   const speedRef = useRef(1)
   const holdRef = useRef(0)
@@ -43,7 +44,7 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
   useEffect(() => {
     simRef.current = makeSim(world, graph, seed)
     simTimeRef.current = 0
-    argmaxId.current = graph.order.find(id => graph.nodes[id].type === 'array.argmax') || null
+    gapId.current = graph.order.find(id => ['lidar.widestGap','array.argmax'].includes(graph.nodes[id].type)) || null
     holdRef.current = 0
     completedRef.current = false
     setRunning(false)
@@ -82,9 +83,10 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
             }
           }
         }
-        const scan = castScan(s.car, world)
-        const gap = argmaxId.current && s.lastVal ? s.lastVal[argmaxId.current]?.i ?? null : null
-        renderSim(ctx, world, s.car, scan, gap, cam, terrainRef.current)
+        const scan = castScan(s.car, world, 21, 2, s.objects)
+        const gap = gapId.current && s.lastVal ? s.lastVal[gapId.current]?.i ?? null : null
+        const overlays=Object.values(useVisualization.getState().latest)
+        renderSim(ctx, world, s.car, scan, gap, cam, terrainRef.current, s.objects, overlays)
         valAcc += dt
         if (valAcc > 0.1) { valAcc = 0; onValuesRef.current?.(s.lastVal, { speed: s.car.vx, lapT: s.lapT, simTime:simTimeRef.current, best: s.best, hold: holdRef.current }) }
       }

@@ -5,7 +5,7 @@ import { Editor } from '../editor/Editor'
 import { coreToRF } from '../editor/compile'
 import { metaOf } from '../editor/nodeMeta'
 import { Viewport } from '../sim/Viewport'
-import { useGame, useLive, useTut, useVisualization } from '../store'
+import { useDesignLibrary, useGame, useLive, useTut, useVisualization } from '../store'
 import { levelById, LEVELS } from './levels'
 import { missionVenue } from './worlds'
 
@@ -39,14 +39,26 @@ const BRIEFS: Record<string,MissionBrief> = {
     takeaway:'속도 계획기는 곡률을 미리 읽어 속도 목표를 바꾸므로 코너 전에 감속합니다.',
   },
   l4:{
-    situation:'Track이 없는 좁은 통로에서는 LiDAR 거리만으로 열린 방향을 찾아야 합니다.',
-    question:'여러 거리 빔 중 어디로 향해야 충돌 가능성이 낮을까요?',
-    hints:['가장 멀리 열린 빔의 인덱스를 찾아 실제 각도로 바꿉니다.','ranges와 argmax로 빔을 고르고 da와 a0로 조향각을 복원합니다.','argmax(ranges)×scan.da + scan.a0 → clamp → STEER로 연결하세요.'],
-    takeaway:'Follow-the-Gap은 지도 대신 센서 공간의 열린 방향을 골라 즉시 조향합니다.',
+    situation:'좁은 통로의 단일 먼 빔은 노이즈일 수 있습니다. 차가 들어갈 만큼 연속된 빈 공간을 찾아야 합니다.',
+    question:'노이즈를 제거한 뒤 가장 넓은 안전 간격의 중심을 어떻게 조향각으로 바꿀까요?',
+    hints:['전처리로 비정상 거리를 정리한 뒤, 임계 거리보다 먼 빔이 가장 길게 이어진 구간을 찾습니다.','Widest gap의 중심 인덱스를 da와 곱하고 a0를 더하면 센서 기준 조향각이 됩니다.','scan.ranges → preprocess → widest gap → × scan.da → + scan.a0 → clamp → STEER.'],
+    takeaway:'Follow-the-Gap은 한 개의 먼 빔이 아니라 차량이 통과할 수 있는 연속된 안전 공간의 중심을 선택합니다.',
+  },
+  l5:{
+    situation:'센터라인 위에 고정 장애물이 놓였습니다. 평소 조향은 유지하되 가까워질 때만 회피해야 합니다.',
+    question:'장애물이 멀리 있을 때의 안정성과 가까울 때의 회피를 어떻게 한 회로에 담을까요?',
+    hints:['Scene objects에서 가장 가까운 객체와 거리를 구하세요.','거리 비교 결과로 0과 회피 오프셋 중 하나를 선택하면 필요할 때만 개입합니다.','Pursuit 조향 + select(distance<12, 회피값, 0) → clamp → STEER.'],
+    takeaway:'로컬 회피는 기본 경로 추종을 버리지 않고 위험 구간에서만 조향을 수정합니다.',
+  },
+  l6:{
+    situation:'앞에 느린 차량이 주행 중입니다. 충돌하지 않으면서 추월 의도를 명시하고 옆 공간을 사용해야 합니다.',
+    question:'대상 차량·추월 방향·개입 조건을 분리하면 왜 더 안전하게 수정할 수 있을까요?',
+    hints:['가장 가까운 차량을 Pass left intent의 target으로 지정하세요.','Intent parts의 offset은 추월 방향을 제어 신호로 꺼내는 경계입니다.','접근 거리 조건으로 추월 offset을 선택해 Pursuit 조향과 합성하세요.'],
+    takeaway:'행동 의도와 저수준 조향을 분리하면 추월 방향을 바꿔도 전체 제어기를 다시 만들 필요가 없습니다.',
   },
 }
 
-function activeNodeTypes(graph: Graph): Set<string> {
+function activeNodeIds(graph: Graph): Set<string> {
   const active = new Set<string>()
   const visit = (id:string) => {
     if (active.has(id) || !graph.nodes[id]) return
@@ -54,7 +66,16 @@ function activeNodeTypes(graph: Graph): Set<string> {
     for (const ref of Object.values(graph.nodes[id].in ?? {})) if (ref[0] === 'n') visit(ref[1] as string)
   }
   graph.order.filter(id => graph.nodes[id].type.startsWith('sink.')).forEach(visit)
-  return new Set([...active].map(id => graph.nodes[id].type))
+  return active
+}
+function requirementMet(graph:Graph, active:Set<string>, req:(typeof LEVELS)[number]['requirements'][number]):boolean {
+  if(req.kind==='node') return [...active].some(id=>graph.nodes[id].type===req.type)
+  return [...active].some(toId=>{
+    const to=graph.nodes[toId]
+    if(to.type!==req.to) return false
+    const ref=to.in?.[req.toPort]
+    return !!ref&&ref[0]==='n'&&active.has(ref[1] as string)&&graph.nodes[ref[1] as string]?.type===req.from&&ref[2]===req.fromPort
+  })
 }
 function throttleWired(graph: Graph): boolean {
   const sinkId = graph.order.find(n => graph.nodes[n].type === 'sink.throttle')
@@ -76,7 +97,9 @@ export function LevelScreen({ id }: { id: string }) {
   const level = levelById(id)
   const venue = useMemo(() => missionVenue(id), [id])
   const world = venue.world
-  const initial = useMemo(() => coreToRF(level.starter), [id])
+  const [editorGraph,setEditorGraph]=useState<Graph>(level.starter)
+  const [editorRevision,setEditorRevision]=useState(0)
+  const initial = useMemo(() => coreToRF(editorGraph), [editorGraph])
   const [graph, setGraph] = useState<Graph>(level.starter)
   const [hud, setHud] = useState({ speed:0, best:null as number | null, hold:0 })
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
@@ -91,6 +114,11 @@ export function LevelScreen({ id }: { id: string }) {
   const resizing = useRef(false)
   const setVals = useLive((s) => s.setVals)
   const { complete, goMap, best } = useGame()
+  const allDesigns=useDesignLibrary(s=>s.designs)
+  const designs=useMemo(()=>allDesigns.filter(d=>d.levelId===id),[allDesigns,id])
+  const saveDesign=useDesignLibrary(s=>s.saveDesign)
+  const [designName,setDesignName]=useState('My setup')
+  const [designNotice,setDesignNotice]=useState('')
   const nextLevel = LEVELS.find(l => l.n === level.n + 1)
   const isTut = level.id === 'tut'
   const isL1 = level.id === 'l1'
@@ -101,8 +129,8 @@ export function LevelScreen({ id }: { id: string }) {
   const issues = useMemo(() => validateGraph(graph, NT, {
     requireOutputs:!requiredOutputs, requiredOutputs,
   }), [graph, requiredOutputs])
-  const activeTypes = useMemo(() => activeNodeTypes(graph), [graph])
-  const checks = level.requirements.map(req => ({ ...req, ok:activeTypes.has(req.type) }))
+  const activeIds = useMemo(() => activeNodeIds(graph), [graph])
+  const checks = level.requirements.map(req => ({ ...req, ok:requirementMet(graph,activeIds,req) }))
   const requirementsMet = checks.every(c => c.ok)
   const outputReady = isTut || isL1 ? throttleWired(graph) : issues.length === 0
   const canRun = issues.length === 0 && requirementsMet && outputReady
@@ -113,13 +141,22 @@ export function LevelScreen({ id }: { id: string }) {
   const waitingMessage = `회로 대기 · ${wiringIssue}`
 
   useEffect(() => {
-    setGraph(level.starter); setHintLevel(0); setTutMoved(false); setPane('graph'); setResult(null); useVisualization.getState().clearAll()
+    setGraph(level.starter);setEditorGraph(level.starter);setEditorRevision(r=>r+1);setHintLevel(0);setTutMoved(false);setPane('graph');setResult(null);useVisualization.getState().clearAll()
   }, [id, level.starter])
 
   const finishTut = () => { complete('tut', 60); useGame.getState().goLevel('l1') }
   const handleGraph = (next:Graph) => { setGraph(next); setResult(null); useVisualization.getState().clearSamples() }
   const retry = () => { setResult(null); useVisualization.getState().clearSamples(); setSimKey(k => k + 1) }
 
+  const saveCurrentDesign=()=>{
+    const saved=saveDesign(id,designName.trim()||'My setup',graph)
+    setDesignNotice(`${saved.name} v${saved.version} 저장됨`)
+  }
+  const restoreDesign=(designId:string)=>{
+    const saved=designs.find(d=>d.id===designId);if(!saved)return
+    setGraph(saved.graph);setEditorGraph(saved.graph);setEditorRevision(r=>r+1)
+    setDesignNotice(`${saved.name} v${saved.version} 복원됨`)
+  }
   const onSpeedTrial = (t:number) => {
     if (!isL1) return
     complete(level.id, t)
@@ -160,11 +197,17 @@ export function LevelScreen({ id }: { id: string }) {
           {isL1 && <span className="done">✓ STRAIGHT PROVING GROUND</span>}
           {isL2 && <span className="done">✓ ▣ Speed PID 블록 제공됨</span>}
           {isL3 && <span className="done">✓ ▣ 조향·속도 블록 제공됨</span>}
-          {checks.map(c => <span key={c.type} className={c.ok ? 'done' : ''}>{c.ok ? '✓' : '○'} {c.label}</span>)}
+          {checks.map((c,i) => <span key={c.label+i} className={c.ok ? 'done' : ''}>{c.ok ? '✓' : '○'} {c.label}</span>)}
           <span className={outputReady ? 'done' : ''}>{outputReady ? '✓' : '○'} 출력 연결</span>
         </div>
         <div className={'run-state ' + (canRun ? 'ready' : 'waiting')}>
           <i />{canRun ? '실행 준비됨' : waitingMessage}
+        </div>
+        <div className="design-tools">
+          <input value={designName} onChange={e=>setDesignName(e.target.value)} aria-label="설계 이름"/>
+          <button onClick={saveCurrentDesign}>설계 버전 저장</button>
+          <select defaultValue="" onChange={e=>{restoreDesign(e.target.value);e.currentTarget.value=''}}><option value="" disabled>저장 설계 복원</option>{designs.slice().reverse().map(d=><option key={d.id} value={d.id}>{d.name} · v{d.version}</option>)}</select>
+          {designNotice&&<span>{designNotice}</span>}
         </div>
       </div>
 
@@ -176,7 +219,7 @@ export function LevelScreen({ id }: { id: string }) {
       <div ref={bodyRef} className="lv-body" style={{ ['--split' as any]:split+'%' }}
         onPointerMove={resize} onPointerUp={() => { resizing.current=false }} onPointerCancel={() => { resizing.current=false }}>
         <div className={'lv-pane editor-pane' + (pane !== 'graph' ? ' mobile-hidden' : '')}>
-          <Editor key={id} initial={initial} palette={editorPalette} onGraph={handleGraph}
+          <Editor key={`${id}-${editorRevision}`} initial={initial} palette={editorPalette} onGraph={handleGraph}
             nodeDefaults={isL1 ? { const:{value:8} } : undefined} requiredOutputs={requiredOutputs} />
         </div>
         <button className="split-handle" aria-label="그래프와 시뮬레이션 영역 너비 조절"

@@ -16,6 +16,7 @@ export const META: Record<string, Meta> = {
   'src.scan':{label:'LiDAR scan',cat:'Sensors',desc:'LiDAR 거리 측정. 여러 빔이 각 방향으로 벽까지 거리를 잼. ranges=거리 배열, a0=시작 각도, da=빔 간격.',real:'실제 F1TENTH의 /scan 토픽.'},
   'src.speed':{label:'Speed',cat:'Sensors',desc:'차의 현재 전진 속도(m/s).'},
   'src.pose':{label:'Pose',cat:'Sensors',desc:'차의 현재 위치·방향 {x, y, yaw(방향각)}.',real:'Localization의 출력.'},
+  'src.objects':{label:'Scene objects',cat:'Sensors',desc:'센서가 인식한 정적 장애물과 상대 차량 목록. 회피·추월 판단의 입력.'},
   'src.track':{label:'Track',cat:'Sensors',desc:'트랙 중심선(웨이포인트 목록). 경로 계획에 사용.'},
   'src.surface':{label:'Surface grip',cat:'Sensors',desc:'현재 노면의 마찰계수 μ와 중력가속도 g. 그립 한계 속도 계산에 사용.'},
   'src.vehicleState':{label:'Vehicle state',cat:'Sensors',desc:'현재 차량의 위치·속도·요레이트·트랙 상태를 하나의 state로 출력.'},
@@ -152,7 +153,7 @@ export function defaultParams(type:string):Record<string,number>{
 // master catalog (palette-v1). Levels expose a curated SUBSET via level.palette.
 // Higher-order (map/filter/reduce/zipWith) are omitted until lambda authoring exists.
 export const PALETTE_CATS: {cat:string; types:string[]}[] = [
-  {cat:'Sensors',  types:['src.scan','src.speed','src.pose','src.track','src.vehicleState']},
+  {cat:'Sensors',  types:['src.scan','src.speed','src.pose','src.track','src.vehicleState','src.objects']},
   {cat:'Math',     types:['const','add','sub','mul','div','abs','neg','sign','mod','pow','sqrt','min','max','clamp','lerp','sin','cos','atan2','hypot','wrapAngle']},
   {cat:'Logic',    types:['lt','gt','le','ge','eq','ne','and','or','not','select']},
   {cat:'Vector',   types:['vec.make','vec.xy','vec.len','vec.scale','vec.add','vec.sub','vec.dot','vec.normalize','vec.rotate','vec.angle','vec.dist']},

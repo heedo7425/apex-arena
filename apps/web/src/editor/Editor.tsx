@@ -172,8 +172,8 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     const node=latest.current.nodes.find(n=>n.id===nodeId)
     if(!node)return
     const valueType=portType(node.data.coreType,port,'out')||'unknown'
-    if(valueType!=='num'){
-      setNotice(`${metaOf(node.data.coreType).label}의 ${port}는 ${valueType} 신호예요. 이번 VISUALIZE에서는 숫자 신호를 선택하세요.`)
+    if(!['num','objects','trajectory','trajectories','prediction','predictions','space'].includes(valueType)){
+      setNotice(`${valueType} 신호는 아직 VISUALIZE 표시를 지원하지 않습니다.`)
       return
     }
     addVisual({nodeId,port,valueType,label:`${metaOf(node.data.coreType).label} · ${port}`,unit:signalUnit(node.data.coreType,port)})

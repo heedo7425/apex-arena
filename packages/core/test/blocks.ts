@@ -98,5 +98,26 @@ const regrouped = inlineComposite(grouped, 'myblock', NT);
 const rg = runFor(world, regrouped, 7, 60);
 ok(purBase.bestClean === rg.bestClean, 'encapsulate → fork round-trip preserves behavior');
 
+// scene-free canonical PURSUIT lap must stay exactly 21.0833s (behavior lock)
+const canonical = runFor(buildWorld(), PURSUIT, 1, 70);
+ok(canonical.bestClean !== null && canonical.bestClean.toFixed(4) === '21.0833', 'scene-free PURSUIT lap is exactly 21.0833s (got ' + canonical.bestClean?.toFixed(4) + ')');
+
+// obstacle on the racing line -> collision -> dirty lap (scene objects change outcomes)
+{ const w = buildWorld(); const mid = Math.floor(w.track.N * 0.4); const p = w.track.pts[mid];
+  const clean0 = runFor(w, PURSUIT, 1, 45); // no objects yet
+  w.objects = [{ id:'block', kind:'static', trackIndex:undefined, trackSpeed:undefined,
+    pose:{ x:p[0], y:p[1], yaw:0 }, velocity:{ x:0, y:0 }, yawRate:0,
+    shape:{ type:'box', radius:0, length:3.8, width:1.8 }, confidence:1 } as any];
+  const hit = runFor(w, PURSUIT, 1, 45);
+  ok(clean0.bestClean !== null, 'same course with no obstacle produces a clean lap (control)');
+  ok(hit.laps.some(l => l.dirty), 'obstacle on the racing line is detected as a collision (dirty lap)'); }
+
+// moving rival cycles deterministically along the track (same seed -> identical)
+{ const w = buildWorld(); w.objects = [{ id:'rival', kind:'vehicle', trackIndex:10, trackSpeed:6,
+    pose:{ x:0, y:0, yaw:0 }, velocity:{ x:0, y:0 }, yawRate:0,
+    shape:{ type:'box', radius:0, length:4.2, width:1.9 }, confidence:1 } as any];
+  const a = runFor(w, PURSUIT, 42, 30), b = runFor(w, PURSUIT, 42, 30);
+  ok(a.bestClean === b.bestClean && a.laps.length === b.laps.length, 'moving rival: same seed → identical (deterministic cycling)'); }
+
 console.log(failed ? `\n❌ ${failed} FAILED` : '\n✅ ALL PASS — composite blocks preserve behavior');
 process.exit(failed ? 1 : 0);

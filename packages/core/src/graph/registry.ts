@@ -132,6 +132,7 @@ export const NT: Record<string, NodeDef> = {
   'src.surface': { kind:'source', cat:'Sensors', outs:['mu','g'], fn:(i,p,s,c)=>({ mu:c.world.mu, g:G }) },
 
   'src.vehicleState': { kind:'source', cat:'Sensors', outs:['state'], fn:(i,p,s,c)=>({ state:currentState(c.car) }) },
+  'src.objects': { kind:'source', cat:'Sensors', outs:['objects'], fn:(i,p,s,c)=>({ objects:c.obs.objects ?? [] }) },
   // ---- L0 primitives: math ----
   'const': { kind:'prim', cat:'Math', outs:['v'], fn:(i,p)=>({ v:p.value }) },
   'add': { kind:'prim', cat:'Math', ins:['a','b'], outs:['v'], fn:(i)=>({ v:i.a+i.b }) },

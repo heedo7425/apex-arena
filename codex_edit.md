@@ -2,6 +2,36 @@
 
 All entries in this file document changes made by Codex in this repository.
 
+## 2026-07-22 - Finalization pass (10-improvements handoff completed)
+
+### Why
+Codex의 10개 개선 작업이 미커밋 상태로 중단됨. 지목된 3개 버그를 실제 파일에서 확인하고,
+요구된 테스트/오프스크린 검증을 마친 뒤 배포까지 완료한다. 워크트리는 reset하지 않음.
+
+### Findings & changes
+- worlds.ts venue() 조기 return 버그: **미존재**(이미 world.objects 할당 후 마지막에 한 번 반환). 변경 없음.
+- LevelScreen 설계 selector/designNotice/design-tools 배치: **이미 올바르게 적용됨**
+  (allDesigns 전체 selector + useMemo 필터, 별도 designNotice 상태, .design-tools가 .mission-bar 내부). 변경 없음.
+- store.ts sample(): **버그 존재 → 수정.** 공간 데이터가 numeric 필터 continue 뒤에 저장돼 latest에 안 들어가던 문제.
+  이제 정의된 값은 모두 latest에 먼저 저장(overlay용), numeric만 timeline samples에 추가, undefined는 skip.
+- VisualizePanel A/B: 신호 개수만 표시하던 것을 **공통 numeric 신호의 mean 비교 테이블(A · B · Δ)** 로 확장.
+- blocks.ts 테스트 추가: (1) scene-free PURSUIT 랩이 정확히 21.0833s (behavior lock), (2) 레이싱 라인 위 장애물 →
+  충돌 dirty lap, (3) 이동 rival 같은 시드 → 동일(결정론적 순환).
+
+### Verification (전부 오프스크린, DISPLAY 제거 / Playwright headless)
+- 코어 4종 PASS: drive.ts, prims.ts, blocks.ts, planning.ts.
+- PURSUIT bestClean === 21.0833s 유지(명시 assert). 장애물 → dirty, rival 결정론 신규 통과.
+- Playwright(1600×950): mission card 7, strategy card 3(RULE BASED / MPC PATH · CORE READY / RL PATH · FOUNDATION),
+  L5 스타터 노드 3, 설계 저장 v1 → 재저장 v2 → 복원(designNotice 사용, 결과패널 0개 = 미션완료 오발동 없음).
+- 스크린샷 육안: L5가 HAZARD 2개, L6가 RIVAL 1개 렌더(missionVenue objects l5=2 / l6=1가 makeSim까지 전달됨). browser page error 0.
+- 프로덕션 빌드 PASS: index-Ba3-cEtN.js / index-3v0wSeED.css. app/ 갱신.
+
+### Next (실제 후속)
+- 공간 Visualize의 trajectory/prediction/space overlay는 파이프라인(store→latest→render overlays)은 갖춰졌으나,
+  전체 planning 그래프 배선을 통한 end-to-end overlay 구동 검증은 미완(objects overlay는 렌더 확인됨).
+- MPC 후보선택 / RL 정책평가 전용 미션은 output→command 경계 확정 후 별도 제작(현재는 CORE READY / FOUNDATION 경로 안내).
+- A/B 비교에 experiment run 이름 + lap/clearance 요약 지표 추가.
+
 ## 2026-07-20 - Graph validation foundation
 
 ### Why this was first
@@ -357,3 +387,36 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - LiDAR scan, add, multiply, clamp, argmax, and STEER appeared only in the Parts Bay and none were pre-placed.
 - No browser page errors occurred; offscreen evidence is `/tmp/apex-l4-blank-steering.png`.
 - Production build passes with `index-Ctemzd6P.js`.
+
+## 2026-07-22 - Behavior missions, scene simulation, experiments, and design versions (complete)
+
+### Why
+- Mission checks accepted disconnected answer-shaped nodes instead of proving that the intended behavior reached an actuator.
+- Static avoidance and overtaking needed real scene observations, LiDAR hits, collision consequences, and distinct venues rather than decorative map variants.
+- Players needed spatial debugging, repeatable A/B comparisons, and complete design versions in addition to reusable composite blocks.
+
+### Changes
+- Replaced node-presence requirements with active sink-path node and exact port-to-port edge requirements.
+- Reworked L4 to require LiDAR preprocessing and widest continuous safe-gap selection instead of raw range argmax.
+- Added deterministic scene objects to World and SimState, including fixed obstacles and track-following opponents.
+- Added src.objects with typed validation, Korean metadata, master-palette membership, and obstacle-aware LiDAR scans.
+- Marked obstacle and rival contact dirty without changing worlds that have no scene objects.
+- Added unique Container Yard static-avoidance and Duel Ring overtaking missions with blank steering builds.
+- Added Rule/MPC/RL campaign paths while keeping turnkey planners and algorithm signatures out of the palette.
+- Extended VISUALIZE from numeric timelines to ObjectSet, Trajectory, Prediction, and DrivableSpace overlays.
+- Added A/B telemetry capture slots for numeric signal min, max, mean, and sample count comparisons.
+- Added mission-scoped full-graph design persistence with named, incrementing versions and restore controls.
+- Rebuilt the committed Pages application bundle.
+
+### Verification
+- drive.ts, prims.ts, blocks.ts, and planning.ts all pass.
+- New primitive checks prove mission obstacles shorten LiDAR ranges and src.objects exposes observed scene data.
+- PURSUIT remains exactly 21.0833s and deterministic.
+- Production web build passes with index-DiCfqAON.js and index-CQiYtEEo.css.
+- Headless Playwright found 7 mission cards and 3 Rule/MPC/RL path cards.
+- Headless Playwright confirmed L5 starts with only 3 speed-control nodes and saved Avoidance A v1.
+- No browser page errors occurred; offscreen evidence is /tmp/apex-10-improvements.png.
+
+### Next
+- Author dedicated MPC candidate-selection and RL policy-evaluation missions after their output-to-command boundary is specified.
+- Add experiment run naming and lap/clearance summary metrics to the A/B comparison table.

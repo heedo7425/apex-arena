@@ -2,6 +2,7 @@
 // so MPPI/MPC can roll it out from inside a graph). Verified physics ported.
 import { type World, nearestIndex, G, DT } from './world.ts';
 
+import type { SceneObject } from '../planning/types.ts';
 export type CarState = {
   x: number; y: number; yaw: number;
   vx: number; vy: number; r: number; delta: number;
@@ -62,7 +63,7 @@ export function stepDynamics(car: CarState, u: Control, world: World, dt: number
 }
 
 export type Scan = { ranges: number[]; a0: number; da: number };
-export function castScan(car: CarState, world: World, nBeams = 21, fov = 2.0): Scan {
+export function castScan(car: CarState, world: World, nBeams = 21, fov = 2.0, objects:SceneObject[] = world.objects ?? []): Scan {
   const T = world.track, a0 = -fov, da = 2*fov/(nBeams-1), ranges: number[] = [];
   for (let b = 0; b < nBeams; b++) {
     const ang = car.yaw + a0 + b*da, dx = Math.cos(ang), dy = Math.sin(ang);
@@ -70,6 +71,12 @@ export function castScan(car: CarState, world: World, nBeams = 21, fov = 2.0): S
     for (let t = 0; t < 35; t++) {
       r += 0.5; const px = car.x + dx*r, py = car.y + dy*r, nn = nearestIndex(T, px, py, hint); hint = nn.i;
       if (nn.dist > T.half) { hit = r - 0.25; break; }
+      for(const object of objects){
+        const ox=px-object.pose.x,oy=py-object.pose.y
+        const radius=object.shape.type==='circle'?object.shape.radius:Math.hypot(object.shape.length,object.shape.width)/2
+        if(ox*ox+oy*oy<=radius*radius){hit=Math.min(hit,r-0.25);break}
+      }
+      if(hit<18)break
     }
     ranges.push(hit);
   }

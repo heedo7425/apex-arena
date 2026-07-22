@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { Graph } from '@apex/core'
 
 // live node output values (from the running sim) — read by editor node probes, ~10fps
 export const useLive = create<{ vals: Record<string, any> | null; setVals: (v: Record<string, any> | null) => void }>(
@@ -16,10 +17,13 @@ export type VisualizedSignal = {
   color:string
 }
 export type VisualizationPoint = { t:number; value:number }
+export type ExperimentRun={slot:'A'|'B';capturedAt:number;stats:Record<string,{min:number;max:number;mean:number;samples:number}>}
 type SignalDraft = Omit<VisualizedSignal,'id'|'color'>
 type Visualization = {
   signals:VisualizedSignal[]
   samples:Record<string,VisualizationPoint[]>
+  latest:Record<string,unknown>
+  runs:Partial<Record<'A'|'B',ExperimentRun>>
   open:boolean
   lastTime:number|null
   addSignal:(signal:SignalDraft)=>void
@@ -28,10 +32,11 @@ type Visualization = {
   clearSamples:()=>void
   clearAll:()=>void
   toggle:()=>void
+  saveRun:(slot:'A'|'B')=>void
 }
 const VIS_COLORS=['#1FDDC9','#F0B541','#69AEEB','#F27D62','#B7DB67','#E78FD0']
 export const useVisualization=create<Visualization>((set,get)=>({
-  signals:[],samples:{},open:false,lastTime:null,
+  signals:[],samples:{},latest:{},runs:{},open:false,lastTime:null,
   addSignal:(draft)=>{
     const id=`${draft.nodeId}.${draft.port}`
     const current=get().signals
@@ -48,16 +53,27 @@ export const useVisualization=create<Visualization>((set,get)=>({
     if(!values||!state.signals.length||time===state.lastTime)return
     const reset=state.lastTime!=null&&time<state.lastTime
     const samples:Record<string,VisualizationPoint[]>={...state.samples}
+    const latest={...state.latest}
     for(const signal of state.signals){
       const value=values[signal.nodeId]?.[signal.port]
-      if(typeof value!=='number'||!Number.isFinite(value))continue
+      if(value===undefined)continue
+      latest[signal.id]=value  // spatial (objects/trajectory/prediction/space) + numeric both land here for overlay
+      if(typeof value!=='number'||!Number.isFinite(value))continue  // only numeric feeds the timeline
       const previous=reset?[]:(samples[signal.id]||[])
       samples[signal.id]=[...previous,{t:time,value}].slice(-360)
     }
-    set({samples,lastTime:time})
+    set({samples,latest,lastTime:time})
   },
-  clearSamples:()=>set(state=>({samples:Object.fromEntries(state.signals.map(s=>[s.id,[]])),lastTime:null})),
-  clearAll:()=>set({signals:[],samples:{},open:false,lastTime:null}),
+  clearSamples:()=>set(state=>({samples:Object.fromEntries(state.signals.map(s=>[s.id,[]])),latest:{},lastTime:null})),
+  clearAll:()=>set({signals:[],samples:{},latest:{},runs:{},open:false,lastTime:null}),
+  saveRun:(slot)=>set(state=>{
+    const stats:ExperimentRun['stats']={}
+    for(const signal of state.signals){
+      const values=(state.samples[signal.id]??[]).map(p=>p.value)
+      if(values.length)stats[signal.id]={min:Math.min(...values),max:Math.max(...values),mean:values.reduce((a,b)=>a+b,0)/values.length,samples:values.length}
+    }
+    return {runs:{...state.runs,[slot]:{slot,capturedAt:Date.now(),stats}}}
+  }),
   toggle:()=>set(state=>({open:!state.open})),
 }))
 
@@ -83,6 +99,30 @@ export const useBlockLibrary=create<BlockLibrary>((set,get)=>({
   removeBlock:(id)=>{
     const next=get().blocks.filter(b=>b.id!==id)
     persistBlocks(next);set({blocks:next})
+  },
+}))
+
+// ---- complete control-graph designs, versioned per mission ----
+export type SavedDesign={id:string;name:string;levelId:string;version:number;createdAt:number;graph:Graph}
+const DESIGN_KEY='apex_design_library_v1'
+function loadDesigns():SavedDesign[]{try{const v=JSON.parse(localStorage.getItem(DESIGN_KEY)||'[]');return Array.isArray(v)?v:[]}catch{return []}}
+function persistDesigns(designs:SavedDesign[]){try{localStorage.setItem(DESIGN_KEY,JSON.stringify(designs))}catch{}}
+type DesignLibrary={
+  designs:SavedDesign[]
+  saveDesign:(levelId:string,name:string,graph:Graph)=>SavedDesign
+  removeDesign:(id:string)=>void
+}
+export const useDesignLibrary=create<DesignLibrary>((set,get)=>({
+  designs:loadDesigns(),
+  saveDesign:(levelId,name,graph)=>{
+    const designs=get().designs
+    const version=Math.max(0,...designs.filter(d=>d.levelId===levelId&&d.name===name).map(d=>d.version))+1
+    const design:SavedDesign={id:`${levelId}_${Date.now()}_${version}`,name,levelId,version,createdAt:Date.now(),graph:JSON.parse(JSON.stringify(graph))}
+    const next=[...designs,design];persistDesigns(next);set({designs:next});return design
+  },
+  removeDesign:(id)=>{
+    const next=get().designs.filter(d=>d.id!==id)
+    persistDesigns(next);set({designs:next})
   },
 }))
 

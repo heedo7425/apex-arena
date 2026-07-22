@@ -3,6 +3,7 @@ import { makeGraph, evalGraph, type EvalCtx } from '../src/graph/engine.ts';
 import { NT } from '../src/graph/registry.ts';
 import { buildWorld, curvAheadAt, G } from '../src/sim/world.ts';
 import { makeRng } from '../src/rng.ts';
+import { castScan, initCar } from '../src/sim/vehicle.ts';
 
 let failed = 0;
 function ok(cond: boolean, msg: string) { console.log((cond ? 'PASS ' : 'FAIL ') + msg); if (!cond) failed++; }
@@ -97,6 +98,16 @@ const mulLam = makeGraph({ a:{ type:'arg' }, b:{ type:'arg2' }, m:{ type:'mul', 
 
 // --- stateful across ticks (deterministic accumulation) ---
 { const g = makeGraph({ n:{ type:'st.accum', in:{ x:L(120) } } }, 'n', 'v'); const c = ctx();
+// --- scene observation and LiDAR integration ---
+{ const car=initCar(world), object:any={
+    id:'test-obstacle',kind:'static',pose:{x:car.x+Math.cos(car.yaw)*5,y:car.y+Math.sin(car.yaw)*5,yaw:car.yaw},
+    velocity:{x:0,y:0},yawRate:0,shape:{type:'box',radius:0,length:2,width:2},confidence:1,
+  };
+  const base=castScan(car,world), blocked=castScan(car,world,21,2,[object]);
+  ok(blocked.ranges[10]<base.ranges[10], 'LiDAR ranges include mission obstacles');
+  const c=ctx();c.obs.objects=[object];
+  const objects=one({n:{type:'src.objects'}},'n','objects',c);
+  ok(objects.length===1&&objects[0].id==='test-obstacle','src.objects exposes observed scene objects'); }
   const a = evalGraph(g,c,NT)['n'].v, b = evalGraph(g,c,NT)['n'].v, d = evalGraph(g,c,NT)['n'].v;
   ok(near(a,1)&&near(b,2)&&near(d,3), 'st.accum(120)·dt accumulates 1,2,3'); }
 { const g = makeGraph({ n:{ type:'st.delay', in:{ x:L(7) } } }, 'n', 'v'); const c = ctx();

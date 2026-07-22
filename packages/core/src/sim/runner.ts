@@ -11,24 +11,44 @@ export type LapResult = { t: number; dirty: boolean };
 
 export type SimState = {
   world: World; graph: Graph; rng: Rng; car: CarState; dt: number;
+  elapsed:number; objects:NonNullable<World['objects']>;
   lapT: number; dirty: boolean; prevProg: number;
   laps: LapResult[]; best: number | null; lastVal: Record<string, any> | null;
   graphState: Record<string, Record<string, unknown>>;
 };
 
 export function makeSim(world: World, graph: Graph, seed = 1): SimState {
-  return { world, graph, rng: makeRng(seed), car: initCar(world), dt: DT,
+  return { world, graph, rng: makeRng(seed), car: initCar(world), dt: DT, elapsed:0,
+    objects:(world.objects??[]).map(o=>({...o,pose:{...o.pose},velocity:{...o.velocity},shape:{...o.shape}})),
     lapT: 0, dirty: false, prevProg: 0, laps: [], best: null, lastVal: null, graphState: {} };
+}
+
+function sceneAt(s:SimState){
+  const track=s.world.track
+  return (s.world.objects??[]).map(o=>{
+    if(o.trackIndex!=null&&o.trackSpeed!=null){
+      const i=Math.floor((o.trackIndex+o.trackSpeed*s.elapsed/track.spacing)%track.N)
+      const p=track.pts[i],t=track.tan[i]
+      return {...o,pose:{x:p[0],y:p[1],yaw:Math.atan2(t[1],t[0])},velocity:{x:t[0]*o.trackSpeed,y:t[1]*o.trackSpeed},shape:{...o.shape}}
+    }
+    return {...o,pose:{...o.pose,x:o.pose.x+o.velocity.x*s.elapsed,y:o.pose.y+o.velocity.y*s.elapsed},velocity:{...o.velocity},shape:{...o.shape}}
+  })
 }
 
 // one control tick (= one physics step) driven by the graph
 export function tick(s: SimState): void {
   const car = s.car, world = s.world;
-  const obs = { scan: castScan(car, world), speed: car.vx, pose: { x: car.x, y: car.y, yaw: car.yaw }, track: world.track };
+  s.objects=sceneAt(s)
+  const obs = { scan: castScan(car, world, 21, 2, s.objects), speed: car.vx, pose: { x: car.x, y: car.y, yaw: car.yaw }, track: world.track, objects:s.objects };
   const ctx: EvalCtx = { obs, cmd: { steer: 0, throttle: 0 }, state: s.graphState, rng: s.rng, world, car, dt: s.dt };
   s.lastVal = evalGraph(s.graph, ctx, NT);
   s.car = stepDynamics(car, ctx.cmd, world, s.dt);
   // lap timing
+  s.elapsed += s.dt;
+  for(const object of s.objects){
+    const radius=object.shape.type==='circle'?object.shape.radius:Math.hypot(object.shape.length,object.shape.width)/2
+    if(Math.hypot(s.car.x-object.pose.x,s.car.y-object.pose.y)<radius+1.35)s.dirty=true
+  }
   const prog = s.car.idx / world.track.N;
   s.lapT += s.dt;
   if (!s.car.onTrack) s.dirty = true;

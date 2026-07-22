@@ -1,5 +1,6 @@
 // World = track geometry + height field + vehicle params. Pure, framework-free.
 export type Vec2 = [number, number];
+import type { SceneObject } from '../planning/types.ts';
 
 export type Track = {
   pts: Vec2[]; tan: Vec2[]; nrm: Vec2[]; curv: number[];
@@ -15,7 +16,7 @@ export type VehicleParams = {
   CF: number; CR: number; FXDRIVE: number; FXBRAKE: number; DRAGC: number; ROLL: number;
   MAXSTEER: number; MAXSTEERVEL: number;
 };
-export type World = { track: Track; height: Height; vp: VehicleParams; mu: number; muGrass: number };
+export type World = { track: Track; height: Height; vp: VehicleParams; mu: number; muGrass: number; objects?: SceneObject[] };
 
 export const G = 9.81;
 export const DT = 1 / 120;
