@@ -118,7 +118,7 @@ button{cursor:pointer;font-family:var(--sans)}
 /* ---------- viewport ---------- */
 .viewport{display:flex;flex-direction:column;gap:8px}
 .vp-stage{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--hairS);background:#0e1922}
-.vp-stage canvas{display:block;width:100%;height:auto}
+.vp-stage canvas{display:block;width:100%;height:auto;max-height:min(50vh,540px);object-fit:contain;margin-inline:auto}
 .vp-tag{position:absolute;top:10px;left:10px;font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:#eaf2f2;background:rgba(8,14,20,.55);padding:4px 9px;border-radius:6px;display:flex;gap:6px;align-items:center}
 .vp-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--signal)}
 .vp-controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -225,8 +225,8 @@ button:focus-visible,.react-flow__handle:focus-visible,input:focus-visible{
 .lv-hud span:last-child{border-right:0}.lv-hud small{display:block;margin-right:auto;color:var(--faint);font-size:.5rem;letter-spacing:.1em}
 .lv-result{box-shadow:0 12px 36px -20px #000}
 .lv-result>span{display:flex;flex-direction:column;gap:3px}.lv-result small{font-size:.52rem;letter-spacing:.12em}
-.graph-feedback{position:absolute;z-index:7;top:10px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:7px;
-  max-width:calc(100% - 28px);padding:6px 10px;border-radius:999px;border:1px solid var(--hairS);
+.graph-feedback{display:flex;align-items:center;gap:7px;
+  max-width:100%;padding:6px 10px;border-radius:999px;border:1px solid var(--hairS);
   background:color-mix(in srgb,var(--surf) 90%,transparent);backdrop-filter:blur(9px);font-size:.66rem;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gf-dot{width:7px;height:7px;flex:none;border-radius:50%;background:var(--faint)}
 .graph-feedback.ready{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,var(--hairS))}.graph-feedback.ready .gf-dot{background:var(--good)}
@@ -294,12 +294,15 @@ button:focus-visible,.react-flow__handle:focus-visible,input:focus-visible{
 
 /* ---------- Game-feel pass: garage loadout and race workspace ---------- */
 .editor{display:flex;position:relative;isolation:isolate;height:100%;min-height:0}
-.editor-mode{position:absolute;z-index:7;right:14px;top:12px;display:flex;align-items:center;gap:9px;
+.editor-topbar{position:absolute;z-index:12;top:0;left:0;right:0;display:flex;align-items:flex-start;gap:10px;padding:12px 14px;pointer-events:none}
+.editor-topbar>*{pointer-events:auto}
+.gf-slot{flex:1;min-width:0;display:flex;justify-content:center}
+.editor-mode{flex:none;display:flex;align-items:center;gap:9px;
   padding:6px 9px;border:1px solid color-mix(in srgb,var(--signal) 28%,var(--hairS));border-radius:7px;
   background:color-mix(in srgb,var(--surf) 86%,transparent);backdrop-filter:blur(9px)}
 .editor-mode span{font-family:var(--mono);font-size:.5rem;letter-spacing:.14em;color:var(--signal)}
 .editor-mode b{font-family:var(--mono);font-size:.58rem;letter-spacing:.08em;color:var(--ink)}
-.parts-toggle{position:absolute;z-index:12;left:14px;top:12px;display:flex;align-items:center;gap:8px;
+.parts-toggle{flex:none;display:flex;align-items:center;gap:8px;
   min-width:148px;padding:7px 9px;border:1px solid var(--hairS);border-radius:8px;
   background:color-mix(in srgb,var(--surf) 91%,transparent);backdrop-filter:blur(10px);color:var(--ink);
   box-shadow:0 12px 30px -22px #000;text-align:left}

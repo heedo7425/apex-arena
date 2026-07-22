@@ -195,10 +195,6 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
 
   return (
     <div className="editor">
-      <div className="editor-mode"><span>BUILD MODE</span><b>CONTROL GRAPH</b></div>
-      {palette.length>0&&!bayOpen&&<button className={'parts-toggle'+(highlightPalette?' hl':'')} onClick={()=>setBayOpen(true)} aria-expanded={bayOpen}>
-        <span className="parts-icon">＋</span><span><small>LOADOUT</small><b>PARTS BAY</b></span><em>{palette.length}</em>
-      </button>}
       {palette.length>0&&bayOpen&&<div className="palette parts-bay">
         <div className="parts-head">
           <div><span>GARAGE LOADOUT</span><b>제어 파트 장착</b></div>
@@ -226,8 +222,16 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
           <button onClick={undo} disabled={undoCount === 0} aria-label="마지막 변경 되돌리기">↶ UNDO</button>
           <button onClick={resetBuild} aria-label="미션 그래프 초기화">↻ RESET</button>
         </div>
-        <div className={'graph-feedback '+(notice?'active':ready?'ready':'waiting')} role="status" aria-live="polite">
-          <span className="gf-dot"/>{notice||(ready?'CONTROL ONLINE · 출전 준비 완료':'CONTROL OFFLINE · 출력 링크를 완성하세요')}
+        <div className="editor-topbar">
+          {palette.length>0&&!bayOpen&&<button className={'parts-toggle'+(highlightPalette?' hl':'')} onClick={()=>setBayOpen(true)} aria-expanded={bayOpen}>
+            <span className="parts-icon">＋</span><span><small>LOADOUT</small><b>PARTS BAY</b></span><em>{palette.length}</em>
+          </button>}
+          <div className="gf-slot">
+            <div className={'graph-feedback '+(notice?'active':ready?'ready':'waiting')} role="status" aria-live="polite">
+              <span className="gf-dot"/>{notice||(ready?'CONTROL ONLINE · 출전 준비 완료':'CONTROL OFFLINE · 출력 링크를 완성하세요')}
+            </div>
+          </div>
+          <div className="editor-mode"><span>BUILD MODE</span><b>CONTROL GRAPH</b></div>
         </div>
         <div ref={trashRef} className={`trash-drop${draggingNode?" dragging":""}${trashHot?" hot":""}`} aria-label="블록 삭제 영역">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg><span>{trashHot?"놓아서 삭제":"여기로 끌어 삭제"}</span>
