@@ -351,6 +351,11 @@ button:focus-visible,.react-flow__handle:focus-visible,input:focus-visible{
 .inner-bar .iv-fork{margin-left:auto;padding:6px 12px;border:1px solid color-mix(in srgb,#8C7CF0 55%,var(--hair));border-radius:6px;background:color-mix(in srgb,#8C7CF0 14%,transparent);color:#8C7CF0;font-size:.72rem;font-weight:600}
 .inner-bar .iv-fork:hover{background:color-mix(in srgb,#8C7CF0 24%,transparent)}
 .inner-flow{flex:1;min-height:0;position:relative}
+.inner-flow .react-flow__edge-path{stroke:#52677c!important;stroke-width:2.6!important;filter:drop-shadow(0 1px 1px rgba(255,255,255,.2))}
+.iv-edit-banner{position:absolute;z-index:6;left:16px;bottom:16px;display:flex;align-items:center;gap:12px;padding:10px 13px;
+  border:1px solid color-mix(in srgb,#8C7CF0 52%,var(--hairS));border-radius:9px;background:color-mix(in srgb,var(--surf) 94%,transparent);
+  box-shadow:0 14px 34px -20px #000;backdrop-filter:blur(12px);color:var(--mut);font-size:.7rem}
+.iv-edit-banner b{color:#9e91ff;font-size:.72rem}.iv-edit-banner:hover{border-color:#9e91ff;background:color-mix(in srgb,#8C7CF0 13%,var(--surf))}
 .gnode{border-color:color-mix(in srgb,var(--accent) 22%,var(--hairS));box-shadow:0 10px 22px -13px rgba(0,0,0,.9)}
 .gnode-h{letter-spacing:.01em}.react-flow__edge-path{stroke-width:1.8}
 .ni-cap{font-family:var(--mono);font-size:.48rem;letter-spacing:.15em;color:var(--faint);margin-bottom:4px}

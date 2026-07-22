@@ -23,12 +23,21 @@ function InnerView({ node, onClose, onFork, onSave }: { node:OpenNode; onClose:(
   for(let i=1;i<trail.length;i++)currentLive=currentLive?.__inner?.[trail[i].id]
   const innerVals=currentLive?.__inner
   const g=React.useMemo(()=>coreToRF(current.sub),[current.sub])
+  const styledEdges=React.useMemo(()=>g.edges.map(edge=>({...edge,
+    className:'inner-edge', zIndex:3, style:{stroke:'#52677c',strokeWidth:2.6},
+  })),[g.edges])
+  const [innerNodes,setInnerNodes,onInnerNodesChange]=useNodesState(g.nodes as any)
+  const [innerEdges,setInnerEdges]=useEdgesState(styledEdges as any)
+  useEffect(()=>{
+    setInnerNodes(g.nodes as any)
+    setInnerEdges(styledEdges as any)
+  },[g,styledEdges,setInnerNodes,setInnerEdges])
   const enter=(id:string,type:string,params:Record<string,any>)=>{
     const sub=(NT[type]?.sub??params?.sub) as Graph|undefined
     if(!sub)return
     setTrail(t=>[...t,{id,type,label:type==='blk.user'?(params.label||'▣ 내 블록'):metaOf(type).label,sub}]);setInspect(null)
   }
-  const displayNodes=g.nodes.map(n=>({...n,data:{...n.data,label:n.data.coreType==='cparam'?`parameter · ${n.data.params.param}`:n.data.label,liveOverride:innerVals?(innerVals[n.id]??null):null,onOpen:enter,onInspect:(id:string,type:string)=>setInspect({id,type})}}))
+  const displayNodes=(innerNodes as RFNode[]).map(n=>({...n,data:{...n.data,label:n.data.coreType==='cparam'?`parameter · ${n.data.params.param}`:n.data.label,liveOverride:innerVals?(innerVals[n.id]??null):null,onOpen:enter,onInspect:(id:string,type:string)=>setInspect({id,type})}}))
   const inspectType=inspect?.type, inspectLive=inspect?innerVals?.[inspect.id]:null
   return (
     <div className="inner-view">
@@ -37,15 +46,17 @@ function InnerView({ node, onClose, onFork, onSave }: { node:OpenNode; onClose:(
         <nav className="iv-crumbs" aria-label="블록 내부 경로">
           {trail.map((p,i)=><button key={`${p.id}-${i}`} className={i===trail.length-1?'on':''} onClick={()=>{setTrail(t=>t.slice(0,i+1));setInspect(null)}}>{p.label}</button>)}
         </nav>
-        <span className="iv-title"><em>LIVE INTERNALS · 읽기전용</em></span>
+        <span className="iv-title"><em>원본 블록 내부 · 배선 미리보기</em></span>
         {node.type==='blk.user'&&<button className="iv-save" onClick={onSave}>보관함에 저장</button>}
-        <button className="iv-fork" onClick={onFork} title="바깥 블록 전체를 풀어서 그래프에 붙이기">전체 펼치기 ⤢</button>
+        <button className="iv-fork" onClick={onFork} title="원본을 보호하면서 내부 파트를 편집 가능한 그래프로 펼치기">편집하기 · 펼치기 ⤢</button>
       </div>
-      <div className="iv-fork-note">{node.sub.order.filter(id=>node.sub.nodes[id].type!=='cin').length}개 파트로 펼쳐집니다 · 기존 그래프는 자동으로 비켜납니다</div>
+      <div className="iv-fork-note">연결선은 실제 내부 배선입니다 · 수정하려면 편집 모드로 펼치세요 · {node.sub.order.filter(id=>node.sub.nodes[id].type!=='cin').length}개 파트</div>
       <div className="inner-flow">
         <ReactFlowProvider>
-          <ReactFlow nodes={displayNodes as any} edges={g.edges as any} nodeTypes={nodeTypes}
-            fitView minZoom={0.4} maxZoom={2} nodesDraggable={false} nodesConnectable={false}
+          <ReactFlow nodes={displayNodes as any} edges={innerEdges as any} nodeTypes={nodeTypes}
+            onNodesChange={onInnerNodesChange} fitView minZoom={0.4} maxZoom={2}
+            nodesDraggable={false} nodesConnectable={false}
+            defaultEdgeOptions={{zIndex:3,style:{stroke:'#52677c',strokeWidth:2.6}}}
             elementsSelectable proOptions={{ hideAttribution:true }}
             onNodeMouseEnter={(_,n:any)=>setInspect({id:n.id,type:n.data.coreType})}
             onNodeClick={(_,n:any)=>setInspect({id:n.id,type:n.data.coreType})}
@@ -53,6 +64,10 @@ function InnerView({ node, onClose, onFork, onSave }: { node:OpenNode; onClose:(
             <Background color="#314052" gap={24} size={1} />
           </ReactFlow>
         </ReactFlowProvider>
+        <button className="iv-edit-banner" onClick={onFork}>
+          <span>배선을 직접 바꾸고 싶나요?</span>
+          <b>편집 가능한 그래프로 펼치기 →</b>
+        </button>
         {inspectType&&<aside className="iv-inspector" style={{['--tip' as any]:colorOf(inspectType)}}>
           <div className="nt-cap">{metaOf(inspectType).cat} · INTERNAL PART</div>
           <div className="nt-title">{metaOf(inspectType).label}</div>

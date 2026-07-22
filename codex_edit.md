@@ -316,3 +316,24 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Build the first static-avoidance example graph and obstacle mission from these enablers.
 - Add a moving-opponent overtaking mission using PredictionSet and pass intent.
 - Complete Path construction primitives and spatial VISUALIZE overlays without changing simulation behavior.
+
+## 2026-07-22 - Composite wiring preview and edit transition (complete)
+
+### Why
+- Double-clicking an openable block showed its internal nodes but no wires, making a valid composite look disconnected.
+- The preview was intentionally read-only, but the small fork action did not clearly explain how to start editing.
+
+### Changes
+- Made the inner React Flow retain measured node dimensions so all existing composite edges can calculate and render endpoints.
+- Increased internal wire contrast and width so wiring remains readable over the dotted workspace.
+- Renamed the top action to `편집하기 · 펼치기` and explained that the visible wires are the real internal circuit.
+- Added a persistent `편집 가능한 그래프로 펼치기` action inside the canvas. It forks the protected original into the main graph, where ports are fully connectable.
+- Kept shipped composite previews protected from accidental edits; editing always creates the behavior-preserving fork already supported by the graph engine.
+- Rebuilt the committed `app/` bundle.
+
+### Verification
+- Headless Playwright opened `Pursuit 조향` and found all 16 expected internal edge paths rendered.
+- The in-canvas edit action was visible and switched to the forked main graph with 36 connectable handles.
+- No browser page errors occurred; offscreen evidence is `/tmp/apex-inner-wires.png`.
+- `drive.ts`, `prims.ts`, and `blocks.ts` all pass; PURSUIT remains exactly `21.0833s`.
+- Production build passes with `index-BrMBdkNq.js` and `index-C2llC1EU.css`.
