@@ -28,15 +28,12 @@ const L3: Graph = makeGraph({
   speedctl:{type:'blk.speedPid'}, tsink:{type:'sink.throttle',in:{x:['n','speedctl','throttle']}},
 })
 
-// L4: throttle is complete; build angle = a0 + argmax(ranges) * da.
+// L4: only the previously learned speed controller is provided as one openable block.
+// The LiDAR steering circuit starts empty so the player chooses and places every new part.
 const L4: Graph = makeGraph({
-  speed:{type:'src.speed'}, vt:{type:'const',params:{value:10}},
-  verr:{type:'sub',in:{a:['n','vt','v'],b:['n','speed','v']}},
-  pid:{type:'ctrl.pid',params:{kp:0.6,ki:0.06,kd:0},in:{err:['n','verr','v']}},
-  thr:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','pid','u']}},
-  tsink:{type:'sink.throttle',in:{x:['n','thr','v']}},
-  scan:{type:'src.scan'}, gap:{type:'array.argmax'}, beam:{type:'mul'},
-  angle:{type:'add'}, safe:{type:'clamp',params:{lo:-1,hi:1}}, ssink:{type:'sink.steer'},
+  target:{type:'const',params:{value:10}},
+  speedctl:{type:'blk.speedPid',in:{target:['n','target','v']}},
+  tsink:{type:'sink.throttle',in:{x:['n','speedctl','throttle']}},
 })
 
 /* The first mission starts as a true blank build: install power and an actuator. */
@@ -60,7 +57,7 @@ export const LEVELS: Level[] = [
     palette:['src.pose','src.track','std.curvAhead','std.gripSpeed'], objective:{type:'time',target:32}, starter:L3,
     requirements:[{type:'std.curvAhead',label:'전방 곡률'},{type:'std.gripSpeed',label:'그립 속도'}], unlock:'곡률 기반 속도 계획' },
   { id:'l4', n:4, title:'보이지 않는 길', kicker:'FOLLOW THE GAP',
-    teach:'LiDAR 거리 배열의 가장 넓은 빔을 찾아 각도로 바꾸고 STEER까지 연결하세요.',
+    teach:'속도 제어는 블록으로 준비돼 있습니다. 빈 조향 캔버스에서 필요한 파트를 직접 골라 LiDAR의 열린 방향을 STEER로 만드세요.',
     palette:['src.scan','mul','add','array.argmax','clamp','sink.steer'], objective:{type:'clean'}, starter:L4,
     requirements:[{type:'src.scan',label:'LiDAR 감지'},{type:'array.argmax',label:'최대 간격 탐색'},{type:'mul',label:'빔 각도 변환'},{type:'add',label:'조향각 합성'}], unlock:'Follow-the-Gap' },
 ]

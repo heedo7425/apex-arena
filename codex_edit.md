@@ -337,3 +337,23 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - No browser page errors occurred; offscreen evidence is `/tmp/apex-inner-wires.png`.
 - `drive.ts`, `prims.ts`, and `blocks.ts` all pass; PURSUIT remains exactly `21.0833s`.
 - Production build passes with `index-BrMBdkNq.js` and `index-C2llC1EU.css`.
+
+## 2026-07-22 - Blank L4 steering build (complete)
+
+### Why
+- The Follow-the-Gap mission pre-placed both the complete throttle circuit and every steering answer node, reducing the task to following wires.
+- A new mission should preserve prior work as a reusable block while leaving the new concept for the player to design.
+
+### Changes
+- Replaced the six-node expanded speed controller with the openable `Speed PID` block connected to target speed and THROTTLE.
+- Removed all pre-placed LiDAR, argmax, multiply, add, clamp, and STEER nodes from the L4 starter graph.
+- Kept those six parts in the L4 Parts Bay so the player chooses, places, and connects the complete LiDAR steering circuit.
+- Reworded the mission brief to state that speed control is provided and the steering canvas starts blank.
+- Kept progressive hints optional; the exact formula appears only after the player requests the final hint.
+- Rebuilt the committed `app/` bundle.
+
+### Verification
+- Headless Playwright found exactly three starter nodes: Const, Speed PID, and THROTTLE.
+- LiDAR scan, add, multiply, clamp, argmax, and STEER appeared only in the Parts Bay and none were pre-placed.
+- No browser page errors occurred; offscreen evidence is `/tmp/apex-l4-blank-steering.png`.
+- Production build passes with `index-Ctemzd6P.js`.
