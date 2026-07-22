@@ -262,3 +262,29 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 ### Next
 - Begin P-c with explicit waypoint construction/editing and deterministic `sim.rollout` primitives for MPPI experiments.
 - Add authored missions only after the P-c vocabulary and behavior-preservation tests are stable.
+
+## 2026-07-22 - Planning contracts and VISUALIZE timeline (complete)
+
+### Why
+- Track following alone cannot represent split free space, moving opponents, overtaking commitment, or planner-specific costs and constraints.
+- Players need to see why parameter and algorithm changes alter behavior without telemetry changing the deterministic simulation.
+
+### Changes
+- Added the authoritative `design/planning-types-v1.md` contract for SceneObject/ObjectSet, Corridor/DrivableSpace, TrajectorySet, PredictionSet, BehaviorIntent, PlanningRequest, CostTerm, and Constraint.
+- Separated high-level intent from planner requests so Rule-based, MPC, and RL implementations can share the same perception, prediction, planning, and control boundaries.
+- Added future graph port types to `node-spec.md`, a P-d Scene/Local Planning wave to `palette-v1.md`, and repository guidance to `CLAUDE.md`.
+- Added a read-only VISUALIZE store that samples selected numeric outputs by monotonic simulation time and automatically resets history when a run restarts.
+- Added output-port waveform controls and edge double-click selection, with clear feedback for unsupported non-numeric signals in this first pass.
+- Added a responsive VISUALIZE panel with current value, unit, min/max, sample count, timeline plot, history clear, and per-signal removal.
+- Rebuilt the committed Pages application bundle.
+
+### Verification
+- `drive.ts`, `prims.ts`, and `blocks.ts` all pass; PURSUIT remains exactly `21.0833s` and deterministic.
+- The production web build passes.
+- Headless Playwright added Const output through its port, drove the tutorial graph, and observed a rendered timeline with increasing samples.
+- Headless Playwright verified history clear, signal removal, and edge double-click re-add with no browser console errors.
+- Offscreen evidence: `/tmp/apex-visualize-timeline.png`.
+
+### Next
+- Add run scrubber and A/B experiment presets.
+- Add Vec2/Pose/Path/Trajectory track overlays, followed by ObjectSet/PredictionSet/DrivableSpace overlays in P-c/P-d.

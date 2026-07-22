@@ -5,6 +5,62 @@ export const useLive = create<{ vals: Record<string, any> | null; setVals: (v: R
   (set) => ({ vals: null, setVals: (v) => set({ vals: v }) })
 )
 
+// ---- read-only experiment visualization; never feeds values back into the graph ----
+export type VisualizedSignal = {
+  id:string
+  nodeId:string
+  port:string
+  label:string
+  unit:string
+  valueType:string
+  color:string
+}
+export type VisualizationPoint = { t:number; value:number }
+type SignalDraft = Omit<VisualizedSignal,'id'|'color'>
+type Visualization = {
+  signals:VisualizedSignal[]
+  samples:Record<string,VisualizationPoint[]>
+  open:boolean
+  lastTime:number|null
+  addSignal:(signal:SignalDraft)=>void
+  removeSignal:(id:string)=>void
+  sample:(time:number,values:Record<string,any>|null)=>void
+  clearSamples:()=>void
+  clearAll:()=>void
+  toggle:()=>void
+}
+const VIS_COLORS=['#1FDDC9','#F0B541','#69AEEB','#F27D62','#B7DB67','#E78FD0']
+export const useVisualization=create<Visualization>((set,get)=>({
+  signals:[],samples:{},open:false,lastTime:null,
+  addSignal:(draft)=>{
+    const id=`${draft.nodeId}.${draft.port}`
+    const current=get().signals
+    if(current.some(s=>s.id===id)){set({open:true});return}
+    const signal:{id:string;color:string}&SignalDraft={...draft,id,color:VIS_COLORS[current.length%VIS_COLORS.length]}
+    set({signals:[...current,signal],samples:{...get().samples,[id]:[]},open:true})
+  },
+  removeSignal:(id)=>set(state=>{
+    const samples={...state.samples};delete samples[id]
+    return {signals:state.signals.filter(s=>s.id!==id),samples}
+  }),
+  sample:(time,values)=>{
+    const state=get()
+    if(!values||!state.signals.length||time===state.lastTime)return
+    const reset=state.lastTime!=null&&time<state.lastTime
+    const samples:Record<string,VisualizationPoint[]>={...state.samples}
+    for(const signal of state.signals){
+      const value=values[signal.nodeId]?.[signal.port]
+      if(typeof value!=='number'||!Number.isFinite(value))continue
+      const previous=reset?[]:(samples[signal.id]||[])
+      samples[signal.id]=[...previous,{t:time,value}].slice(-360)
+    }
+    set({samples,lastTime:time})
+  },
+  clearSamples:()=>set(state=>({samples:Object.fromEntries(state.signals.map(s=>[s.id,[]])),lastTime:null})),
+  clearAll:()=>set({signals:[],samples:{},open:false,lastTime:null}),
+  toggle:()=>set(state=>({open:!state.open})),
+}))
+
 // ---- reusable player-made blocks (persisted across missions) ----
 export type SavedBlock = { id:string; label:string; params:Record<string,any> }
 const BLOCK_KEY = 'apex_block_library_v1'

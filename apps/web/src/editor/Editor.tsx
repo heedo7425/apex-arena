@@ -3,10 +3,11 @@ import { ReactFlow, ReactFlowProvider, Background, Controls, addEdge,
   useNodesState, useEdgesState, useReactFlow, type Connection } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { GraphNode } from './GraphNode'
+import { VisualizePanel } from './VisualizePanel'
 import { connectionIssue, graphIssues, newNode, rfToCore, coreToRF, type RFNode, type RFEdge } from './compile'
 import { defaultParams, metaOf, colorOf, ins, outs, PALETTE_CATS } from './nodeMeta'
-import { useBlockLibrary, useLive, usePending } from '../store'
-import { NT, inlineComposite, encapsulate, type Graph } from '@apex/core'
+import { useBlockLibrary, useLive, usePending, useVisualization } from '../store'
+import { NT, inlineComposite, encapsulate, portType, type Graph } from '@apex/core'
 
 const nodeTypes = { apex: GraphNode }
 
@@ -68,6 +69,13 @@ function InnerView({ node, onClose, onFork, onSave }: { node:OpenNode; onClose:(
 
 type Decorate = Record<string, { label?: string; highlight?: boolean; tag?: string }>
 type HoverInfo = { type:string; x:number; y:number }
+function signalUnit(type:string,port:string){
+  if(type==='src.speed')return 'm/s'
+  if(port==='yaw'||port==='psi')return 'rad'
+  if(port==='k'||port==='kappa')return '1/m'
+  if(port==='x'||port==='y'||port==='s'||port==='d'||port==='width')return 'm'
+  return ''
+}
 function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, nodeDefaults, requiredOutputs }:
   { initial:{nodes:RFNode[];edges:RFEdge[]}; palette:string[]; onGraph:(g:Graph)=>void; decorate?:Decorate; highlightPalette?:string; nodeDefaults?:Record<string,Record<string,number>>; requiredOutputs?:string[] }) {
 
@@ -77,6 +85,8 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   const arranged = compact ? initial.nodes.map((n,i)=>({...n,position:{x:10+(i%2)*225,y:70+Math.floor(i/2)*138}})) : initial.nodes
   const {blocks,saveBlock,removeBlock}=useBlockLibrary()
   const liveVals=useLive(s=>s.vals)
+  const vizSignals=useVisualization(s=>s.signals)
+  const addVisual=useVisualization(s=>s.addSignal)
   const latest = useRef<{nodes:RFNode[];edges:RFEdge[]}>({nodes:arranged,edges:initial.edges})
   const [notice,setNotice] = useState<string|null>(null)
   const [bayOpen,setBayOpen] = useState(true)
@@ -143,6 +153,17 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   }
   const hideHover=()=>setHover(null)
   const withCb=(ns:RFNode[])=>ns.map(n=>({...n,data:{...n.data,onParam,onPort,onHover:showHover,onHoverEnd:hideHover,...(decorate?.[n.id]||{})}}))
+  const visualizeSignal=useCallback((nodeId:string,port:string)=>{
+    const node=latest.current.nodes.find(n=>n.id===nodeId)
+    if(!node)return
+    const valueType=portType(node.data.coreType,port,'out')||'unknown'
+    if(valueType!=='num'){
+      setNotice(`${metaOf(node.data.coreType).label}의 ${port}는 ${valueType} 신호예요. 이번 VISUALIZE에서는 숫자 신호를 선택하세요.`)
+      return
+    }
+    addVisual({nodeId,port,valueType,label:`${metaOf(node.data.coreType).label} · ${port}`,unit:signalUnit(node.data.coreType,port)})
+    setNotice(`${metaOf(node.data.coreType).label}의 ${port} 신호를 VISUALIZE에 추가했습니다.`)
+  },[addVisual])
 
   const [nodes,setNodes,onNodesChange]=useNodesState(withCb(arranged) as any)
   const [edges,setEdges,onEdgesChange]=useEdgesState(initial.edges as any)
@@ -237,10 +258,12 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
 
 
   const renderedNodes = (nodes as RFNode[]).map(n => {
-    if (n.data.coreType !== 'const') return n
+    const visualized=vizSignals.filter(s=>s.nodeId===n.id).map(s=>s.port)
+    const base={...n,data:{...n.data,onVisualize:visualizeSignal,visualized}}
+    if (n.data.coreType !== 'const') return base
     const targets = [...new Set((edges as RFEdge[]).filter(e => e.source === n.id && e.sourceHandle === 'v').map(e => e.targetHandle))]
     const label = targets.length === 1 ? "value → " + targets[0] : "value"
-    return {...n,data:{...n.data,outputLabels:{v:label}}}
+    return {...base,data:{...base.data,outputLabels:{v:label}}}
   })
   const issues=graphIssues(nodes as any,edges as any,requiredOutputs)
   const issue=issues[0]
@@ -314,6 +337,9 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
               <span className="gf-dot"/>{feedback}
             </div>
           </div>
+          <button className={'visualize-toggle'+(vizSignals.length?' active':'')} onClick={()=>useVisualization.getState().toggle()}>
+            <span>∿</span> VISUALIZE <em>{vizSignals.length}</em>
+          </button>
           <div className="editor-mode"><span>BUILD MODE</span><b>CONTROL GRAPH</b></div>
         </div>
         <div ref={trashRef} className={`trash-drop${draggingNode?" dragging":""}${trashHot?" hot":""}`} aria-label="블록 삭제 영역">
@@ -325,6 +351,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange} onConnect={onConnect}
           onSelectionChange={({nodes:sel}:any)=>setSelectedIds(sel.map((n:any)=>n.id))}
           selectionOnDrag panOnDrag={[1,2]} selectionKeyCode={null} multiSelectionKeyCode={["Shift","Meta"]}
+          onEdgeDoubleClick={(_,edge:any)=>visualizeSignal(edge.source,edge.sourceHandle)}
           isValidConnection={c=>!!c.source&&!!c.sourceHandle&&!!c.target&&!!c.targetHandle&&!connectionIssue(latest.current.nodes,latest.current.edges,c.source,c.sourceHandle,c.target,c.targetHandle)}
           onNodeClick={(_,node:any)=>{setHover(null);setInfo(node.data.coreType)}} onPaneClick={clearPending}
           onNodeDoubleClick={(_,node:any)=>openBlock(node.id,node.data.coreType)}
@@ -332,6 +359,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
           <Background color="#314052" gap={24} size={1}/>
           <Controls showInteractive={false}/>
         </ReactFlow>
+        <VisualizePanel/>
         {info&&<div className="node-info">
           <button className="ni-close" aria-label="파트 정보 닫기" onClick={()=>setInfo(null)}>×</button>
           <div className="ni-cap">PART INSPECT</div>

@@ -2,6 +2,8 @@
 
 데이터플로 그래프의 **토대**. curvature·lookahead·waypoint 생성·컨트롤러 전부 이 프리미티브로 조립하고, 고수준 노드는 **합성(composite)** 일 뿐 — 열어서 뜯거나 새로 짓는다.
 
+멀티카·회피·local planning 확장 타입의 권위 계약은 [`planning-types-v1.md`](./planning-types-v1.md)를 따른다.
+
 ## 0. 원칙
 - 그래프 = **매 tick(고정 dt) 실행되는 순수 함수**. 결정론(wall-clock·RNG 금지). 피드백(사이클)은 **Delay(z⁻¹)** 노드를 통해서만.
 - **타입 있는 와이어.** Primitives = 원자(못 엶). Composites = 서브그래프(열림·유저 생성).
@@ -27,6 +29,18 @@
 | `command` | `{steer, throttle}` (싱크) | teal |
 | `array<T>` | 동종 배열, 원소타입을 포트에 표시 | 원소색 |
 | `scan` | `{ranges: array<num>, a0, da}` (LiDAR) | purple |
+| `vehicleState` | pose·twist·동역학 상태 | blue |
+| `object` / `objects` | 장면 객체 / 결정론 정렬 객체 집합 | orange |
+| `corridor` | progress 기준 중심선·좌우 폭 | gold |
+| `drivable` | 다중 자유공간 region과 blocked polygon | lime |
+| `trajectory` / `trajectories` | 시간별 vehicleState·command / 후보 집합 | cyan |
+| `prediction` / `predictions` | 객체별 다중 미래와 occupancy | magenta |
+| `intent` | 설명 가능한 상위 행동 의도 | white |
+| `planningRequest` | 목표·비용·제약을 묶은 planner 입력 | white |
+| `constraint` / `constraints` | hard/soft 주행 제약 | red |
+| `cost` / `costs` | 독립 가중 비용 항 | amber |
+
+- 위 확장 타입은 v1 계약을 먼저 고정한 것이며 registry 노출은 P-c 이후 구현 웨이브에서 진행한다.
 
 - **제네릭**: `array<T>` 는 원소 타입까지 매칭돼야 연결(`array<num>`↔`array<num>`).
 - **구조체**: `Make X` 로 생성, `Get .field` 로 접근.

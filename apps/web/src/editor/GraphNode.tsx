@@ -28,6 +28,8 @@ export function GraphNode({ id, data }:{ id:string; data:any }) {
   const onHoverEnd = data.onHoverEnd as (()=>void)|undefined
   const onOpen = data.onOpen as ((id:string,type:string,params:Record<string,any>)=>void)|undefined
   const onInspect = data.onInspect as ((id:string,type:string)=>void)|undefined
+  const onVisualize = data.onVisualize as ((id:string,port:string)=>void)|undefined
+  const visualized = new Set<string>(data.visualized||[])
   const nRows = Math.max(inP.length, outP.length, 1)
   const isComposite = !!NT[type]?.sub || !!data.params?.sub
   const headLabel = data.label || (type === 'blk.user' ? (data.params?.label || '▣ 내 블록') : meta.label)
@@ -62,7 +64,11 @@ export function GraphNode({ id, data }:{ id:string; data:any }) {
             <div className="io-row" key={i} style={{height:ROWH}}>
               <span className="pin">{inP[i]??''}</span>
               <span className="pout">
-                {outP[i]?<><span className="pname">{outputLabel(outP[i])}</span>{live!=null&&<b>{fmt(live[outP[i]])}</b>}</>:''}
+                {outP[i]?<><span className="pname">{outputLabel(outP[i])}</span>{live!=null&&<b>{fmt(live[outP[i]])}</b>}
+                  {onVisualize&&<button className={'viz-port nodrag nowheel'+(visualized.has(outP[i])?' on':'')} title={`${outputLabel(outP[i])} 신호 Visualize`}
+                    aria-label={`${meta.label} ${outputLabel(outP[i])} 신호 Visualize`}
+                    onClick={e=>{e.stopPropagation();onVisualize(id,outP[i])}}>∿</button>}
+                </>:''}
               </span>
             </div>
           ))}

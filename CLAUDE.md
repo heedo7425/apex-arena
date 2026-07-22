@@ -16,6 +16,7 @@
 - **`app/`** — **빌드 산출물(커밋됨)**. GitHub Pages가 이걸 서빙. 소스만 고치고 여기 리빌드 안 하면 라이브 반영 안 됨.
 - **`design/palette-v1.md`** ★ 현행 권위 문서: 팔레트 노드 어휘 전체 + 소속 규칙 + P-a/P-b 진행상황.
 - **`design/node-spec.md`** — 타입 시스템 + L0/L1 어휘 + 유도 검증.
+- **`design/planning-types-v1.md`** — overtaking/static avoidance/local planning 공통 타입과 VISUALIZE 계약. P-c/P-d 확장의 권위 문서.
 - `docs/GAME_DESIGN.md` — ⚠️ **오래됨(그래프 엔진 이전)**. 초기 비전 참고용, 현재 아키텍처는 palette-v1/node-spec/이 파일을 따를 것.
 - `codex_edit.md` — Codex(다른 에이전트)가 이 repo에서 한 작업 로그.
 
@@ -44,4 +45,5 @@ git add -A && git commit && git push origin main                                
 - Codex UX 오버홀 + 내 후속 작업 반영: Parts Bay 좌측 레일, Pure Pursuit 프리미티브 조립화, L2/L3 블록 제공, **P-a 완료**(L0 어휘), **P-b 열기/fork/캡슐화 완료**, 반응형(상단바 겹침·sim 높이) 수정.
 - **P-b 완료**: 경로 접근자와 센서 배열 프리미티브를 추가하고 `std.lookahead`·`std.tocar`·`std.curvAhead`·`std.gripSpeed` 및 geometry/LiDAR L1 노드를 모두 열기/fork 가능한 composite로 전환했다. PURSUIT 랩은 정확히 동일하다.
 - composite 내부는 breadcrumb, 파트 설명, live signal, 자동 배치 fork를 제공한다. 유저 블록은 Parts Bay 보관함에 저장되어 모든 미션에서 재사용할 수 있고 그래프 오류는 해당 블록·포트 단위로 안내된다.
-- **다음**: **P-c** Path(웨이포인트 생성) + `sim.rollout`(MPPI). 상세는 `design/palette-v1.md`.
+- 에디터 VISUALIZE는 출력 신호를 읽기 전용으로 수집한다. simulation 시간만 사용하며 graph 계산·랩 결과에 영향을 주면 안 된다.
+- **다음**: **P-c** Path(웨이포인트 생성) + `sim.rollout`(MPPI), 이후 P-d Scene/Prediction/Local Planning. 상세는 `design/palette-v1.md`와 `design/planning-types-v1.md`.

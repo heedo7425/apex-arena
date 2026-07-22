@@ -8,7 +8,7 @@ type Props = {
   graph: Graph
   seed?: number
   canRun?: boolean
-  onValues?: (lastVal: Record<string, any> | null, info: { speed:number; lapT:number; best:number|null; hold:number }) => void
+  onValues?: (lastVal: Record<string, any> | null, info: { speed:number; lapT:number; simTime:number; best:number|null; hold:number }) => void
   onLap?: (t: number, dirty: boolean) => void
   trial?: { target:number; hold:number; tolerance:number }
   onTrial?: (t: number) => void
@@ -25,6 +25,7 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
   const speedRef = useRef(1)
   const holdRef = useRef(0)
   const completedRef = useRef(false)
+  const simTimeRef = useRef(0)
   const [running, setRunning] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [lapMsg, setLapMsg] = useState<string>('READY')
@@ -41,6 +42,7 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
   // Editing changes the program: pause and restart so every attempt is comparable.
   useEffect(() => {
     simRef.current = makeSim(world, graph, seed)
+    simTimeRef.current = 0
     argmaxId.current = graph.order.find(id => graph.nodes[id].type === 'array.argmax') || null
     holdRef.current = 0
     completedRef.current = false
@@ -63,7 +65,7 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
         if (runRef.current) {
           acc += dt * speedRef.current
           let g = 0, prevLaps = s.laps.length
-          try { while (acc >= DT && g < 2000) { tick(s); acc -= DT; g++ } } catch (e:any) { setLapMsg('ERR: ' + (e?.message||e)); setRunning(false) }
+          try { while (acc >= DT && g < 2000) { tick(s); simTimeRef.current += DT; acc -= DT; g++ } } catch (e:any) { setLapMsg('ERR: ' + (e?.message||e)); setRunning(false) }
           if (s.laps.length > prevLaps && !trial) {
             const lp = s.laps[s.laps.length - 1]
             setLapMsg((lp.dirty ? 'DIRTY ' : 'LAP ') + lp.t.toFixed(3) + 's')
@@ -84,7 +86,7 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
         const gap = argmaxId.current && s.lastVal ? s.lastVal[argmaxId.current]?.i ?? null : null
         renderSim(ctx, world, s.car, scan, gap, cam, terrainRef.current)
         valAcc += dt
-        if (valAcc > 0.1) { valAcc = 0; onValuesRef.current?.(s.lastVal, { speed: s.car.vx, lapT: s.lapT, best: s.best, hold: holdRef.current }) }
+        if (valAcc > 0.1) { valAcc = 0; onValuesRef.current?.(s.lastVal, { speed: s.car.vx, lapT: s.lapT, simTime:simTimeRef.current, best: s.best, hold: holdRef.current }) }
       }
       raf = requestAnimationFrame(loop)
     }
@@ -95,12 +97,13 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
 
   const reset = () => {
     simRef.current = makeSim(world, graph, seed)
+    simTimeRef.current = 0
     holdRef.current = 0
     completedRef.current = false
     setRunning(false)
     setLapMsg(canRun ? (trial ? 'SPEED TEST READY' : 'READY') : 'WIRE GRAPH')
   }
-  const stepN = () => { const s = simRef.current; if (s && canRun) { try { for (let i=0;i<12;i++) tick(s) } catch {} } }
+  const stepN = () => { const s = simRef.current; if (s && canRun) { try { for (let i=0;i<12;i++){ tick(s); simTimeRef.current += DT } } catch {} } }
 
   return (
     <div className="viewport">

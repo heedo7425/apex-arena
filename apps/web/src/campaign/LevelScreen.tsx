@@ -5,7 +5,7 @@ import { Editor } from '../editor/Editor'
 import { coreToRF } from '../editor/compile'
 import { metaOf } from '../editor/nodeMeta'
 import { Viewport } from '../sim/Viewport'
-import { useGame, useLive, useTut } from '../store'
+import { useGame, useLive, useTut, useVisualization } from '../store'
 import { levelById, LEVELS } from './levels'
 import { missionVenue } from './worlds'
 
@@ -113,12 +113,12 @@ export function LevelScreen({ id }: { id: string }) {
   const waitingMessage = `회로 대기 · ${wiringIssue}`
 
   useEffect(() => {
-    setGraph(level.starter); setHintLevel(0); setTutMoved(false); setPane('graph'); setResult(null)
+    setGraph(level.starter); setHintLevel(0); setTutMoved(false); setPane('graph'); setResult(null); useVisualization.getState().clearAll()
   }, [id, level.starter])
 
   const finishTut = () => { complete('tut', 60); useGame.getState().goLevel('l1') }
-  const handleGraph = (next:Graph) => { setGraph(next); setResult(null) }
-  const retry = () => { setResult(null); setSimKey(k => k + 1) }
+  const handleGraph = (next:Graph) => { setGraph(next); setResult(null); useVisualization.getState().clearSamples() }
+  const retry = () => { setResult(null); useVisualization.getState().clearSamples(); setSimKey(k => k + 1) }
 
   const onSpeedTrial = (t:number) => {
     if (!isL1) return
@@ -190,6 +190,7 @@ export function LevelScreen({ id }: { id: string }) {
             trial={level.objective.type === 'speed' ? level.objective : undefined} onTrial={onSpeedTrial}
             onValues={(vals, info) => {
               setVals(vals); setHud({ speed:info.speed, best:info.best, hold:info.hold })
+              useVisualization.getState().sample(info.simTime,vals)
               if (isTut && info.speed > 2) setTutMoved(true)
             }}
             onLap={onLap} />

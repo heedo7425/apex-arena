@@ -83,6 +83,8 @@ Follow-the-Gap `argmax→각도` · 완성 속도정책. (2026-07-21 `std.pursui
 - **P-b · L1 = composite 전환** — 현 opaque `std.*`(fn)를 내부 서브그래프로 재정의(engine `composite` 지원 이미 있음) →
   에디터 "열기"로 속 보이고 fork. + 신규 L1(crossTrack·headingErr·widestGap·nearestWpt …).
 - **P-c · Path + Model** — 웨이포인트 생성 노드 + `sim.rollout`(MPPI 샘플 궤적 시각화).
+- **P-d · Scene + Local Planning** — ObjectSet·DrivableSpace·Prediction·Intent·PlanningRequest·TrajectorySet을 기반으로 static avoidance와 overtaking을 조립한다.
+  turnkey Overtake/Planner 노드는 금지하고 perception→prediction→behavior→planning→control 경계를 유지한다.
 
 각 웨이브 합격 = 기존 랩 결정론 유지 + 대표 알고리즘 1개가 새 노드로 재구성됨.
 
@@ -94,3 +96,4 @@ Follow-the-Gap `argmax→각도` · 완성 속도정책. (2026-07-21 `std.pursui
   고차(map/filter/reduce/zipWith)는 core엔 있으나 **에디터 람다 저작 UI 전까지 팔레트 미노출**. Struct 생성(make.waypoint/make.command)은 P-c(Path)와 함께.
 - **P-b ✅ 완료(2026-07-22)** — shipped `lookahead`·`tocar`·`curvAhead`·`gripSpeed`와 신규 `nearestWpt`·`crossTrack`·`headingErr`, LiDAR 3종을 전부 L0 서브그래프 기반 composite로 전환. `path.at` 등 경계 프리미티브와 파라미터 fork 치환까지 포함하며 기존 결정론 랩을 완전히 보존.
   에디터는 중첩 breadcrumb, 내부 PART GUIDE, 실시간 신호, 충돌 회피 fork 배치, 원인별 회로 진단, 사용자 블록 이름 지정·영구 보관함을 지원. **다음**: P-c Path 생성(`midpoints`·`resample`·make waypoint) + `sim.rollout`.
+  **Planning type v1 확정**: `design/planning-types-v1.md`. VISUALIZE 숫자 timeline 1차 구현 후 trajectory/object 공간 overlay로 확장한다.
