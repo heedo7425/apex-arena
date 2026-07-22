@@ -3,32 +3,64 @@ import { ReactFlow, ReactFlowProvider, Background, Controls, addEdge,
   useNodesState, useEdgesState, useReactFlow, type Connection } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { GraphNode } from './GraphNode'
-import { connectionIssue, graphReady, newNode, rfToCore, coreToRF, type RFNode, type RFEdge } from './compile'
+import { connectionIssue, graphIssues, newNode, rfToCore, coreToRF, type RFNode, type RFEdge } from './compile'
 import { defaultParams, metaOf, colorOf, ins, outs, PALETTE_CATS } from './nodeMeta'
-import { usePending } from '../store'
+import { useBlockLibrary, useLive, usePending } from '../store'
 import { NT, inlineComposite, encapsulate, type Graph } from '@apex/core'
 
 const nodeTypes = { apex: GraphNode }
 
-type OpenNode = { id:string; type:string; label:string; sub:Graph }
-// Read-only drill-in view of a composite block's inner sub-graph.
-function InnerView({ node, onClose, onFork }: { node:OpenNode; onClose:()=>void; onFork:()=>void }) {
-  const g = React.useMemo(() => coreToRF(node.sub), [node.sub])
+type OpenNode = { id:string; type:string; label:string; sub:Graph; params:Record<string,any> }
+type InnerLevel = { id:string; type:string; label:string; sub:Graph }
+function InnerView({ node, onClose, onFork, onSave }: { node:OpenNode; onClose:()=>void; onFork:()=>void; onSave:()=>void }) {
+  const rootLive=useLive(s=>s.vals?.[node.id])
+  const [trail,setTrail]=useState<InnerLevel[]>([{id:node.id,type:node.type,label:node.label,sub:node.sub}])
+  const [inspect,setInspect]=useState<{id:string;type:string}|null>(null)
+  useEffect(()=>{setTrail([{id:node.id,type:node.type,label:node.label,sub:node.sub}]);setInspect(null)},[node])
+  const current=trail[trail.length-1]
+  let currentLive=rootLive
+  for(let i=1;i<trail.length;i++)currentLive=currentLive?.__inner?.[trail[i].id]
+  const innerVals=currentLive?.__inner
+  const g=React.useMemo(()=>coreToRF(current.sub),[current.sub])
+  const enter=(id:string,type:string,params:Record<string,any>)=>{
+    const sub=(NT[type]?.sub??params?.sub) as Graph|undefined
+    if(!sub)return
+    setTrail(t=>[...t,{id,type,label:type==='blk.user'?(params.label||'▣ 내 블록'):metaOf(type).label,sub}]);setInspect(null)
+  }
+  const displayNodes=g.nodes.map(n=>({...n,data:{...n.data,label:n.data.coreType==='cparam'?`parameter · ${n.data.params.param}`:n.data.label,liveOverride:innerVals?(innerVals[n.id]??null):null,onOpen:enter,onInspect:(id:string,type:string)=>setInspect({id,type})}}))
+  const inspectType=inspect?.type, inspectLive=inspect?innerVals?.[inspect.id]:null
   return (
     <div className="inner-view">
       <div className="inner-bar">
-        <button className="iv-close" onClick={onClose}>← 닫기</button>
-        <span className="iv-title">{node.label} <em>· 내부 (읽기전용)</em></span>
-        <button className="iv-fork" onClick={onFork} title="이 블록을 풀어서 내 그래프에 붙여넣기">펼쳐서 내 그래프로 ⤢</button>
+        <button className="iv-close" onClick={onClose}>← 그래프로</button>
+        <nav className="iv-crumbs" aria-label="블록 내부 경로">
+          {trail.map((p,i)=><button key={`${p.id}-${i}`} className={i===trail.length-1?'on':''} onClick={()=>{setTrail(t=>t.slice(0,i+1));setInspect(null)}}>{p.label}</button>)}
+        </nav>
+        <span className="iv-title"><em>LIVE INTERNALS · 읽기전용</em></span>
+        {node.type==='blk.user'&&<button className="iv-save" onClick={onSave}>보관함에 저장</button>}
+        <button className="iv-fork" onClick={onFork} title="바깥 블록 전체를 풀어서 그래프에 붙이기">전체 펼치기 ⤢</button>
       </div>
+      <div className="iv-fork-note">{node.sub.order.filter(id=>node.sub.nodes[id].type!=='cin').length}개 파트로 펼쳐집니다 · 기존 그래프는 자동으로 비켜납니다</div>
       <div className="inner-flow">
         <ReactFlowProvider>
-          <ReactFlow nodes={g.nodes as any} edges={g.edges as any} nodeTypes={nodeTypes}
+          <ReactFlow nodes={displayNodes as any} edges={g.edges as any} nodeTypes={nodeTypes}
             fitView minZoom={0.4} maxZoom={2} nodesDraggable={false} nodesConnectable={false}
-            elementsSelectable={false} proOptions={{ hideAttribution:true }}>
+            elementsSelectable proOptions={{ hideAttribution:true }}
+            onNodeMouseEnter={(_,n:any)=>setInspect({id:n.id,type:n.data.coreType})}
+            onNodeClick={(_,n:any)=>setInspect({id:n.id,type:n.data.coreType})}
+            onNodeDoubleClick={(_,n:any)=>enter(n.id,n.data.coreType,n.data.params)}>
             <Background color="#314052" gap={24} size={1} />
           </ReactFlow>
         </ReactFlowProvider>
+        {inspectType&&<aside className="iv-inspector" style={{['--tip' as any]:colorOf(inspectType)}}>
+          <div className="nt-cap">{metaOf(inspectType).cat} · INTERNAL PART</div>
+          <div className="nt-title">{metaOf(inspectType).label}</div>
+          <p>{metaOf(inspectType).desc||'설명 준비 중.'}</p>
+          {metaOf(inspectType).real&&<div className="nt-real">REAL WORLD · {metaOf(inspectType).real}</div>}
+          {inspectLive&&<div className="iv-live"><small>LIVE SIGNAL</small>
+            {Object.entries(inspectLive).filter(([k])=>k!=='__inner').map(([k,v])=><span key={k}><b>{k}</b>{typeof v==='number'?v.toFixed(3):Array.isArray(v)?`[${v.length}]`:typeof v==='object'?'{…}':String(v)}</span>)}
+          </div>}
+        </aside>}
       </div>
     </div>
   )
@@ -43,6 +75,8 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   const frameBuild = () => requestAnimationFrame(() => fitView({ padding:0.2, duration:250 }))
   const compact = typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches
   const arranged = compact ? initial.nodes.map((n,i)=>({...n,position:{x:10+(i%2)*225,y:70+Math.floor(i/2)*138}})) : initial.nodes
+  const {blocks,saveBlock,removeBlock}=useBlockLibrary()
+  const liveVals=useLive(s=>s.vals)
   const latest = useRef<{nodes:RFNode[];edges:RFEdge[]}>({nodes:arranged,edges:initial.edges})
   const [notice,setNotice] = useState<string|null>(null)
   const [bayOpen,setBayOpen] = useState(true)
@@ -162,14 +196,15 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     const sub = (NT[type]?.sub ?? rfNode?.data?.params?.sub) as Graph | undefined
     if(!sub) return
     const label = rfNode?.data?.label || (type==='blk.user' ? (rfNode?.data?.params?.label || '▣ 내 블록') : metaOf(type).label)
-    setOpenNode({ id, type, label, sub })
+    setOpenNode({ id, type, label, sub, params:{...(rfNode?.data?.params||{})} })
   }
   const groupSelected = () => {
     const ids = selectedIds.filter(id => latest.current.nodes.some(n=>n.id===id))
     if(ids.length < 2) return
     const core = rfToCore(latest.current.nodes as any, latest.current.edges as any)
-    const blockId = `blk_${blockUid.current++}`
-    const grouped = encapsulate(core, ids, blockId, NT)
+    const seq=blockUid.current++, blockId = `blk_${seq}`
+    const grouped = encapsulate(core, ids, blockId, NT, `▣ 내 블록 ${seq}`)
+
     if(grouped.nodes[blockId] === undefined){ setNotice('이 노드들은 블록으로 묶을 수 없어요.'); return }
     const rf = coreToRF(grouped)
     remember(); setNodes(withCb(rf.nodes) as any); setEdges(rf.edges as any)
@@ -184,6 +219,22 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     if(compact)setBayOpen(false)
     frameBuild()
   }
+  const addSavedBlock=(saved:(typeof blocks)[number])=>{
+    remember()
+    const index=nodes.length, nn=newNode('blk.user',compact?10+(index%2)*225:70+(index%3)*260,compact?70+Math.floor(index/2)*138:70+(Math.floor(index/3)%4)*128)
+    const params=JSON.parse(JSON.stringify(saved.params))
+    setNodes((nds:any)=>nds.concat({...nn,data:{coreType:'blk.user',params:{...params,label:saved.label},onParam,onPort,onHover:showHover,onHoverEnd:hideHover}}))
+    setNotice(`${saved.label} 블록을 보관함에서 장착했습니다.`);if(compact)setBayOpen(false);frameBuild()
+  }
+  const saveOpen=()=>{
+    if(!openNode)return
+    const raw=window.prompt('보관함에 표시할 블록 이름',openNode.label.replace(/^▣\s*/,''))
+    const name=raw?.trim();if(!name)return
+    const label=`▣ ${name}`
+    saveBlock(label,{...openNode.params,label})
+    setNotice(`${label}을 Parts Bay 보관함에 저장했습니다.`);setOpenNode(null)
+  }
+
 
   const renderedNodes = (nodes as RFNode[]).map(n => {
     if (n.data.coreType !== 'const') return n
@@ -191,7 +242,29 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     const label = targets.length === 1 ? "value → " + targets[0] : "value"
     return {...n,data:{...n.data,outputLabels:{v:label}}}
   })
-  const ready=graphReady(nodes as any,edges as any,requiredOutputs)
+  const issues=graphIssues(nodes as any,edges as any,requiredOutputs)
+  const issue=issues[0]
+  const issueNode=issue?.nodeId?(nodes as RFNode[]).find(n=>n.id===issue.nodeId):null
+  let buildMessage=issue?.message||'출력 링크를 완성하세요.'
+  if(issue?.code==='missing-output')buildMessage=issue.message.includes('steer')?'STEER 출력 블록을 장착하세요.':'THROTTLE 출력 블록을 장착하세요.'
+  else if(issue?.code==='unwired-output')buildMessage=`${metaOf(issueNode?.data.coreType||'sink.steer').label}의 x 입력이 비어 있어요.`
+  else if(issue?.code==='unwired-input')buildMessage=`${metaOf(issueNode?.data.coreType||'const').label}의 ${issue.port} 입력에 신호가 필요해요.`
+  else if(issue?.code==='type-mismatch')buildMessage='포트 데이터 타입이 맞지 않아요. 같은 타입끼리 연결하세요.'
+  else if(issue?.code==='cycle')buildMessage='Delay 없이 되돌아오는 연결이 있어요. 피드백 고리를 끊으세요.'
+  let runtimeMessage:string|null=null
+  for(const n of nodes as RFNode[]){
+    const e=n.data.coreType==='std.tocar'?liveVals?.[n.id]?.e:null
+    if(e?.x<0){runtimeMessage='목표점이 차량 뒤쪽에 있어요. Lookahead 거리와 경로 입력을 확인하세요.';break}
+  }
+  for(const edge of edges as RFEdge[]){
+    const target=(nodes as RFNode[]).find(n=>n.id===edge.target)
+    if(!target?.data.coreType.startsWith('sink.'))continue
+    const value=liveVals?.[edge.source]?.[edge.sourceHandle]
+    if(value!=null&&!Number.isFinite(value))runtimeMessage='출력 경로에 계산할 수 없는 값이 있어요. 나눗셈 입력을 확인하세요.'
+    if(target.data.coreType==='sink.steer'&&Number.isFinite(value)&&Math.abs(value)>1)runtimeMessage='STEER 범위를 넘었어요. 출력 전에 clamp로 −1~1을 제한하세요.'
+  }
+  const ready=issues.length===0
+  const feedback=notice||(ready?(runtimeMessage||'CONTROL ONLINE · 출전 준비 완료'):`CONTROL OFFLINE · ${buildMessage}`)
 
   return (
     <div className="editor">
@@ -213,6 +286,16 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
                 </button>)}</div>
             </div>
           })}
+          {blocks.length>0&&<div className="pal-cat saved-blocks">
+            <div className="pal-cat-h" style={{color:'#8C7CF0'}}>MY BLOCKS · 모든 미션에서 사용</div>
+            <div className="pal-chips">{blocks.map(saved=><div className="saved-row" key={saved.id}>
+              <button className="pal-chip" style={{['--part' as any]:'#8C7CF0'}} onClick={()=>addSavedBlock(saved)}>
+                <i>+</i><span>{saved.label}</span>
+              </button>
+              <button className="saved-remove" aria-label={`${saved.label} 보관함에서 삭제`} onClick={()=>removeBlock(saved.id)}>×</button>
+            </div>)}</div>
+          </div>}
+
         </div>
         <div className="pal-note">파트 선택 → 캔버스 장착 → 신호 포트 체결 · 빈 곳 드래그로 여러 노드 선택 → <b>블록으로 묶기</b> · 블록을 휴지통에 드롭</div>
       </div>}
@@ -224,11 +307,11 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
         </div>
         <div className="editor-topbar">
           {palette.length>0&&!bayOpen&&<button className={'parts-toggle'+(highlightPalette?' hl':'')} onClick={()=>setBayOpen(true)} aria-expanded={bayOpen}>
-            <span className="parts-icon">＋</span><span><small>LOADOUT</small><b>PARTS BAY</b></span><em>{palette.length}</em>
+            <span className="parts-icon">＋</span><span><small>LOADOUT</small><b>PARTS BAY</b></span><em>{palette.length+blocks.length}</em>
           </button>}
           <div className="gf-slot">
             <div className={'graph-feedback '+(notice?'active':ready?'ready':'waiting')} role="status" aria-live="polite">
-              <span className="gf-dot"/>{notice||(ready?'CONTROL ONLINE · 출전 준비 완료':'CONTROL OFFLINE · 출력 링크를 완성하세요')}
+              <span className="gf-dot"/>{feedback}
             </div>
           </div>
           <div className="editor-mode"><span>BUILD MODE</span><b>CONTROL GRAPH</b></div>
@@ -260,7 +343,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
             {outs(info).length>0&&<span>OUT <b>{outs(info).join(', ')}</b></span>}
           </div>
         </div>}
-        {openNode&&<InnerView node={openNode} onClose={()=>setOpenNode(null)} onFork={forkOpen} />}
+        {openNode&&<InnerView node={openNode} onClose={()=>setOpenNode(null)} onFork={forkOpen} onSave={saveOpen} />}
       </div>
       {hover&&<div className="node-tooltip" role="tooltip" style={{left:hover.x,top:hover.y,['--tip' as any]:colorOf(hover.type)}}>
         <div className="nt-cap">{metaOf(hover.type).cat} · PART GUIDE</div>

@@ -1,7 +1,7 @@
 // Unit checks for P-a L0 primitives (math / logic / vector / array / stateful).
 import { makeGraph, evalGraph, type EvalCtx } from '../src/graph/engine.ts';
 import { NT } from '../src/graph/registry.ts';
-import { buildWorld, G } from '../src/sim/world.ts';
+import { buildWorld, curvAheadAt, G } from '../src/sim/world.ts';
 import { makeRng } from '../src/rng.ts';
 
 let failed = 0;
@@ -45,10 +45,36 @@ ok(near(one({ n:{ type:'vec.dot', in:{ a:L({x:1,y:2}), b:L({x:3,y:4}) } } }, 'n'
   const distance=6, advanced=one({ n:{type:'path.advanceByDist',in:{track:L(T),i:L(nearest),d:L(distance)}} },'n','pt');
   const target=(sourceIndex+Math.max(1,Math.round(distance/T.spacing)))%T.N;
   ok(advanced.x===T.pts[target][0]&&advanced.y===T.pts[target][1], 'path.advanceByDist matches track spacing'); }
+{ const T=world.track, idx=7;
+  const w=one({n:{type:'path.at',in:{track:L(T),i:L(idx)}}},'n','waypoint');
+  ok(w.x===T.pts[idx][0]&&w.y===T.pts[idx][1]&&w.kappa===T.curv[idx], 'path.at exposes a typed waypoint');
+  const curve=one({n:{type:'path.maxCurvature',in:{track:L(T),i:L(idx),d:L(18)}}},'n','k');
+  ok(curve===curvAheadAt(T,idx,18), 'path.maxCurvature preserves world formula'); }
 
 // --- shipped L1 geometry is openable and numerically equivalent to the old formulas ---
 ok(NT['std.lookahead'].kind==='composite'&&!!NT['std.lookahead'].sub, 'std.lookahead is an openable composite');
 ok(NT['std.tocar'].kind==='composite'&&!!NT['std.tocar'].sub, 'std.tocar is an openable composite');
+ok(NT['std.curvAhead'].kind==='composite'&&!!NT['std.curvAhead'].sub, 'std.curvAhead is an openable composite');
+ok(NT['std.gripSpeed'].kind==='composite'&&!!NT['std.gripSpeed'].sub, 'std.gripSpeed is an openable composite');
+ok(['std.nearestWpt','std.crossTrack','std.headingErr','lidar.preprocess','lidar.widestGap','lidar.freeAhead'].every(t=>NT[t].kind==='composite'&&!!NT[t].sub), 'new L1 geometry/LiDAR nodes are openable composites');
+{ const T=world.track, idx=12, psi=Math.atan2(T.tan[idx][1],T.tan[idx][0]);
+  const pose={x:T.pts[idx][0]+T.nrm[idx][0]*2,y:T.pts[idx][1]+T.nrm[idx][1]*2,yaw:psi-0.3};
+  const curve=one({n:{type:'std.curvAhead',in:{pose:L(pose),track:L(T)}}},'n','k');
+  ok(curve===curvAheadAt(T,idx,18), 'curvature composite preserves old formula exactly');
+  const grip=one({n:{type:'std.gripSpeed',params:{vmax:13,margin:0.85},in:{k:L(curve)}}},'n','v');
+  ok(grip===Math.min(13,Math.sqrt(world.mu*G/Math.max(curve,0.004))*0.85), 'grip-speed composite preserves old formula exactly');
+  const nearest=one({n:{type:'std.nearestWpt',in:{track:L(T),pt:L({x:pose.x,y:pose.y})}}},'n','waypoint');
+  ok(nearest.x===T.pts[idx][0]&&nearest.kappa===T.curv[idx], 'nearest-waypoint composite returns path data');
+  const cross=one({n:{type:'std.crossTrack',in:{pose:L(pose),track:L(T)}}},'n','e');
+  ok(near(cross,2), 'cross-track composite returns signed lateral distance');
+  const heading=one({n:{type:'std.headingErr',in:{pose:L(pose),track:L(T)}}},'n','e');
+  ok(near(heading,0.3), 'heading-error composite wraps path minus vehicle yaw');
+  const gap=one({n:{type:'lidar.widestGap',in:{ranges:L([1,4,2,8,3])}}},'n','i');
+  const clean=one({n:{type:'lidar.preprocess',params:{maxRange:30},in:{ranges:L([NaN,4,-2,40,3])}}},'n','ranges');
+  ok(JSON.stringify(clean)==='[0,4,0,30,3]', 'LiDAR preprocess sanitizes and clips ranges');
+  const free=one({n:{type:'lidar.freeAhead',params:{width:3},in:{ranges:L([9,9,9,8,2,7,9,9,9])}}},'n','d');
+  ok(free===2, 'free-ahead composite reads the central safety window');
+  ok(gap===3, 'widest-gap composite exposes the most open beam'); }
 { const pose={x:world.track.pts[5][0]+0.2,y:world.track.pts[5][1]-0.1,yaw:0.37}, Ld=6;
   const g=makeGraph({ look:{type:'std.lookahead',in:{pose:L(pose),track:L(world.track),Ld:L(Ld)}} }); const v=evalGraph(g,ctx(),NT).look;
   const nearest=one({n:{type:'path.nearestIndex',in:{track:L(world.track),pt:L({x:pose.x,y:pose.y})}}},'n','i');

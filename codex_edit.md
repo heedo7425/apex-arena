@@ -236,3 +236,29 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 ### Next
 - Convert `std.curvAhead` and `std.gripSpeed` to openable composites.
 - Add the remaining P-b L1 geometry/LiDAR methods without exposing turnkey algorithm decisions.
+
+## 2026-07-22 - Composite lab and reusable control blocks (complete)
+
+### Why
+- P-b still had opaque planning methods, no reusable player block library, and too little feedback when an internal signal or graph connection was wrong.
+- LiDAR and path concepts needed typed enablers rather than turnkey algorithm nodes so players can inspect and fork the actual reasoning chain.
+
+### Changes
+- Added `path.at`, `path.maxCurvature`, surface grip, range sanitizing, widest-gap, and central-window primitives with typed validation and Korean metadata.
+- Converted curvature-ahead and grip-speed to open composites and added open nearest-waypoint, cross-track, heading-error, LiDAR preprocessing, widest-gap, and free-ahead methods.
+- Preserved composite parameters through an internal `cparam` node and materialized them as Const nodes when forked.
+- Added nested breadcrumb navigation, internal part inspection, live signals, and topology-aware fork layout that moves existing graph nodes out of the way.
+- Added persistent MY BLOCKS storage so grouped player blocks can be named, saved, removed, and reused in every mission.
+- Replaced generic offline text with actionable node/port/type/cycle diagnostics plus invalid-target and control-range runtime warnings.
+- Updated the authoritative palette and node-spec documents and rebuilt the committed Pages app.
+
+### Verification
+- `drive.ts`, `prims.ts`, and `blocks.ts` pass, including new path, planning, geometry, and LiDAR unit coverage.
+- PURSUIT remains exactly `bestClean=21.083333333332778` (`21.0833s`); planning and geometry fork regressions preserve the shipped lap exactly.
+- Headless Playwright opened Lookahead, Curvature ahead, and Grip speed internals, verified their visible enablers, and expanded Lookahead with automatic layout.
+- Headless Playwright verified precise blank-graph diagnostics and saved a user block that remained available after reload in another mission.
+- Offscreen evidence: `/tmp/apex-lookahead-open.png`, `/tmp/apex-lookahead-fork.png`, and `/tmp/apex-block-library.png`.
+
+### Next
+- Begin P-c with explicit waypoint construction/editing and deterministic `sim.rollout` primitives for MPPI experiments.
+- Add authored missions only after the P-c vocabulary and behavior-preservation tests are stable.

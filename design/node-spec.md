@@ -52,8 +52,9 @@
 - 기본: `Length` · `Index(arr,i)` · `Slice(arr,i,j)` · `Window(arr,i,W)`(닫힌트랙 wrap) · `Range(n)` · `Diff(arr)` · `Concat`.
 - **고차(내부 서브그래프 λ):** `Map(arr, λ)→array` · `Filter(arr, λ)` · `Reduce(arr, init, λ)→acc` · `ZipWith(a,b, λ)→array`.
 - 리덕션: `Sum Max Min Mean` · `Argmax Argmin`(최대/최소 인덱스 — 예: 가장 넓은 갭, 최근접).
+- 센서 배열: `SanitizeRanges(arr,max)` · `WidestAbove(arr,min)→(i,width)` · `CenterMin(arr,w)`.
 
-**Path / Waypoint:** `NearestIndex(path, pt)→i` · `AdvanceByDist(path, i, d)→(pt, i2)` · `Resample(path, ds)` · `Midpoints(left, right)→path` · `MinCurvStep(path, bounds)→path`(레이싱라인 1스텝, Loop로 반복).
+**Path / Waypoint:** `NearestIndex(path, pt)→i` · `At(path,i)→waypoint` · `AdvanceByDist(path, i, d)→(pt, i2)` · `MaxCurvature(path,i,d)→κ` · `Resample(path, ds)` · `Midpoints(left, right)→path` · `MinCurvStep(path, bounds)→path`(레이싱라인 1스텝, Loop로 반복).
 
 **Stateful (결정론, 리셋시 0) — ⏱ 표시:** `Delay z⁻¹(x)→prev` · `Accumulate(x)→Σx·dt` · `PID(err, kp,ki,kd)→u`(=Delay/Acc 합성) · `LowPass(x, α)` · `RateLimit(x, rate)`. **사이클은 반드시 ⏱ 노드 경유.**
 
@@ -62,7 +63,7 @@
 
 **Geometry / Perception:** `To Car Frame` · `Frenet (s,d)` · `Nearest Waypoint` · `Curvature ahead(W)` · `Heading error` · `Cross-track error` · `Distance to boundary` · `Track width here`.
 
-**LiDAR:** `Preprocess scan (bubble)` · `Widest gap` · `Free distance ahead` · `Min range in arc`.
+**LiDAR:** `Preprocess scan (sanitize/clip)` · `Widest gap (연속 여유 구간)` · `Free distance ahead (중앙 안전창)` · `Min range in arc`.
 
 **Planning:** `Lookahead point(Ld)` · `Speed from curvature (grip)` · `Speed profile` · `Sample path ahead` · `Centerline (from bounds)` · `Racing-line step`(Loop).
 
@@ -75,6 +76,8 @@
 > **v1 팔레트 확정 = `design/palette-v1.md`.** 왼쪽에 존재하는 노드 어휘 전체를 못 박음(레벨은 부분집합만 노출).
 > 결정(2026-07-21): L1은 넉넉하되 전부 `composite`(열림). 위 Control의 `Pursuit curvature`/`Steer from curvature`는
 > **L1에서 내려 예제 그래프로만** — 알고리즘의 시그니처 결정규칙이라 유저가 조립(오늘 registry에서 제거함).
+> 에디터에서 composite는 중첩 breadcrumb로 계속 열 수 있고, 각 내부 노드의 설명·실시간 출력을 확인한다. fork는 인스턴스 파라미터를 Const로 치환해 수치를 보존하며 기존 노드를 자동 이동한다.
+> 사용자 `blk.user`는 이름을 붙여 로컬 보관함에 저장하고 다른 미션의 Parts Bay에서 재사용할 수 있다.
 
 ## 4. 실행 · 비용
 - 매 tick **위상 정렬 평가**. ⏱ 노드는 이전-tick 상태 읽고 새 상태 씀. 리셋 = ⏱ 상태 0.
@@ -98,12 +101,13 @@ ds   = ZipWith(Slice(P,0,-1), Slice(P,1,-0), (a,b) → distance(a,b))
 # Pure Pursuit steer(pose, pt, L, gain) → steer
 e = toLocal(pt, pose);  κ = 2·Y(e) / length(e)²;  δ = atan(L·κ)·gain;  clamp(δ/δmax, −1, 1)
 
-# Grip speed(κ, μ) → v :  sqrt(μ·g / max(κ, ε))
+# Grip speed(κ, μ, vmax, margin) → v :  min(vmax, sqrt(μ·g / max(κ, ε))·margin)
 # Speed throttle :  clamp( PID(v_tgt − speed, kp,ki,kd), −1, 1 )
 
 # Follow-the-Gap(scan) → steer
-r = scan.ranges;  safe = Map(r, x → Select(x < bubble, 0, x))
-best = Argmax(safe);  ang = scan.a0 + best·scan.da;  clamp(ang·k, −1, 1)
+r = SanitizeRanges(scan.ranges, maxRange)
+best = WidestAbove(r, minClear).i
+ang = scan.a0 + best·scan.da;  clamp(ang·k, −1, 1)
 
 # Waypoints — Centerline :  Midpoints(left, right)   (또는 ZipWith(left,right,(l,r)→scale(l+r, .5)))
 # Waypoints — Racing line :  Loop N× MinCurvStep(path, bounds)

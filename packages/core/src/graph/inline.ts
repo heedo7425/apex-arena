@@ -25,10 +25,16 @@ export function inlineComposite(g: Graph, nodeId: string, NT: Record<string, Nod
   for (const [id, n] of Object.entries(g.nodes)) if (id !== nodeId) nodes[id] = { ...n, in: { ...(n.in || {}) } };
 
   const base = node.pos || [0, 0];
-  let k = 0;
-  for (const [iid, inode] of Object.entries(sub.nodes)) {
-    if (inode.type === 'cin') continue;
-    const nin: Record<string, Ref> = {};
+  const visibleIds = sub.order.filter(id => sub.nodes[id].type !== 'cin');
+  const depth: Record<string,number> = {};
+  const innerDepth = (id:string):number => depth[id] ?? (depth[id] = Math.max(0, ...Object.values(sub.nodes[id].in || {}).map(ref => ref[0] === 'n' && !isCin(ref[1] as string) ? innerDepth(ref[1] as string)+1 : 0)));
+  const perDepth: Record<number,number> = {};
+  const maxDepth = Math.max(0, ...visibleIds.map(innerDepth));
+  const shift = Math.max(0, maxDepth*240-210);
+  for (const [id,n] of Object.entries(nodes)) if (n.pos && n.pos[0] > base[0]+80) nodes[id] = { ...n, pos:[n.pos[0]+shift,n.pos[1]] };
+
+  for (const iid of visibleIds) {
+    const inode=sub.nodes[iid], nin: Record<string, Ref> = {};
     if (inode.in) for (const [port, ref] of Object.entries(inode.in)) {
       if (ref[0] === 'n') {
         const src = ref[1] as string;
@@ -36,9 +42,13 @@ export function inlineComposite(g: Graph, nodeId: string, NT: Record<string, Nod
         else nin[port] = ['n', rn(src), ref[2] as string];
       } else nin[port] = ref as Ref;
     }
-    nodes[rn(iid)] = { type: inode.type, params: { ...(inode.params || {}) },
-      pos: [base[0] + (k % 4) * 220, base[1] + Math.floor(k / 4) * 120], in: nin };
-    k++;
+    const d=innerDepth(iid), row=(perDepth[d]=(perDepth[d]??0)+1)-1;
+    if (inode.type === 'cparam') {
+      const key=inode.params?.param as string, value=node.params?.[key] ?? inode.params?.fallback;
+      nodes[rn(iid)] = { type:'const', params:{ value }, pos:[base[0]+d*240,base[1]+row*140], in:{} };
+    } else {
+      nodes[rn(iid)] = { type:inode.type, params:{ ...(inode.params || {}) }, pos:[base[0]+d*240,base[1]+row*140], in:nin };
+    }
   }
 
   for (const id in nodes) {

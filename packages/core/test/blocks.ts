@@ -40,6 +40,8 @@ ok(NT['blk.pursuit'].kind === 'composite' && !!NT['blk.pursuit'].sub, 'blk.pursu
 ok(NT['blk.speedPid'].kind === 'composite' && !!NT['blk.speedPid'].sub, 'blk.speedPid is an openable composite (has .sub)');
 ok(NT['std.lookahead'].kind === 'composite' && !!NT['std.lookahead'].sub, 'std.lookahead is an openable composite (has .sub)');
 ok(NT['std.tocar'].kind === 'composite' && !!NT['std.tocar'].sub, 'std.tocar is an openable composite (has .sub)');
+ok(NT['std.curvAhead'].kind === 'composite' && !!NT['std.curvAhead'].sub, 'std.curvAhead is an openable composite (has .sub)');
+ok(NT['std.gripSpeed'].kind === 'composite' && !!NT['std.gripSpeed'].sub, 'std.gripSpeed is an openable composite (has .sub)');
 const lookTypes = new Set(Object.values(NT['std.lookahead'].sub!.nodes).map(n => n.type));
 const tocarTypes = new Set(Object.values(NT['std.tocar'].sub!.nodes).map(n => n.type));
 ok(lookTypes.has('pose.parts')&&lookTypes.has('path.nearestIndex')&&lookTypes.has('path.advanceByDist'), 'lookahead inner graph uses struct/path enablers');
@@ -66,6 +68,12 @@ ok(noBlocks, 'fork inlines blocks away (no blk.* / cin left)');
 const fk = runFor(world, forked, 1, 70);
 console.log('FORKED:', 'bestClean=' + (fk.bestClean?.toFixed(4) ?? '--'));
 ok(fk.bestClean === blk.bestClean, 'forked (inlined) lap === block lap (fork preserves behavior)');
+let planned = inlineComposite(BLOCKS, 'curve', NT);
+planned = inlineComposite(planned, 'grip', NT);
+ok(Object.values(planned.nodes).every(n => n.type !== 'std.curvAhead' && n.type !== 'std.gripSpeed' && n.type !== 'cparam'), 'planning fork replaces composites and parameter placeholders');
+const plannedRun = runFor(world, planned, 1, 70);
+ok(plannedRun.bestClean === blk.bestClean, 'forked curvature/grip lap === shipped composite lap');
+
 
 // encapsulation: collapse PURSUIT's steering nodes into a user block -> same lap; fork back -> same lap
 import { encapsulate } from '../src/graph/inline.ts';

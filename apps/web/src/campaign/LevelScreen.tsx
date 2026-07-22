@@ -3,6 +3,7 @@ import { NT, validateGraph } from '@apex/core'
 import type { Graph, GraphIssue } from '@apex/core'
 import { Editor } from '../editor/Editor'
 import { coreToRF } from '../editor/compile'
+import { metaOf } from '../editor/nodeMeta'
 import { Viewport } from '../sim/Viewport'
 import { useGame, useLive, useTut } from '../store'
 import { levelById, LEVELS } from './levels'
@@ -60,11 +61,14 @@ function throttleWired(graph: Graph): boolean {
   return !!(sinkId && graph.nodes[sinkId].in?.x)
 }
 
-function issueLabel(issue: GraphIssue): string {
-  if (issue.code === 'unwired-output') return 'STEER와 THROTTLE 출력 연결이 필요해요.'
-  if (issue.code === 'unwired-input') return `${issue.nodeId}의 ${issue.port} 입력이 비어 있어요.`
+function issueLabel(issue: GraphIssue, graph:Graph): string {
+  const nodeType=issue.nodeId?graph.nodes[issue.nodeId]?.type:undefined
+  const label=nodeType?metaOf(nodeType).label:'출력'
+  if (issue.code === 'missing-output') return issue.message.includes('steer')?'STEER 출력 블록을 장착하세요.':'THROTTLE 출력 블록을 장착하세요.'
+  if (issue.code === 'unwired-output') return `${label}의 x 입력을 연결하세요.`
+  if (issue.code === 'unwired-input') return `${label}의 ${issue.port} 입력이 비어 있어요.`
   if (issue.code === 'type-mismatch') return '서로 다른 데이터 타입의 포트가 연결되어 있어요.'
-  if (issue.code === 'cycle') return 'Delay 없이 순환하는 연결이 있어요.'
+  if (issue.code === 'cycle') return 'Delay 없이 되돌아오는 연결이 있어요.'
   return issue.message
 }
 
@@ -105,8 +109,8 @@ export function LevelScreen({ id }: { id: string }) {
   const brief = BRIEFS[level.id]
   const editorPalette = level.palette
   const simGraph = graph
-  const wiringIssue = issueLabel(issues[0] ?? { code:'unwired-input', message:'필수 노드를 출력 경로에 연결하세요.' })
-  const waitingMessage = hintLevel >= 3 ? wiringIssue : '회로가 아직 가설을 실행할 준비가 되지 않았어요.'
+  const wiringIssue = issueLabel(issues[0] ?? { code:'unwired-input', message:'필수 노드를 출력 경로에 연결하세요.' },graph)
+  const waitingMessage = `회로 대기 · ${wiringIssue}`
 
   useEffect(() => {
     setGraph(level.starter); setHintLevel(0); setTutMoved(false); setPane('graph'); setResult(null)

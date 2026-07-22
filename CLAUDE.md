@@ -42,5 +42,6 @@ git add -A && git commit && git push origin main                                
 
 ## 현재 상태 (2026-07-22)
 - Codex UX 오버홀 + 내 후속 작업 반영: Parts Bay 좌측 레일, Pure Pursuit 프리미티브 조립화, L2/L3 블록 제공, **P-a 완료**(L0 어휘), **P-b 열기/fork/캡슐화 완료**, 반응형(상단바 겹침·sim 높이) 수정.
-- **P-b Geometry 1차 완료**: `pose.parts`·`wpt.parts`와 `path.nearestIndex`·`path.advanceByDist` 추가. shipped `std.lookahead`·`std.tocar`는 opaque fn이 아닌 열기/fork 가능한 L0 서브그래프이며 PURSUIT 랩이 동일하다.
-- **다음**: P-b 잔여 — `std.curvAhead`·`std.gripSpeed` composite 전환 + 신규 L1(crossTrack·headingErr·widestGap·nearestWpt). 이후 **P-c**: Path(웨이포인트 생성) + `sim.rollout`(MPPI). 상세는 `design/palette-v1.md`.
+- **P-b 완료**: 경로 접근자와 센서 배열 프리미티브를 추가하고 `std.lookahead`·`std.tocar`·`std.curvAhead`·`std.gripSpeed` 및 geometry/LiDAR L1 노드를 모두 열기/fork 가능한 composite로 전환했다. PURSUIT 랩은 정확히 동일하다.
+- composite 내부는 breadcrumb, 파트 설명, live signal, 자동 배치 fork를 제공한다. 유저 블록은 Parts Bay 보관함에 저장되어 모든 미션에서 재사용할 수 있고 그래프 오류는 해당 블록·포트 단위로 안내된다.
+- **다음**: **P-c** Path(웨이포인트 생성) + `sim.rollout`(MPPI). 상세는 `design/palette-v1.md`.

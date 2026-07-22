@@ -11,11 +11,12 @@ function argmaxArr(a: number[]): number { let bi = 0, bv = -Infinity; for (let i
 // Inner nodes read the block's inputs via `cin` (composite-in); state is namespaced per instance.
 function composite(cat: string, ins: string[], outs: string[], sub: Graph, outMap: Record<string, [string, string]>): NodeDef {
   return { kind:'composite', cat, ins, outs, sub, outMap, fn:(inv,p,st,ctx)=>{
-    const savedCin=ctx.__cin, savedState=ctx.state;
-    ctx.__cin=inv; ctx.state=(st.__inner ||= {});
+    const savedCin=ctx.__cin, savedParams=ctx.__cparams, savedState=ctx.state;
+    ctx.__cin=inv; ctx.__cparams=p; ctx.state=(st.__inner ||= {});
     const v=evalGraph(sub,ctx,NT);
-    ctx.__cin=savedCin; ctx.state=savedState;
+    ctx.__cin=savedCin; ctx.__cparams=savedParams; ctx.state=savedState;
     const o:Record<string,any>={}; for (const k in outMap) o[k]=v[outMap[k][0]]?.[outMap[k][1]];
+    o.__inner=v;
     return o;
   } };
 }
@@ -36,6 +37,64 @@ const TOCAR_SUB: Graph = makeGraph({
   delta:{ type:'vec.sub', in:{ a:['n','pointIn','v'], b:['n','posePoint','e'] } },
   negYaw:{ type:'neg', in:{ x:['n','poseParts','yaw'] } },
   local:{ type:'vec.rotate', in:{ e:['n','delta','e'], th:['n','negYaw','v'] } },
+});
+
+const CURVAHEAD_SUB: Graph = makeGraph({
+  poseIn:{ type:'cin', params:{ port:'pose' } }, trackIn:{ type:'cin', params:{ port:'track' } },
+  poseParts:{ type:'pose.parts', in:{ pose:['n','poseIn','v'] } },
+  posePoint:{ type:'vec.make', in:{ x:['n','poseParts','x'], y:['n','poseParts','y'] } },
+  nearest:{ type:'path.nearestIndex', in:{ track:['n','trackIn','v'], pt:['n','posePoint','e'] } },
+  distance:{ type:'const', params:{ value:18 } },
+  curve:{ type:'path.maxCurvature', in:{ track:['n','trackIn','v'], i:['n','nearest','i'], d:['n','distance','v'] } },
+});
+
+const GRIPSPEED_SUB: Graph = makeGraph({
+  curveIn:{ type:'cin', params:{ port:'k' } }, surface:{ type:'src.surface' },
+  vmax:{ type:'cparam', params:{ param:'vmax', fallback:13 } }, margin:{ type:'cparam', params:{ param:'margin', fallback:0.85 } },
+  floor:{ type:'const', params:{ value:0.004 } }, safeCurve:{ type:'max', in:{ a:['n','curveIn','v'], b:['n','floor','v'] } },
+  grip:{ type:'mul', in:{ a:['n','surface','mu'], b:['n','surface','g'] } },
+  ratio:{ type:'div', in:{ a:['n','grip','v'], b:['n','safeCurve','v'] } }, root:{ type:'sqrt', in:{ x:['n','ratio','v'] } },
+  scaled:{ type:'mul', in:{ a:['n','root','v'], b:['n','margin','v'] } }, limited:{ type:'min', in:{ a:['n','vmax','v'], b:['n','scaled','v'] } },
+});
+
+const NEAREST_WPT_SUB: Graph = makeGraph({
+  trackIn:{ type:'cin', params:{ port:'track' } }, pointIn:{ type:'cin', params:{ port:'pt' } },
+  nearest:{ type:'path.nearestIndex', in:{ track:['n','trackIn','v'], pt:['n','pointIn','v'] } },
+  waypoint:{ type:'path.at', in:{ track:['n','trackIn','v'], i:['n','nearest','i'] } },
+});
+
+const CROSS_TRACK_SUB: Graph = makeGraph({
+  poseIn:{ type:'cin', params:{ port:'pose' } }, trackIn:{ type:'cin', params:{ port:'track' } },
+  poseParts:{ type:'pose.parts', in:{ pose:['n','poseIn','v'] } }, posePoint:{ type:'vec.make', in:{ x:['n','poseParts','x'], y:['n','poseParts','y'] } },
+  nearest:{ type:'path.nearestIndex', in:{ track:['n','trackIn','v'], pt:['n','posePoint','e'] } },
+  waypoint:{ type:'path.at', in:{ track:['n','trackIn','v'], i:['n','nearest','i'] } }, parts:{ type:'wpt.parts', in:{ waypoint:['n','waypoint','waypoint'] } },
+  pathPoint:{ type:'vec.make', in:{ x:['n','parts','x'], y:['n','parts','y'] } }, delta:{ type:'vec.sub', in:{ a:['n','posePoint','e'], b:['n','pathPoint','e'] } },
+  quarterTurn:{ type:'const', params:{ value:Math.PI/2 } }, normalAngle:{ type:'add', in:{ a:['n','parts','psi'], b:['n','quarterTurn','v'] } },
+  nx:{ type:'cos', in:{ x:['n','normalAngle','v'] } }, ny:{ type:'sin', in:{ x:['n','normalAngle','v'] } },
+  normal:{ type:'vec.make', in:{ x:['n','nx','v'], y:['n','ny','v'] } }, error:{ type:'vec.dot', in:{ a:['n','delta','e'], b:['n','normal','e'] } },
+});
+
+const HEADING_ERR_SUB: Graph = makeGraph({
+  poseIn:{ type:'cin', params:{ port:'pose' } }, trackIn:{ type:'cin', params:{ port:'track' } },
+  poseParts:{ type:'pose.parts', in:{ pose:['n','poseIn','v'] } }, posePoint:{ type:'vec.make', in:{ x:['n','poseParts','x'], y:['n','poseParts','y'] } },
+  nearest:{ type:'path.nearestIndex', in:{ track:['n','trackIn','v'], pt:['n','posePoint','e'] } },
+  waypoint:{ type:'path.at', in:{ track:['n','trackIn','v'], i:['n','nearest','i'] } }, parts:{ type:'wpt.parts', in:{ waypoint:['n','waypoint','waypoint'] } },
+  raw:{ type:'sub', in:{ a:['n','parts','psi'], b:['n','poseParts','yaw'] } }, error:{ type:'wrapAngle', in:{ x:['n','raw','v'] } },
+});
+
+const WIDEST_GAP_SUB: Graph = makeGraph({
+  rangesIn:{ type:'cin', params:{ port:'ranges' } }, threshold:{ type:'cparam', params:{ param:'minClear', fallback:3 } },
+  widest:{ type:'array.widestAbove', in:{ arr:['n','rangesIn','v'], min:['n','threshold','v'] } },
+});
+
+const LIDAR_PREPROCESS_SUB: Graph = makeGraph({
+  rangesIn:{ type:'cin', params:{ port:'ranges' } }, maxRange:{ type:'cparam', params:{ param:'maxRange', fallback:30 } },
+  clean:{ type:'array.sanitizeRanges', in:{ arr:['n','rangesIn','v'], max:['n','maxRange','v'] } },
+});
+
+const FREE_AHEAD_SUB: Graph = makeGraph({
+  rangesIn:{ type:'cin', params:{ port:'ranges' } }, width:{ type:'cparam', params:{ param:'width', fallback:5 } },
+  clear:{ type:'array.centerMin', in:{ arr:['n','rangesIn','v'], w:['n','width','v'] } },
 });
 
 // Inner sub-graph: Pure Pursuit steering (what the player builds in L2) → steer.
@@ -63,6 +122,7 @@ export const NT: Record<string, NodeDef> = {
   'src.speed': { kind:'source', cat:'Sensors', outs:['v'], fn:(i,p,s,c)=>({ v:c.obs.speed }) },
   'src.pose':  { kind:'source', cat:'Sensors', outs:['pose'], fn:(i,p,s,c)=>({ pose:c.obs.pose }) },
   'src.track': { kind:'source', cat:'Sensors', outs:['track'], fn:(i,p,s,c)=>({ track:c.obs.track }) },
+  'src.surface': { kind:'source', cat:'Sensors', outs:['mu','g'], fn:(i,p,s,c)=>({ mu:c.world.mu, g:G }) },
 
   // ---- L0 primitives: math ----
   'const': { kind:'prim', cat:'Math', outs:['v'], fn:(i,p)=>({ v:p.value }) },
@@ -134,6 +194,18 @@ export const NT: Record<string, NodeDef> = {
   'array.min': { kind:'prim', cat:'Array', ins:['arr'], outs:['v'], fn:(i)=>({ v:i.arr.length?Math.min.apply(null,i.arr):0 }) },
   'array.sum': { kind:'prim', cat:'Array', ins:['arr'], outs:['v'], fn:(i)=>({ v:i.arr.reduce((a:number,b:number)=>a+b,0) }) },
   'array.mean': { kind:'prim', cat:'Array', ins:['arr'], outs:['v'], fn:(i)=>({ v:i.arr.length?i.arr.reduce((a:number,b:number)=>a+b,0)/i.arr.length:0 }) },
+  'array.sanitizeRanges': { kind:'prim', cat:'Array', ins:['arr','max'], outs:['v'], fn:(i)=>({
+    v:i.arr.map((x:number)=>Number.isFinite(x)&&x>0?Math.min(x,i.max):0),
+  }) },
+  'array.widestAbove': { kind:'prim', cat:'Array', ins:['arr','min'], outs:['i','width'], fn:(i)=>{
+    let start=-1, bestStart=0, bestWidth=0;
+    for(let k=0;k<=i.arr.length;k++){const open=k<i.arr.length&&i.arr[k]>=i.min;if(open&&start<0)start=k;if(!open&&start>=0){const width=k-start;if(width>bestWidth){bestStart=start;bestWidth=width}start=-1}}
+    return { i:bestWidth?bestStart+Math.floor((bestWidth-1)/2):argmaxArr(i.arr), width:bestWidth };
+  } },
+  'array.centerMin': { kind:'prim', cat:'Array', ins:['arr','w'], outs:['v'], fn:(i)=>{
+    const n=i.arr.length, width=Math.max(1,Math.round(i.w)), lo=Math.max(0,Math.floor(n/2)-Math.floor(width/2));
+    return { v:n?Math.min(...i.arr.slice(lo,Math.min(n,lo+width))):0 };
+  } },
 
   // ---- L0 primitives: struct decomposition ----
   'pose.parts': { kind:'prim', cat:'Struct', ins:['pose'], outs:['x','y','yaw'], fn:(i)=>({ x:i.pose.x, y:i.pose.y, yaw:i.pose.yaw }) },
@@ -148,6 +220,14 @@ export const NT: Record<string, NodeDef> = {
     const i2=((Math.round(i.i)+steps)%T.N+T.N)%T.N;
     return { pt:{x:T.pts[i2][0],y:T.pts[i2][1]}, i2 };
   } },
+  'path.at': { kind:'prim', cat:'Path', ins:['track','i'], outs:['waypoint'], fn:(i)=>{
+    const T=i.track, k=((Math.round(i.i)%T.N)+T.N)%T.N, p=T.pts[k], t=T.tan[k];
+    return { waypoint:{ x:p[0], y:p[1], s:k*T.spacing, kappa:T.curv[k], psi:Math.atan2(t[1],t[0]), vref:0 } };
+  } },
+  'path.maxCurvature': { kind:'prim', cat:'Path', ins:['track','i','d'], outs:['k'], fn:(i)=>({
+    k:curvAheadAt(i.track,Math.round(i.i),i.d),
+  }) },
+
 
   // vec2 decomposition — reusable geometry primitives so any car-frame vector can be opened
   'vec.make': { kind:'prim', cat:'Vector', ins:['x','y'], outs:['e'], fn:(i)=>({ e:{ x:i.x, y:i.y } }) },
@@ -165,10 +245,15 @@ export const NT: Record<string, NodeDef> = {
   // ---- L1 standard library: shipped, openable composites ----
   'std.lookahead': composite('Geometry', ['pose','track','Ld'], ['pt','idx'], LOOKAHEAD_SUB, { pt:['ahead','pt'], idx:['nearest','i'] }),
   'std.tocar': composite('Geometry', ['pt','pose'], ['e'], TOCAR_SUB, { e:['local','e'] }),
-  'std.curvAhead': { kind:'std', cat:'Geometry', ins:['pose','track'], outs:['k'], fn:(i,p,s,c)=>{
-    const idx=nearestIndex(c.world.track,i.pose.x,i.pose.y,undefined).i; return { k:curvAheadAt(c.world.track,idx,18) };
-  } },
-  'std.gripSpeed': { kind:'std', cat:'Planning', ins:['k'], outs:['v'], fn:(i,p,s,c)=>({ v:Math.min(p.vmax,Math.sqrt(c.world.mu*G/Math.max(i.k,0.004))*p.margin) }) },
+  'std.curvAhead': composite('Geometry', ['pose','track'], ['k'], CURVAHEAD_SUB, { k:['curve','k'] }),
+  'std.gripSpeed': composite('Planning', ['k'], ['v'], GRIPSPEED_SUB, { v:['limited','v'] }),
+  'std.nearestWpt': composite('Geometry', ['track','pt'], ['waypoint','i'], NEAREST_WPT_SUB, { waypoint:['waypoint','waypoint'], i:['nearest','i'] }),
+  'std.crossTrack': composite('Geometry', ['pose','track'], ['e'], CROSS_TRACK_SUB, { e:['error','v'] }),
+  'std.headingErr': composite('Geometry', ['pose','track'], ['e'], HEADING_ERR_SUB, { e:['error','v'] }),
+  'lidar.widestGap': composite('LiDAR', ['ranges'], ['i'], WIDEST_GAP_SUB, { i:['widest','i'] }),
+  'lidar.preprocess': composite('LiDAR', ['ranges'], ['ranges'], LIDAR_PREPROCESS_SUB, { ranges:['clean','v'] }),
+  'lidar.freeAhead': composite('LiDAR', ['ranges'], ['d'], FREE_AHEAD_SUB, { d:['clear','v'] }),
+
   'ctrl.pid': { kind:'std', cat:'Control', ins:['err'], outs:['u'], fn:(i,p,s)=>{
     s.int=Math.max(-6,Math.min(6,(s.int||0)+i.err*(1/120))); const d=(i.err-(s.prev||0))*120; s.prev=i.err;
     return { u:p.kp*i.err + (p.ki||0)*s.int + (p.kd||0)*d };
@@ -182,6 +267,7 @@ export const NT: Record<string, NodeDef> = {
 
   // ---- composite input placeholder (used only inside block sub-graphs) ----
   'cin': { kind:'prim', cat:'Composite', outs:['v'], fn:(i,p,s,c)=>({ v:(c.__cin||{})[p.port] }) },
+  'cparam': { kind:'prim', cat:'Composite', outs:['v'], fn:(i,p,s,c)=>({ v:(c.__cparams||{})[p.param] ?? p.fallback }) },
 
   // ---- Modules: prior-mission controllers provided as openable blocks (P-b) ----
   'blk.pursuit': composite('Module', [], ['steer'], PURSUIT_SUB, { steer:['steer','v'] }),
@@ -189,11 +275,12 @@ export const NT: Record<string, NodeDef> = {
   // user-made block (encapsulation): inner sub-graph + outMap carried on params
   'blk.user': { kind:'composite', cat:'Module', fn:(inv,p,st,ctx)=>{
     const sub:Graph=p.sub, outMap:Record<string,[string,string]>=p.outMap||{};
-    const savedCin=ctx.__cin, savedState=ctx.state;
-    ctx.__cin=inv; ctx.state=(st.__inner ||= {});
+    const savedCin=ctx.__cin, savedParams=ctx.__cparams, savedState=ctx.state;
+    ctx.__cin=inv; ctx.__cparams=p; ctx.state=(st.__inner ||= {});
     const v=evalGraph(sub,ctx,NT);
-    ctx.__cin=savedCin; ctx.state=savedState;
+    ctx.__cin=savedCin; ctx.__cparams=savedParams; ctx.state=savedState;
     const o:Record<string,any>={}; for (const k in outMap) o[k]=v[outMap[k][0]]?.[outMap[k][1]];
+    o.__inner=v;
     return o;
   } },
 

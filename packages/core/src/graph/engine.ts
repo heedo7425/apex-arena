@@ -22,6 +22,7 @@ export type EvalCtx = {
   __arg2?: unknown;   // zipWith: paired element
   __argAcc?: unknown; // reduce: accumulator
   __cin?: Record<string, unknown>; // composite node: inputs by port name
+  __cparams?: Record<string, unknown>; // composite node: instance parameters
 };
 export type NodeDef = {
   kind: NodeKind; cat: string; label?: string;
