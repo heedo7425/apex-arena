@@ -1,6 +1,7 @@
 // Physics v2 Phase 2: oriented-box narrow-phase collision (SAT). Pure/deterministic.
 // v1 keeps detection-only circle overlap; v2 adds penetration correction + impulse.
 import type { SceneObject } from '../planning/types.ts';
+import type { CarState } from './vehicle.ts';
 
 export type CollisionBox = { x: number; y: number; yaw: number; hl: number; hw: number };
 
@@ -31,4 +32,31 @@ export function collideBoxes(a: CollisionBox, b: CollisionBox): { normal: [numbe
     if (overlap < minDepth) { minDepth = overlap; const s = dist < 0 ? 1 : -1; nx = e[0]*s; ny = e[1]*s; }
   }
   return { normal: [nx, ny], depth: minDepth };
+}
+
+export const carBoxOf = (c: CarState): CollisionBox => ({ x: c.x, y: c.y, yaw: c.yaw, hl: CAR_HL, hw: CAR_HW });
+const worldVel = (c: CarState): [number, number] => [c.vx*Math.cos(c.yaw) - c.vy*Math.sin(c.yaw), c.vx*Math.sin(c.yaw) + c.vy*Math.cos(c.yaw)];
+function setBodyVel(c: CarState, wx: number, wy: number) { const ch = Math.cos(c.yaw), sh = Math.sin(c.yaw); c.vx = wx*ch + wy*sh; c.vy = -wx*sh + wy*ch; }
+
+// 1-body: separate `car` out of an immovable box and kill its into-obstacle velocity. Mutates car.
+export function resolveStatic(car: CarState, obstacle: CollisionBox): boolean {
+  const hit = collideBoxes(carBoxOf(car), obstacle);
+  if (!hit) return false;
+  car.x += hit.normal[0]*hit.depth; car.y += hit.normal[1]*hit.depth;
+  const [vx, vy] = worldVel(car), vn = vx*hit.normal[0] + vy*hit.normal[1];
+  if (vn < 0) setBodyVel(car, vx - vn*hit.normal[0], vy - vn*hit.normal[1]);
+  return true;
+}
+
+// 2-body: equal-mass, inelastic, deterministic. Splits penetration and normal impulse. Mutates both.
+export function resolvePair(a: CarState, aBox: CollisionBox, b: CarState, bBox: CollisionBox): boolean {
+  const hit = collideBoxes(aBox, bBox);
+  if (!hit) return false;
+  const half = hit.depth*0.5;
+  a.x += hit.normal[0]*half; a.y += hit.normal[1]*half;
+  b.x -= hit.normal[0]*half; b.y -= hit.normal[1]*half;
+  const [avx, avy] = worldVel(a), [bvx, bvy] = worldVel(b);
+  const rvn = (avx-bvx)*hit.normal[0] + (avy-bvy)*hit.normal[1];
+  if (rvn < 0) { const j = -rvn*0.5; setBodyVel(a, avx + j*hit.normal[0], avy + j*hit.normal[1]); setBodyVel(b, bvx - j*hit.normal[0], bvy - j*hit.normal[1]); }
+  return true;
 }

@@ -1,5 +1,5 @@
 // Physics v2 Phase 2: oriented-box collision response. v1 stays detection-only.
-import { DT, buildWorld, initCar, makeSim, tick, collideBoxes, boxForObject, CAR_HL, CAR_HW } from '../src/index.ts';
+import { DT, buildWorld, initCar, makeSim, tick, collideBoxes, boxForObject, carBoxOf, resolvePair, CAR_HL, CAR_HW } from '../src/index.ts';
 import { makeGraph } from '../src/graph/engine.ts';
 import type { SceneObject, World } from '../src/index.ts';
 
@@ -14,6 +14,20 @@ function near(a: number, b: number, msg: string, eps = 1e-9) { ok(Math.abs(a-b) 
   ok(hit!.normal[0] < -0.99 && Math.abs(hit!.normal[1]) < 1e-9, 'push-out normal points away from the obstacle'); }
 ok(collideBoxes({x:0,y:0,yaw:0,hl:2,hw:1}, {x:4,y:0,yaw:0,hl:1,hw:1}) === null, 'clearly separated boxes do not collide');
 ok(!!collideBoxes({x:0,y:0,yaw:0,hl:2,hw:0.5}, {x:2.2,y:0,yaw:Math.PI/4,hl:1,hw:1}), 'oriented (rotated) box overlap is detected');
+
+// ---- 2-body equal-mass impulse (physical opponents) ----
+{ const w = buildWorld();
+  const a = { ...initCar(w), x:0, y:0, yaw:0, vx:5, v:5 };            // moving +x toward b
+  const b = { ...initCar(w), x:2, y:0, yaw:Math.PI, vx:5, v:5 };     // moving -x toward a (head-on)
+  const hit = resolvePair(a, carBoxOf(a), b, carBoxOf(b));
+  ok(hit, 'overlapping cars trigger a 2-body response');
+  ok(a.x < 0 && b.x > 2, 'both cars are pushed apart (split penetration)');
+  ok(collideBoxes(carBoxOf(a), carBoxOf(b)) === null, 'cars are separated after resolution');
+  ok(Math.abs(a.vx) < 1e-9 && Math.abs(b.vx) < 1e-9, 'equal head-on closing speed cancels for both (momentum-consistent)');
+  // determinism
+  const a2 = { ...initCar(w), x:0, y:0, yaw:0, vx:5, v:5 }, b2 = { ...initCar(w), x:2, y:0, yaw:Math.PI, vx:5, v:5 };
+  resolvePair(a2, carBoxOf(a2), b2, carBoxOf(b2));
+  ok(a2.x===a.x && a2.vx===a.vx && b2.x===b.x, '2-body impulse is deterministic'); }
 
 // straight-drive world (flat height, so the car travels straight along its heading)
 // with a static wall placed 9 m ahead. Progress is measured along the heading axis.

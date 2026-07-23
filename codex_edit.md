@@ -2,6 +2,35 @@
 
 All entries in this file document changes made by Codex in this repository.
 
+## 2026-07-23 - Physics v2 Phase 2: physical opponents + 2-body impulse (v2-gated)
+
+### Why
+Phase 2 item 2: opponents must obey the same dynamics, grip, and collision rules as the player for
+fair PvP. v1 opponents stay kinematic and frozen; the physical model is opt-in via physics v2.
+
+### Changes
+- collision.ts: extracted pure, deterministic resolvers — `resolveStatic` (1-body vs immovable box)
+  and `resolvePair` (equal-mass, inelastic 2-body split of penetration + normal impulse), plus
+  `carBoxOf` and world/body velocity helpers.
+- runner.ts: physics v2 promotes each moving rival (kind vehicle with a track speed) to an
+  `OpponentState` = a full `CarState` + target cruise + spec. A deterministic pure-pursuit
+  `opponentControl` drives it, stepped by `stepVehicle` each tick; opponents are published into the
+  scene (appended last) for LiDAR/render/dirty. `resolveCollisions` now does 1-body vs statics and
+  2-body vs opponents. v1 tick is byte-unchanged (kinematic `sceneAt`, no physical opponents).
+- Tests: added packages/core/test/opponents.ts (v2 opponent holds a grip-respecting on-track cruise
+  and progresses; deterministic; v1 opponent still matches the kinematic centerline formula) and
+  2-body unit checks in collision.ts (head-on equal closing speed cancels, separation, determinism).
+
+### Verification (offscreen only)
+- `pnpm --filter @apex/core test`: all 8 suites pass. v1 PURSUIT stays exactly 21.083333333332778;
+  v2 PURSUIT baseline unchanged (no objects there).
+- `tsc --noEmit`: 0 errors. web build passes. `git diff --check`: clean.
+
+### Next (Physics v2 Phase 2 continued)
+- Ordered sectors/checkpoints for authoritative lap validation (replace nearest-index wrap).
+- Then v2 gameplay rollout: v2-tuned reference controller, retuned medals, v2-only leaderboard/season
+  (kept fully separate from v1 records).
+
 ## 2026-07-23 - Physics v2 Phase 2: oriented-box collision response (v2-gated)
 
 ### Why

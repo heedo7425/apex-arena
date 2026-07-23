@@ -135,7 +135,7 @@ Combined slip is verified behaviorally: adding throttle under a saturating steer
 
 ### Phase 2: make racing fair
 
-Implementation status: **collision response complete (2026-07-23)**; opponent dynamics and
+Implementation status: **collision response + physical opponents complete (2026-07-23)**;
 checkpoint validation still pending.
 
 - [x] Oriented-box narrow-phase collision (SAT), penetration correction, and a deterministic
@@ -146,7 +146,13 @@ checkpoint validation still pending.
   Verified by `packages/core/test/collision.ts`: v2 car stops at a wall without penetrating and the
   same setup on v1 passes straight through; response is deterministic. The v2 PURSUIT baseline is
   unchanged (no objects on that track).
-- [ ] Run opponents through the same `stepVehicle` model and command interface as players.
+- [x] Run opponents through the same `stepVehicle` model and command interface as players
+  (physics v2). Each moving rival becomes a full `CarState` driven by a deterministic
+  pure-pursuit brain and stepped by `stepVehicle`; the player and opponents share an
+  equal-mass, inelastic, deterministic 2-body impulse (`resolvePair`). v1 opponents stay
+  kinematic centerline followers, unchanged. Verified by `packages/core/test/opponents.ts`
+  (opponent holds a grip-respecting cruise on-track and progresses; deterministic; v1 kinematic
+  formula preserved) and the 2-body unit checks in `collision.ts`.
 - [ ] Replace index-wrap finishes with ordered sectors, checkpoints, and authoritative
   race-state validation.
 

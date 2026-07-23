@@ -1,7 +1,8 @@
 // Sim runner: builds observation, evaluates the graph, steps the plant, times laps.
-import { type World, type PhysicsVersion, DT, PHYSICS_VERSION } from './world.ts';
-import { type CarState, initCar, stepVehicle, castScan } from './vehicle.ts';
-import { collideBoxes, boxForObject, CAR_HL, CAR_HW } from './collision.ts';
+import { type World, type PhysicsVersion, DT, PHYSICS_VERSION, nearestIndex } from './world.ts';
+import { type CarState, type Control, initCar, stepVehicle, castScan } from './vehicle.ts';
+import { boxForObject, carBoxOf, resolveStatic, resolvePair } from './collision.ts';
+import type { SceneObject } from '../planning/types.ts';
 import { type Graph, type EvalCtx, evalGraph } from '../graph/engine.ts';
 import { NT } from '../graph/registry.ts';
 import { makeRng, type Rng } from '../rng.ts';
@@ -10,24 +11,54 @@ export type Medals = { dev: number; gold: number; silver: number; bronze: number
 export const DEFAULT_MEDALS: Medals = { dev: 20.5, gold: 22.5, silver: 26, bronze: 33 };
 export type LapResult = { t: number; dirty: boolean; physicsVersion: PhysicsVersion };
 
+// physics v2: an opponent is a full vehicle (same stepVehicle model + collision), not a
+// kinematic track follower. It carries its own CarState and a target cruise speed.
+export type OpponentState = { car: CarState; target: number; spec: SceneObject };
+
 export type SimState = {
   world: World; graph: Graph; rng: Rng; car: CarState; dt: number;
   physicsVersion: PhysicsVersion;
   elapsed:number; objects:NonNullable<World['objects']>;
+  staticSpecs: SceneObject[]; opponents: OpponentState[];
   lapT: number; dirty: boolean; prevProg: number;
   laps: LapResult[]; best: number | null; lastVal: Record<string, any> | null;
   graphState: Record<string, Record<string, unknown>>;
 };
 
+const cloneObj = (o:SceneObject):SceneObject => ({...o,pose:{...o.pose},velocity:{...o.velocity},shape:{...o.shape}});
+const isMover = (o:SceneObject) => o.kind==='vehicle' && o.trackIndex!=null && o.trackSpeed!=null;
+
+function initOpponent(world: World, spec: SceneObject): OpponentState {
+  const T=world.track, i=(((spec.trackIndex??0)%T.N)+T.N)%T.N, p=T.pts[i], t=T.tan[i], sp=spec.trackSpeed??0;
+  const car: CarState = { ...initCar(world), x:p[0], y:p[1], yaw:Math.atan2(t[1],t[0]), vx:sp, v:sp, idx:i, nz:world.height.at(p[0],p[1]), groundSpeed:sp };
+  return { car, target: sp, spec: cloneObj(spec) };
+}
+// deterministic opponent brain: pure pursuit on the centerline at the target speed
+function opponentControl(car: CarState, world: World, target: number): Control {
+  const T=world.track, i=nearestIndex(T,car.x,car.y,car.idx).i;
+  const j=(i+Math.max(1,Math.round(6/T.spacing)))%T.N, pt=T.pts[j];
+  const dx=pt[0]-car.x, dy=pt[1]-car.y, cs=Math.cos(car.yaw), sn=Math.sin(car.yaw);
+  const ey=-sn*dx+cs*dy, ex=cs*dx+sn*dy, Ld2=Math.max(1, ex*ex+ey*ey);
+  return { steer: Math.max(-1,Math.min(1, (2*ey/Ld2)*5.2)), throttle: Math.max(-1,Math.min(1,(target-car.vx)*0.5)) };
+}
+function oppSceneObject(opp: OpponentState): SceneObject {
+  const c=opp.car, ch=Math.cos(c.yaw), sh=Math.sin(c.yaw);
+  return { ...opp.spec, pose:{x:c.x,y:c.y,yaw:c.yaw}, velocity:{x:c.vx*ch-c.vy*sh, y:c.vx*sh+c.vy*ch}, shape:{...opp.spec.shape} };
+}
+
 export function makeSim(world: World, graph: Graph, seed = 1): SimState {
-  return { world, graph, rng: makeRng(seed), car: initCar(world), dt: DT, physicsVersion:world.physicsVersion ?? PHYSICS_VERSION, elapsed:0,
-    objects:(world.objects??[]).map(o=>({...o,pose:{...o.pose},velocity:{...o.velocity},shape:{...o.shape}})),
+  const v2 = (world.physicsVersion ?? PHYSICS_VERSION) === 2;
+  const all = world.objects ?? [];
+  const opponents = v2 ? all.filter(isMover).map(o=>initOpponent(world,o)) : [];
+  const staticSpecs = (v2 ? all.filter(o=>!isMover(o)) : all).map(cloneObj);
+  return { world, graph, rng: makeRng(seed), car: initCar(world), dt: DT, physicsVersion: v2?2:PHYSICS_VERSION, elapsed:0,
+    objects: [], staticSpecs, opponents,
     lapT: 0, dirty: false, prevProg: 0, laps: [], best: null, lastVal: null, graphState: {} };
 }
 
 function sceneAt(s:SimState){
   const track=s.world.track
-  return (s.world.objects??[]).map(o=>{
+  return s.staticSpecs.map(o=>{
     if(o.trackIndex!=null&&o.trackSpeed!=null){
       const i=Math.floor((o.trackIndex+o.trackSpeed*s.elapsed/track.spacing)%track.N)
       const p=track.pts[i],t=track.tan[i]
@@ -37,32 +68,24 @@ function sceneAt(s:SimState){
   })
 }
 
-// physics v2 collision response: push the car out of any penetrating object and
-// remove the velocity component driving into it (deterministic inelastic impulse).
-// Opponents are still kinematic (Phase 2 item 2), so they act as immovable here.
+// physics v2 collision response. Static objects are immovable (1-body); physical
+// opponents share an equal-mass, deterministic, inelastic 2-body impulse with the car.
 function resolveCollisions(s: SimState): void {
-  const carBox = { x: s.car.x, y: s.car.y, yaw: s.car.yaw, hl: CAR_HL, hw: CAR_HW };
-  for (const object of s.objects) {
-    const hit = collideBoxes(carBox, boxForObject(object));
-    if (!hit) continue;
-    s.car.x += hit.normal[0] * hit.depth;
-    s.car.y += hit.normal[1] * hit.depth;
-    carBox.x = s.car.x; carBox.y = s.car.y;
-    const ch = Math.cos(s.car.yaw), sh = Math.sin(s.car.yaw);
-    const vwx = s.car.vx*ch - s.car.vy*sh, vwy = s.car.vx*sh + s.car.vy*ch;
-    const vn = vwx*hit.normal[0] + vwy*hit.normal[1];
-    if (vn < 0) {
-      const nvx = vwx - vn*hit.normal[0], nvy = vwy - vn*hit.normal[1];
-      s.car.vx = nvx*ch + nvy*sh; s.car.vy = -nvx*sh + nvy*ch;
-    }
-    s.dirty = true;
+  const staticCount = s.objects.length - s.opponents.length; // opponents are appended last in tick
+  for (let k=0; k<staticCount; k++) if (resolveStatic(s.car, boxForObject(s.objects[k]))) s.dirty = true;
+  for (const opp of s.opponents) {
+    const b = opp.car, bBox = { x:b.x, y:b.y, yaw:b.yaw, hl:opp.spec.shape.length/2, hw:opp.spec.shape.width/2 };
+    if (resolvePair(s.car, carBoxOf(s.car), b, bBox)) s.dirty = true;
   }
 }
 
 // one control tick (= one physics step) driven by the graph
 export function tick(s: SimState): void {
   const car = s.car, world = s.world;
-  s.objects=sceneAt(s)
+  // v2: advance physical opponents through the same vehicle model (their own brain), then
+  // publish them into the scene (appended last, so resolveCollisions can split static vs opponent).
+  if (world.physicsVersion === 2) for (const opp of s.opponents) opp.car = stepVehicle(opp.car, opponentControl(opp.car, world, opp.target), world, s.dt);
+  s.objects = world.physicsVersion === 2 ? [...sceneAt(s), ...s.opponents.map(oppSceneObject)] : sceneAt(s)
   const obs = { scan: castScan(car, world, 21, 2, s.objects), speed: car.vx, groundSpeed: car.groundSpeed ?? Math.hypot(car.vx, car.vy), pose: { x: car.x, y: car.y, yaw: car.yaw }, track: world.track, objects:s.objects };
   const ctx: EvalCtx = { obs, cmd: { steer: 0, throttle: 0 }, state: s.graphState, rng: s.rng, world, car, dt: s.dt };
   s.lastVal = evalGraph(s.graph, ctx, NT);
