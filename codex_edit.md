@@ -548,3 +548,21 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Headless interaction opens and forks Academy A04, confirms completion, finds all three race modes, and loads editable 2-car and 6-car race fields with live field counts and zero browser errors.
 - A full offscreen Time Trial finishes clean in `23.25s` and persists `best.rt`, proving the mode is executable rather than a menu mock.
 - Mobile 390×844 checks show one-column Academy/Race layouts with no horizontal overflow. Evidence: `/tmp/apex-graph-academy.png`, `/tmp/apex-academy-first-build.png`, `/tmp/apex-race-hub.png`, `/tmp/apex-academy-mobile.png`, `/tmp/apex-race-mobile.png`, `/tmp/apex-time-trial-finish.png`.
+
+## 2026-07-23 - Wire-only deletion and deliberate part inspection
+
+### Why
+- Selecting or deleting only a connection was not discoverable, forcing players to remove nodes or rely on keyboard behavior.
+- Part-guide tooltips appeared immediately on pointer entry and interrupted graph reading.
+
+### Changes
+- Added explicit wire selection with a gold highlight and a persistent toolbar showing `source.port → target.port`.
+- Added `연결만 삭제`, VISUALIZE, and close actions. Wire deletion keeps both nodes and participates in the existing UNDO history.
+- Delayed hover/focus part guides by 700ms, cancelled pending guides on leave, and retained click-to-open as the stable pinned inspector path.
+- Added responsive wrapping so the selected-wire toolbar remains usable on narrow mobile canvases.
+
+### Verification
+- All four core suites pass; PURSUIT remains exactly `21.0833s`. Production build emits `index-CM8lSm6e.js` and `index-D0WLA7vU.css` (with a non-blocking Vite 500kB chunk warning).
+- Desktop headless interaction confirms no tooltip at 220ms, a tooltip after the dwell threshold, dismissal on leave, and a pinned inspector on click.
+- Selecting one edge shows the correct `Const.v → THROTTLE.x` toolbar; wire-only deletion changes 2 nodes/1 edge to 2 nodes/0 edges, and UNDO restores the edge.
+- Mobile 390×844 verification keeps the toolbar between x=8 and x=370 with no horizontal overflow and repeats delete/UNDO successfully. Evidence: `/tmp/apex-wire-selected.png`, `/tmp/apex-wire-selected-mobile.png`.

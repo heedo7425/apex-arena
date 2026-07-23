@@ -113,6 +113,8 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   const [selectedIds,setSelectedIds]=useState<string[]>([])
   const blockUid=useRef(1)
   const [hover,setHover]=useState<HoverInfo|null>(null)
+  const hoverTimer=useRef<number|null>(null)
+  const [selectedEdgeId,setSelectedEdgeId]=useState<string|null>(null)
   const trashRef = useRef<HTMLDivElement>(null)
   const [draggingNode,setDraggingNode] = useState(false)
   const [trashHot,setTrashHot] = useState(false)
@@ -165,11 +167,13 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   },[])
   const clearPending=()=>{pending.current=null;usePending.getState().setSel(null);setNotice(null)}
   const showHover=(type:string, el:HTMLElement)=>{
+    if(hoverTimer.current!=null)window.clearTimeout(hoverTimer.current)
     const box=el.getBoundingClientRect(), width=286, height=190, gap=12
     const right=box.right+gap, left=box.left-width-gap
-    setHover({type,x:right+width<window.innerWidth?right:Math.max(8,left),y:Math.max(8,Math.min(box.top,window.innerHeight-height-8))})
+    hoverTimer.current=window.setTimeout(()=>{setHover({type,x:right+width<window.innerWidth?right:Math.max(8,left),y:Math.max(8,Math.min(box.top,window.innerHeight-height-8))});hoverTimer.current=null},700)
   }
-  const hideHover=()=>setHover(null)
+  const hideHover=()=>{if(hoverTimer.current!=null)window.clearTimeout(hoverTimer.current);hoverTimer.current=null;setHover(null)}
+  useEffect(()=>()=>{if(hoverTimer.current!=null)window.clearTimeout(hoverTimer.current)},[])
   const withCb=(ns:RFNode[])=>ns.map(n=>({...n,data:{...n.data,onParam,onPort,onHover:showHover,onHoverEnd:hideHover,...(decorate?.[n.id]||{})}}))
   const visualizeSignal=useCallback((nodeId:string,port:string)=>{
     const node=latest.current.nodes.find(n=>n.id===nodeId)
@@ -190,8 +194,12 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     onNodesChange(changes)
   }
   const handleEdgesChange = (changes:any[]) => {
-    if (changes.some(c => c.type === 'remove')) remember()
+    if (changes.some(c => c.type === 'remove')) {remember();setSelectedEdgeId(null)}
     onEdgesChange(changes)
+  }
+  const deleteSelectedEdge=()=>{
+    if(!selectedEdgeId)return
+    remember();onSkill?.('delete');setEdges((items:any)=>items.filter((edge:any)=>edge.id!==selectedEdgeId));setSelectedEdgeId(null);setNotice('연결선만 제거했습니다. 블록은 그대로 유지됩니다.')
   }
   const undo = () => {
     const prev = history.current.pop()
@@ -287,7 +295,8 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   const activePathIds=new Set<string>()
   const visitActive=(id:string)=>{if(activePathIds.has(id))return;activePathIds.add(id);for(const edge of edges as RFEdge[])if(edge.target===id)visitActive(edge.source)}
   for(const node of nodes as RFNode[])if(node.data.coreType.startsWith('sink.'))visitActive(node.id)
-  const renderedEdges=(edges as RFEdge[]).map(edge=>activePathIds.has(edge.source)&&activePathIds.has(edge.target)?{...edge,className:'active-path'}:edge)
+  const renderedEdges=(edges as RFEdge[]).map(edge=>({...edge,className:[activePathIds.has(edge.source)&&activePathIds.has(edge.target)?'active-path':'',edge.id===selectedEdgeId?'wire-selected':''].filter(Boolean).join(' ')}))
+  const selectedEdge=(edges as RFEdge[]).find(edge=>edge.id===selectedEdgeId)
   const renderedNodes = (nodes as RFNode[]).map(n => {
     const visualized=vizSignals.filter(s=>s.nodeId===n.id).map(s=>s.port)
     const base={...n,data:{...n.data,onVisualize:visualizeSignal,visualized,issue:issueNodeIds.has(n.id),semanticCompact:zoom<0.76,activePath:activePathIds.has(n.id)}}
@@ -379,15 +388,17 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
         <div ref={trashRef} className={`trash-drop${draggingNode?" dragging":""}${trashHot?" hot":""}`} aria-label="블록 삭제 영역">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg><span>{trashHot?"놓아서 삭제":"여기로 끌어 삭제"}</span>
         </div>
+        {selectedEdge&&<div className="wire-toolbar" role="dialog" aria-label="선택한 연결선"><span><small>SELECTED WIRE</small><b>{metaOf((nodes as RFNode[]).find(n=>n.id===selectedEdge.source)?.data.coreType??'').label}.{selectedEdge.sourceHandle} → {metaOf((nodes as RFNode[]).find(n=>n.id===selectedEdge.target)?.data.coreType??'').label}.{selectedEdge.targetHandle}</b></span><button onClick={()=>visualizeSignal(selectedEdge.source,selectedEdge.sourceHandle!)}>∿ Visualize</button><button className="danger" onClick={deleteSelectedEdge}>연결만 삭제</button><button className="close" aria-label="연결선 선택 해제" onClick={()=>setSelectedEdgeId(null)}>×</button></div>}
         <ReactFlow nodes={renderedNodes} edges={renderedEdges} nodeTypes={nodeTypes} deleteKeyCode={["Backspace","Delete"]}
           onNodeDragStart={()=>{remember();setDraggingNode(true)}} onNodeDrag={e=>setTrashHot(isOverTrash(e))}
           onNodeDragStop={(e,node)=>{const remove=isOverTrash(e);setDraggingNode(false);setTrashHot(false);if(remove)deleteNode(node.id,false)}}
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange} onConnect={onConnect}
           onSelectionChange={({nodes:sel}:any)=>setSelectedIds(sel.map((n:any)=>n.id))}
           selectionOnDrag panOnDrag={[1,2]} selectionKeyCode={null} multiSelectionKeyCode={["Shift","Meta"]}
+          onEdgeClick={(event,edge:any)=>{event.stopPropagation();hideHover();setInfo(null);setSelectedEdgeId(edge.id)}}
           onEdgeDoubleClick={(_,edge:any)=>visualizeSignal(edge.source,edge.sourceHandle)}
           isValidConnection={c=>!!c.source&&!!c.sourceHandle&&!!c.target&&!!c.targetHandle&&!connectionIssue(latest.current.nodes,latest.current.edges,c.source,c.sourceHandle,c.target,c.targetHandle)}
-          onNodeClick={(_,node:any)=>{setHover(null);setInfo(node.data.coreType)}} onPaneClick={clearPending}
+          onNodeClick={(_,node:any)=>{hideHover();setSelectedEdgeId(null);setInfo(node.data.coreType)}} onPaneClick={()=>{clearPending();setSelectedEdgeId(null);hideHover()}}
           onNodeDoubleClick={(_,node:any)=>openBlock(node.id,node.data.coreType)}
           onMove={(_,viewport)=>setZoom(viewport.zoom)}
           fitView minZoom={0.58} maxZoom={2} proOptions={{hideAttribution:true}}>
@@ -409,7 +420,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
         {openNode&&<InnerView node={openNode} onClose={()=>setOpenNode(null)} onFork={forkOpen} onSave={saveOpen} />}
       </div>
       {hover&&<div className="node-tooltip" role="tooltip" style={{left:hover.x,top:hover.y,['--tip' as any]:colorOf(hover.type)}}>
-        <div className="nt-cap">{metaOf(hover.type).cat} · PART GUIDE</div>
+        <div className="nt-cap">{metaOf(hover.type).cat} · PART GUIDE · 클릭하면 고정</div>
         <div className="nt-title">{metaOf(hover.type).label}</div>
         <p>{metaOf(hover.type).desc||'설명 준비 중.'}</p>
         {metaOf(hover.type).real&&<div className="nt-real">REAL WORLD · {metaOf(hover.type).real}</div>}
