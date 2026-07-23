@@ -1,4 +1,5 @@
 import React from 'react'
+import { PHYSICS_VERSION } from '@apex/core'
 import { useGame } from '../store'
 import { fetchLeaderboard, joinMatch, playerId, raceNetwork, type LeaderboardEntry, type RaceMode } from './raceOnline'
 
@@ -17,7 +18,7 @@ export function RaceHub(){
   const [status,setStatus]=React.useState(raceNetwork.configured?'ONLINE SERVICE READY':'LOCAL PRACTICE · SERVER NOT CONFIGURED')
   React.useEffect(()=>{let live=true;fetchLeaderboard(mode).then(v=>{if(live)setOnline(v)}).catch(()=>{if(live)setStatus('ONLINE SERVICE UNREACHABLE')});return()=>{live=false}},[mode])
   const local=best.rt
-  const findMatch=(raceMode:RaceMode)=>{if(raceMode==='time-trial'){setMode(raceMode);return}try{socketClose.current?.();setStatus('MATCHMAKING · SEARCHING');socketClose.current=joinMatch({version:1,mode:raceMode,playerId:playerId(),designHash:'pursuit-v1',region:'auto'},message=>{const value=message as any;setStatus(value?.type==='match.found'?'MATCH FOUND · ROOM READY':'MATCHMAKING · CONNECTED')})}catch{setStatus('ONLINE SERVICE UNAVAILABLE')}}
+  const findMatch=(raceMode:RaceMode)=>{if(raceMode==='time-trial'){setMode(raceMode);return}try{socketClose.current?.();setStatus('MATCHMAKING · SEARCHING');socketClose.current=joinMatch({version:1,physicsVersion:PHYSICS_VERSION,mode:raceMode,playerId:playerId(),designHash:'pursuit-v1',region:'auto'},message=>{const value=message as any;setStatus(value?.type==='match.found'?'MATCH FOUND · ROOM READY':'MATCHMAKING · CONNECTED')})}catch{setStatus('ONLINE SERVICE UNAVAILABLE')}}
   React.useEffect(()=>()=>socketClose.current?.(),[])
   return <main className="race-hub">
     <header className="race-hero"><button className="back" onClick={goMap}>← 메인</button><span className="eyebrow">COMPETITIVE AUTONOMOUS RACING</span><h1>RACE <em>CONTROL</em></h1><p>알고리즘을 만드는 것에서 끝나지 않습니다. 동일한 규칙에서 기록과 위치로 증명하세요.</p><div className={'network-state '+(raceNetwork.configured?'on':'off')}><i/>{status}</div></header>

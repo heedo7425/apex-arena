@@ -20,6 +20,7 @@ export type World = { track: Track; height: Height; vp: VehicleParams; mu: numbe
 
 export const G = 9.81;
 export const DT = 1 / 120;
+export const PHYSICS_VERSION = 1 as const;
 
 export const DEFAULT_VP: VehicleParams = {
   M: 1000, IZ: 1400, LF: 1.25, LR: 1.35, L: 2.6, HCG: 0.5,

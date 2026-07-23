@@ -1,7 +1,9 @@
+import { PHYSICS_VERSION } from '@apex/core'
+
 export type RaceMode='time-trial'|'head-to-head'|'grid-start'
-export type LeaderboardEntry={rank:number;player:string;time:number;verified:boolean;algorithm:string}
-export type RunSubmission={version:1;mode:RaceMode;playerId:string;designHash:string;seed:number;lapTime:number;dirty:boolean;inputsHash:string}
-export type MatchTicket={version:1;mode:Exclude<RaceMode,'time-trial'>;playerId:string;designHash:string;region:string}
+export type LeaderboardEntry={rank:number;player:string;time:number;verified:boolean;algorithm:string;physicsVersion:typeof PHYSICS_VERSION}
+export type RunSubmission={version:1;physicsVersion:typeof PHYSICS_VERSION;mode:RaceMode;playerId:string;designHash:string;seed:number;lapTime:number;dirty:boolean;inputsHash:string}
+export type MatchTicket={version:1;physicsVersion:typeof PHYSICS_VERSION;mode:Exclude<RaceMode,'time-trial'>;playerId:string;designHash:string;region:string}
 
 const api=(import.meta.env.VITE_RACE_API_URL as string|undefined)?.replace(/\/$/,'')
 const ws=import.meta.env.VITE_RACE_WS_URL as string|undefined
@@ -16,7 +18,8 @@ export async function fetchLeaderboard(mode:RaceMode):Promise<LeaderboardEntry[]
   if(!api)return []
   const response=await fetch(`${api}/leaderboard?mode=${encodeURIComponent(mode)}`)
   if(!response.ok)throw new Error(`leaderboard ${response.status}`)
-  return response.json()
+  const entries=await response.json() as LeaderboardEntry[]
+  return entries.filter(entry=>entry.physicsVersion===PHYSICS_VERSION)
 }
 
 export function joinMatch(ticket:MatchTicket,onMessage:(value:unknown)=>void){

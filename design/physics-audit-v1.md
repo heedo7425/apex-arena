@@ -82,6 +82,15 @@ Temporary offscreen probes used the production core model without changing sourc
 
 ### Phase 0: freeze and characterize v1
 
+Implementation status: **complete (2026-07-23)**.
+
+- `PHYSICS_VERSION = 1` is exported by core and carried by simulation state, lap
+  records, run summaries, local bests, online submissions, match tickets, and
+  leaderboard filtering.
+- `packages/core/test/physics.ts` locks throttle, brake, coastdown, cornering,
+  bank, deterministic state, version propagation, and the exact PURSUIT lap.
+- Future ghost/replay records are required to carry the same version contract.
+
 - Add `physicsVersion` to run, replay, ghost, and leaderboard records.
 - Lock golden tests for acceleration, braking, coastdown, constant-radius steering,
   grade, bank, low-speed transition, timestep convergence, and current best laps.

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { migrateGraph } from '@apex/core'
+import { migrateGraph, PHYSICS_VERSION } from '@apex/core'
 import type { Graph } from '@apex/core'
 
 // live node output values (from the running sim) — read by editor node probes, ~10fps
@@ -151,8 +151,16 @@ export const useTut = create<{ open: boolean; show: () => void; close: () => voi
 
 // ---- game progress (persisted) ----
 const KEY = 'apex_progress_v1'
-type Saved = { completed: string[]; best: Record<string, number> }
-function load(): Saved { try { return JSON.parse(localStorage.getItem(KEY) || '') } catch { return { completed: [], best: {} } } }
+type Saved = { physicsVersion:typeof PHYSICS_VERSION; completed: string[]; best: Record<string, number> }
+function load(): Saved {
+  try {
+    const value=JSON.parse(localStorage.getItem(KEY) || '')
+    const storedVersion=Number(value.physicsVersion??1)
+    return {physicsVersion:PHYSICS_VERSION,completed:Array.isArray(value.completed)?value.completed:[],best:storedVersion===PHYSICS_VERSION&&value.best&&typeof value.best==='object'?value.best:{}}
+  } catch {
+    return { physicsVersion:PHYSICS_VERSION, completed: [], best: {} }
+  }
+}
 function save(s: Saved) { try { localStorage.setItem(KEY, JSON.stringify(s)) } catch {} }
 
 type Game = {
@@ -180,7 +188,7 @@ export const useGame = create<Game>((set, get) => {
       const st = get()
       const completed = st.completed.includes(id) ? st.completed : [...st.completed, id]
       const best = { ...st.best, [id]: st.best[id] != null ? Math.min(st.best[id], time) : time }
-      save({ completed, best }); set({ completed, best })
+      save({ physicsVersion:PHYSICS_VERSION, completed, best }); set({ completed, best })
     },
   }
 })

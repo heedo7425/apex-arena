@@ -588,3 +588,27 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Freeze golden v1 physics tests and add version fields before changing forces.
 - Implement combined longitudinal/lateral grip and corrected terrain gravity as physics v2, then add deterministic collision response, equal AI dynamics, and checkpoint-based race validation.
 - Retune missions and start a separate v2 leaderboard season instead of mixing incompatible lap times.
+
+## 2026-07-23 - Physics v1 freeze and competition version boundary
+
+### Why
+- Correcting the audited physics in place would mix incompatible lap times and invalidate missions, local bests, future ghosts/replays, and online competition.
+- The current deterministic model needed executable golden characterization before a physics v2 branch can change forces safely.
+
+### Changes
+- Exported `PHYSICS_VERSION = 1` from core and attached it to simulation state, every lap result, and run summaries.
+- Added `physicsVersion` to time-trial submissions and match tickets; leaderboard responses now retain only entries from the current physics version.
+- Versioned persisted local bests while treating existing untagged data as v1; a future mismatch preserves course completion but resets incomparable times.
+- Added `packages/core/test/physics.ts` with golden acceleration, braking, coastdown, cornering, bank, determinism, and exact PURSUIT lap checks.
+- Updated the core package test command, race contract, physics audit status, committed web build output, and added the missing Vite environment type reference.
+
+### Verification
+- `drive.ts`, `prims.ts`, `blocks.ts`, `planning.ts`, and the new `physics.ts` all pass.
+- PURSUIT remains exactly `21.083333333332778s`; generated lap and run records both carry physics version 1.
+- Web TypeScript checking passes; production build emits `index-D_4qADz0.js` with only the existing non-blocking Vite chunk-size warning.
+- Source and generated output pass `git diff --check`.
+
+### Next
+- Start physics v2 behind an explicit version switch instead of replacing v1 behavior.
+- Correct combined longitudinal/lateral grip and terrain bank direction, then recompute post-step track observations.
+- Retune missions and open a separate v2 leaderboard season before making v2 the default.

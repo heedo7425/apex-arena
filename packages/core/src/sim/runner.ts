@@ -1,5 +1,5 @@
 // Sim runner: builds observation, evaluates the graph, steps the plant, times laps.
-import { type World, DT } from './world.ts';
+import { type World, DT, PHYSICS_VERSION } from './world.ts';
 import { type CarState, initCar, stepDynamics, castScan } from './vehicle.ts';
 import { type Graph, type EvalCtx, evalGraph } from '../graph/engine.ts';
 import { NT } from '../graph/registry.ts';
@@ -7,10 +7,11 @@ import { makeRng, type Rng } from '../rng.ts';
 
 export type Medals = { dev: number; gold: number; silver: number; bronze: number };
 export const DEFAULT_MEDALS: Medals = { dev: 20.5, gold: 22.5, silver: 26, bronze: 33 };
-export type LapResult = { t: number; dirty: boolean };
+export type LapResult = { t: number; dirty: boolean; physicsVersion: typeof PHYSICS_VERSION };
 
 export type SimState = {
   world: World; graph: Graph; rng: Rng; car: CarState; dt: number;
+  physicsVersion: typeof PHYSICS_VERSION;
   elapsed:number; objects:NonNullable<World['objects']>;
   lapT: number; dirty: boolean; prevProg: number;
   laps: LapResult[]; best: number | null; lastVal: Record<string, any> | null;
@@ -18,7 +19,7 @@ export type SimState = {
 };
 
 export function makeSim(world: World, graph: Graph, seed = 1): SimState {
-  return { world, graph, rng: makeRng(seed), car: initCar(world), dt: DT, elapsed:0,
+  return { world, graph, rng: makeRng(seed), car: initCar(world), dt: DT, physicsVersion:PHYSICS_VERSION, elapsed:0,
     objects:(world.objects??[]).map(o=>({...o,pose:{...o.pose},velocity:{...o.velocity},shape:{...o.shape}})),
     lapT: 0, dirty: false, prevProg: 0, laps: [], best: null, lastVal: null, graphState: {} };
 }
@@ -53,7 +54,7 @@ export function tick(s: SimState): void {
   s.lapT += s.dt;
   if (!s.car.onTrack) s.dirty = true;
   if (s.prevProg > 0.7 && prog < 0.15) {
-    const lap: LapResult = { t: s.lapT, dirty: s.dirty };
+    const lap: LapResult = { t: s.lapT, dirty: s.dirty, physicsVersion:s.physicsVersion };
     s.laps.push(lap);
     if (!lap.dirty && (s.best === null || lap.t < s.best)) s.best = lap.t;
     s.lapT = 0; s.dirty = false;
@@ -61,7 +62,7 @@ export function tick(s: SimState): void {
   s.prevProg = prog;
 }
 
-export type RunSummary = { laps: LapResult[]; bestClean: number | null; maxV: number; nan: boolean };
+export type RunSummary = { physicsVersion:typeof PHYSICS_VERSION; laps: LapResult[]; bestClean: number | null; maxV: number; nan: boolean };
 export function runFor(world: World, graph: Graph, seed: number, seconds: number): RunSummary {
   const s = makeSim(world, graph, seed);
   let maxV = 0, nan = false;
@@ -72,7 +73,7 @@ export function runFor(world: World, graph: Graph, seed: number, seconds: number
     if (s.car.vx > maxV) maxV = s.car.vx;
   }
   const clean = s.laps.filter(l => !l.dirty).map(l => l.t);
-  return { laps: s.laps, bestClean: clean.length ? Math.min(...clean) : null, maxV, nan };
+  return { physicsVersion:s.physicsVersion, laps: s.laps, bestClean: clean.length ? Math.min(...clean) : null, maxV, nan };
 }
 
 export function medalFor(best: number | null, m: Medals = DEFAULT_MEDALS): string {

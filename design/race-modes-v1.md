@@ -25,6 +25,8 @@
 - `VITE_RACE_API_URL`: `GET /leaderboard?mode=...`, `POST /runs`.
 - `VITE_RACE_WS_URL`: `queue.join` → `match.found` → room snapshot/event/result.
 - `RunSubmission`과 `MatchTicket`은 version 1 계약이다.
+- `version`은 메시지 스키마 버전이고 `physicsVersion`은 랩 호환성 버전이다. run, match, leaderboard는 `PHYSICS_VERSION`이 같은 기록만 비교한다.
+- 향후 ghost/replay payload도 생성 당시 `physicsVersion`을 필수로 저장하며 다른 버전 물리에서 재생하거나 검증하지 않는다.
 - 서버가 설정되지 않으면 로컬 AI benchmark만 표시하며 가짜 유저나 가짜 글로벌 기록을 만들지 않는다.
 
 ## 4. 서버 후속 범위

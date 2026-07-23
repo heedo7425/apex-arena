@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { NT, validateGraph } from '@apex/core'
+import { NT, PHYSICS_VERSION, validateGraph } from '@apex/core'
 import type { Graph, GraphIssue } from '@apex/core'
 import { Editor } from '../editor/Editor'
 import { coreToRF } from '../editor/compile'
@@ -188,7 +188,7 @@ export function LevelScreen({ id }: { id: string }) {
       setResult({ ok:false, msg:`클린 랩 ${t.toFixed(2)}s · 목표까지 ${(t-level.objective.target).toFixed(2)}s` }); return
     }
     complete(level.id, t)
-    if(level.id==='rt')void submitRun({version:1,mode:'time-trial',playerId:playerId(),designHash:hashDesign(graph),seed:1,lapTime:t,dirty:false,inputsHash:'autonomous-graph'}).catch(()=>{})
+    if(level.id==='rt')void submitRun({version:1,physicsVersion:PHYSICS_VERSION,mode:'time-trial',playerId:playerId(),designHash:hashDesign(graph),seed:1,lapTime:t,dirty:false,inputsHash:'autonomous-graph'}).catch(()=>{})
     setResult({ ok:true, msg:`클리어 · ${t.toFixed(2)}s` })
   }
 
