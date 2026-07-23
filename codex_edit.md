@@ -566,3 +566,25 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Desktop headless interaction confirms no tooltip at 220ms, a tooltip after the dwell threshold, dismissal on leave, and a pinned inspector on click.
 - Selecting one edge shows the correct `Const.v → THROTTLE.x` toolbar; wire-only deletion changes 2 nodes/1 edge to 2 nodes/0 edges, and UNDO restores the edge.
 - Mobile 390×844 verification keeps the toolbar between x=8 and x=370 with no horizontal overflow and repeats delete/UNDO successfully. Evidence: `/tmp/apex-wire-selected.png`, `/tmp/apex-wire-selected-mobile.png`.
+
+## 2026-07-23 - Vehicle physics suitability audit
+
+### Why
+- The new racing modes, future overtaking/static avoidance work, and RL/MPC paths require a clear boundary between an educational control sandbox and a physically credible competitive simulator.
+- Changing physics in place would invalidate the exact PURSUIT lap, mission medals, ghosts, replays, and leaderboard comparisons.
+
+### Changes
+- Added `design/physics-audit-v1.md` with a model inventory, measured probes, prioritized findings, suitability decision, and versioned v1-to-v2 migration plan.
+- Classified the current model as suitable for deterministic control-graph learning, but not yet for high-fidelity dynamics claims or fair contact-heavy PvP.
+- Kept runtime behavior unchanged and proposed preserving it as `physicsVersion: 1` before correctness changes.
+
+### Verification
+- Measured full braking at 20 m/s as -17.540 m/s2 versus an asphalt grip reference of 9.810 m/s2, and grass full drive as 8.585 m/s2 versus 4.415 m/s2.
+- Confirmed the bank-force sign error with uphill lateral acceleration on a 10% cross-slope; the generated track reaches about 16.0 degrees longitudinal grade and 20.7 degrees lateral bank.
+- Compared fixed steps over five seconds: 120 Hz differs from a 240 Hz reference by 0.030 m, supporting retention of the current 120 Hz rate.
+- Confirmed the public speed signal follows longitudinal `vx` rather than velocity magnitude, collision is detection-only, and AI opponents are kinematic.
+
+### Next
+- Freeze golden v1 physics tests and add version fields before changing forces.
+- Implement combined longitudinal/lateral grip and corrected terrain gravity as physics v2, then add deterministic collision response, equal AI dynamics, and checkpoint-based race validation.
+- Retune missions and start a separate v2 leaderboard season instead of mixing incompatible lap times.
