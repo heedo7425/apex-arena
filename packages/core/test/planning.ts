@@ -44,6 +44,8 @@ const command={steer:0,throttle:0.4};
 const trajectoryA=rolloutTrajectory(car,command,1,0.1,world);
 const trajectoryB=rolloutTrajectory(car,command,1,0.1,world);
 ok(trajectoryA.points.length===11&&trajectoryA.valid,'trajectory: rollout creates a finite horizon candidate');
+// spatial-overlay contract: render.ts drawTrajectory reads point.state.x/.y — real rollouts must expose them
+ok(trajectoryA.points.every(pt=>Number.isFinite(pt.state.x)&&Number.isFinite(pt.state.y)),'trajectory: rollout points expose render-compatible state.x/.y (overlay contract)');
 ok(JSON.stringify(trajectoryA)===JSON.stringify(trajectoryB),'trajectory: rollout is deterministic');
 ok(trajectoryClearance(trajectoryA,[makeStaticObject(egoPose,1,1)])===0,'trajectory: current obstacle produces zero clearance');
 ok(rolloutTrajectory(car,command,0,0.1,world).points.length===1,'trajectory: zero horizon contains only the initial state');
