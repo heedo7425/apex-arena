@@ -4,7 +4,7 @@ import type { Graph } from '@apex/core'
 export type Objective = { type: 'clean' } | { type: 'time'; target: number }
   | { type: 'speed'; target: number; hold: number; tolerance: number }
 export type Requirement =
-  | { kind:'node'; type:string; label:string }
+  | { kind:'node'; type:string; label:string; count?:number }
   | { kind:'edge'; from:string; fromPort:string; to:string; toPort:string; label:string }
 export type Level = {
   id:string; n:number; title:string; kicker:string; teach:string; palette:string[]
@@ -50,6 +50,20 @@ const L6: Graph = makeGraph({
   tsink:{type:'sink.throttle',in:{x:['n','speedctl','throttle']}},
 })
 
+// L7 provides only prior controllers. Candidate generation, scoring and selection are blank.
+const L7: Graph = makeGraph({
+  cruise:{type:'const',params:{value:8}},
+  baseSteer:{type:'blk.pursuit'},
+  speedctl:{type:'blk.speedPid',in:{target:['n','cruise','v']}},
+})
+
+// L8 keeps the previously learned speed loop; policy features, action and reward start blank.
+const L8: Graph = makeGraph({
+  cruise:{type:'const',params:{value:8}},
+  speedctl:{type:'blk.speedPid',in:{target:['n','cruise','v']}},
+  tsink:{type:'sink.throttle',in:{x:['n','speedctl','throttle']}},
+})
+
 /* The first mission starts as a true blank build: install power and an actuator. */
 const TUT: Graph = makeGraph({})
 
@@ -82,5 +96,13 @@ export const LEVELS: Level[] = [
     teach:'느린 상대 차량을 인식하고 추월 의도를 만든 뒤, 필요할 때만 왼쪽 오프셋을 조향에 반영하세요.',
     palette:['src.objects','src.pose','objects.nearest','object.relative','intent.passLeft','intent.parts','vec.xy','const','lt','select','add','clamp','blk.pursuit','sink.steer'], objective:{type:'clean'}, starter:L6,
     requirements:[{kind:'edge',from:'src.objects',fromPort:'objects',to:'objects.nearest',toPort:'objects',label:'추월 대상 차량 선택'},{kind:'edge',from:'objects.nearest',fromPort:'object',to:'intent.passLeft',toPort:'target',label:'대상을 왼쪽 추월 의도에 지정'},{kind:'edge',from:'intent.passLeft',fromPort:'intent',to:'intent.parts',toPort:'intent',label:'추월 오프셋 사용'},{kind:'node',type:'select',label:'접근 시 추월 조향 개입'},{kind:'edge',from:'clamp',fromPort:'v',to:'sink.steer',toPort:'x',label:'합성 조향을 STEER에 전달'}], unlock:'Overtaking intent' },
+  { id:'l7', n:7, title:'두 개의 미래', kicker:'CANDIDATE MPC',
+    teach:'기본 조향 양쪽에 후보 명령을 만들고 미래 궤적을 굴린 뒤, 전진 비용이 더 낮은 후보의 첫 명령만 실행하세요.',
+    palette:['src.vehicleState','src.track','blk.pursuit','blk.speedPid','const','add','sub','neg','command.make','trajectory.rollout','trajectory.progress','trajectories.empty','trajectories.append','array.pack2','trajectories.selectMin','trajectory.commandAt','command.parts','sink.steer','sink.throttle'], objective:{type:'clean'}, starter:L7,
+    requirements:[{kind:'node',type:'trajectory.rollout',count:2,label:'두 후보 미래 생성'},{kind:'node',type:'array.pack2',label:'후보 비용 순서대로 묶기'},{kind:'node',type:'trajectories.selectMin',label:'최저 비용 후보 선택'},{kind:'edge',from:'trajectories.selectMin',fromPort:'trajectory',to:'trajectory.commandAt',toPort:'trajectory',label:'선택 궤적에서 실행 명령 추출'},{kind:'edge',from:'trajectory.commandAt',fromPort:'command',to:'command.parts',toPort:'command',label:'명령을 조향·가속으로 분해'}], unlock:'Candidate MPC pipeline' },
+  { id:'l8', n:8, title:'정책을 시험하라', kicker:'RL POLICY EVALUATION',
+    teach:'횡오차와 헤딩오차를 정책 관측으로 넣어 조향 행동을 만들고, 주행 성능과 이탈을 별도의 보상 신호로 평가하세요.',
+    palette:['src.pose','src.track','src.speed','src.vehicleState','state.parts','std.crossTrack','std.headingErr','policy.linear2','reward.track','clamp','sink.steer','sink.reward'], objective:{type:'clean'}, starter:L8,
+    requirements:[{kind:'edge',from:'std.crossTrack',fromPort:'e',to:'policy.linear2',toPort:'x1',label:'횡오차를 정책 관측 x1에 입력'},{kind:'edge',from:'std.headingErr',fromPort:'e',to:'policy.linear2',toPort:'x2',label:'헤딩오차를 정책 관측 x2에 입력'},{kind:'edge',from:'clamp',fromPort:'v',to:'sink.steer',toPort:'x',label:'정책 행동을 안전 범위로 제한'},{kind:'edge',from:'reward.track',fromPort:'reward',to:'sink.reward',toPort:'x',label:'보상 신호를 평가 출력에 연결'}], unlock:'Policy · Reward boundary' },
 ]
 export const levelById = (id: string) => LEVELS.find(l => l.id === id)!

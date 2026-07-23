@@ -60,10 +60,10 @@
 **Vector / Geometry:** `Vec2(x,y)` · `X Y` · `+v −v scale dot length normalize rotate(v,θ) angleOf(v)` · `distance(a,b)` · `toLocal(pt, pose)`(월드→차프레임) · `toWorld(pt, pose)`.
 
 **Struct:** `Pose parts(pose)→x,y,yaw` · `Waypoint parts(wpt)→x,y,s,kappa,psi,vref`.
-문자열 파라미터 UI가 생기기 전까지 범용 `Get .field` 대신 타입별 분해 노드를 사용. 생성은 `Make waypoint|command`.
+문자열 파라미터 UI가 생기기 전까지 범용 `Get .field` 대신 타입별 분해 노드를 사용. 생성은 `Make waypoint|command`. 선택된 계획을 실행하기 위해 `Command parts(command)→steer,throttle`을 둔다.
 
 **Array & Iteration ← 핵심 enabler:**
-- 기본: `Length` · `Index(arr,i)` · `Slice(arr,i,j)` · `Window(arr,i,W)`(닫힌트랙 wrap) · `Range(n)` · `Diff(arr)` · `Concat`.
+- 기본: `Pack2(a,b)→array<num>`(후보 비용 순서 보존) · `Length` · `Index(arr,i)` · `Slice(arr,i,j)` · `Window(arr,i,W)`(닫힌트랙 wrap) · `Range(n)` · `Diff(arr)` · `Concat`.
 - **고차(내부 서브그래프 λ):** `Map(arr, λ)→array` · `Filter(arr, λ)` · `Reduce(arr, init, λ)→acc` · `ZipWith(a,b, λ)→array`.
 - 리덕션: `Sum Max Min Mean` · `Argmax Argmin`(최대/최소 인덱스 — 예: 가장 넓은 갭, 최근접).
 - 센서 배열: `SanitizeRanges(arr,max)` · `WidestAbove(arr,min)→(i,width)` · `CenterMin(arr,w)`.
@@ -76,7 +76,9 @@
 `Track corridor` · `Drivable space` · `Block obstacle` · `Point is drivable`.
 
 **Trajectory / Prediction:** `Vehicle state` · `Control command` · `Rollout trajectory` · `Trajectory parts/clearance/progress/collides` ·
-`Trajectories empty/append/selectMin` · `Constant velocity prediction` · `Predictions empty/append` · `Future clearance`.
+`Trajectories empty/append/selectMin` · `Trajectory commandAt(i)→command` · `Constant velocity prediction` · `Predictions empty/append` · `Future clearance`.
+
+**Policy / Reward:** `Linear policy(x1,x2)→action`은 가중합 내부가 열리는 배포 추론 경계이며 학습 알고리즘이 아니다. `Track reward(speed,cte,onTrack)→reward`와 `Reward sink`는 차량 command를 변경하지 않는 평가 경로다.
 
 **Behavior:** `Follow` · `Avoid` · `Pass left/right` · `Emergency stop` intent와 `Planning request`.
 Intent는 목적만 표현하며 경로 생성·후보 선택·제어를 내부에서 수행하지 않는다.

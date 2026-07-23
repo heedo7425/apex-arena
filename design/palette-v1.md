@@ -67,10 +67,10 @@ Follow-the-Gap `argmax→각도` · 완성 속도정책. (2026-07-21 `std.pursui
 — **Pursuit/Steer/Stanley 조향식은 여기 없음**(예제 그래프).
 
 ### 11. Model — MPC/MPPI/RL 훅
-`sim.predict ✓`(1-step) · `sim.rollout +`(N-step 배치 궤적) · `rng.uniform ✓` · `rng.gauss ✓`
+`sim.predict ✓`(1-step) · `trajectory.rollout ✓`(일정 command 미래) · `rng.uniform ✓` · `rng.gauss ✓` · `policy.linear2 ✓`(열리는 추론 경계) · `reward.track ✓`(열리는 평가식)
 
 ### 12. Sinks · L0 (경계, 필수 둘 다)
-`sink.steer ✓` · `sink.throttle ✓`
+`sink.steer ✓` · `sink.throttle ✓` · `sink.reward ✓`(평가 전용, 제어 불변)
 
 ### 13. 캡슐화 (노드 아님, 에디터 기능)
 서브그래프 선택 → **"노드로 만들기"** → 재사용 composite(= 내 L1). L1을 늘리는 위쪽 escape hatch.
@@ -99,4 +99,5 @@ Follow-the-Gap `argmax→각도` · 완성 속도정책. (2026-07-21 `std.pursui
 - **P-c 🟡 일부 완료(2026-07-22)** — 현재 vehicle state와 command로 결정론적 `trajectory.rollout` 후보를 생성한다. Path 생성(`midpoints`·`resample`·make waypoint)은 남아 있다.
 - **P-d enabler ✅ 완료(2026-07-22)** — Scene ObjectSet, Corridor/DrivableSpace, TrajectorySet, PredictionSet, BehaviorIntent, PlanningRequest, CostTerm, Constraint를 실제 registry·포트 검증·팔레트에 구현했다.
   static avoidance와 overtaking은 이 블록들의 예제 그래프/미션으로 조립하며 turnkey Planner·Overtake·MPPI·PPO·SAC 노드는 두지 않는다. 전용 `test/planning.ts`가 장면→공간→예측→행동→평가 흐름과 결정론을 검증한다.
-  **다음**: 첫 static avoidance 예제 그래프와 장애물 포함 미션, 이후 overtaking 상대차 시나리오. VISUALIZE는 trajectory/object 공간 overlay로 확장한다.
+  static avoidance(L5), overtaking(L6), 후보 선택 MPC(L7), 정책 평가 RL(L8) 미션까지 구현했다.
+- **P-e ✅ 완료(2026-07-23)** — `array.pack2`, `trajectory.commandAt`, `command.parts`로 Trajectory→Command 실행 경계를 완성했다. `policy.linear2`와 `reward.track`은 L0 내부가 보이는 composite이며 `sink.reward`는 제어와 분리된 평가 출력이다. 두 후보 MPC와 정책/보상 RL 참조 그래프가 각각 전용 트랙에서 클린 랩을 완주한다.

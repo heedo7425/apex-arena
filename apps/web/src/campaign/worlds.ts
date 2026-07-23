@@ -63,9 +63,17 @@ export function missionVenue(id:string): MissionVenue {
     {id:'barrier-b',kind:'static',at:190,offset:-0.8,length:3.2,width:2},
   ] })
 
-  return venue('DUEL RING', 'OVERTAKE LOOP · 06', 'circuit', [
+  if (id === 'l6') return venue('DUEL RING', 'OVERTAKE LOOP · 06', 'circuit', [
     [12,42],[24,14],[58,7],[96,12],[120,38],[110,68],[74,79],[36,70],
   ], { half:7.2, mu:1.05, flat:true, scene:[
     {id:'rival-07',kind:'vehicle',at:34,offset:0,speed:6.5,length:4.2,width:1.9},
   ] })
+
+  if (id === 'l7') return venue('PREDICTION LOOP', 'TWIN FUTURES · 07', 'circuit', [
+    [10,40],[22,13],[55,6],[91,14],[112,38],[103,65],[70,76],[37,68],[17,58],
+  ], { half:6.8, mu:1.05, flat:true })
+
+  return venue('POLICY CIRCUIT', 'GENERALIZATION LOOP · 08', 'circuit', [
+    [8,43],[18,18],[46,8],[78,12],[105,30],[111,55],[91,73],[59,70],[31,79],[13,64],
+  ], { half:7, mu:1.05, flat:true })
 }

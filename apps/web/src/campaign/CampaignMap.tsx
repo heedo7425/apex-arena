@@ -25,7 +25,7 @@ export function CampaignMap() {
           <button className="map-secondary" onClick={showTut}>그래프 사용법</button>
         </div>
         <div className="progress-block">
-          <div><span>ACT 01 · CLASSIC CONTROL</span><b>{cleared}/{LEVELS.length} MISSIONS</b></div>
+          <div><span>ACT 01–03 · CONTROL TO LEARNING</span><b>{cleared}/{LEVELS.length} MISSIONS</b></div>
           <div className="progress-track"><i style={{ width:progress+'%' }} /></div>
         </div>
       </header>
@@ -55,8 +55,8 @@ export function CampaignMap() {
       </section>
       <section className="strategy-grid" aria-label="알고리즘 학습 경로">
         <article className="strategy-card active"><span>RULE BASED</span><b>조건과 의도를 직접 설계</b><p>센서 → 객체 선택 → 조건 → 회피·추월 조향</p><button onClick={()=>goLevel('l5')}>미션 05부터 시작 →</button></article>
-        <article className="strategy-card"><span>MPC PATH · CORE READY</span><b>후보 미래를 비교해 선택</b><p>Vehicle state → Rollout trajectory → Cost + Constraint → Select minimum</p><small>trajectory.rollout · trajectory.evaluate · constraints</small></article>
-        <article className="strategy-card"><span>RL PATH · FOUNDATION</span><b>관측·행동·보상을 분리</b><p>State/Objects → Policy boundary → Command · seeded evaluation</p><small>결정론적 평가와 정책 모델 경계 유지</small></article>
+        <article className="strategy-card active"><span>MPC PATH · MISSION 07</span><b>후보 미래를 비교해 선택</b><p>Vehicle state → Rollout → Cost array → Select → Command</p><button onClick={()=>goLevel('l7')}>두 개의 미래 열기 →</button></article>
+        <article className="strategy-card active"><span>RL PATH · MISSION 08</span><b>관측·행동·보상을 분리</b><p>Features → Policy → Action · Reward → Evaluation</p><button onClick={()=>goLevel('l8')}>정책 평가 열기 →</button></article>
       </section>
 
       <footer className="map-foot">

@@ -1,5 +1,7 @@
 // Shared planning-enabler checks for rule-based, RL, and MPC graphs.
 import { buildWorld } from '../src/sim/world.ts';
+import { makeGraph } from '../src/graph/engine.ts';
+import { runFor } from '../src/sim/runner.ts';
 import { initCar } from '../src/sim/vehicle.ts';
 import {
   makeVehicleObject, makeStaticObject, nearestObject, objectsInRadius, relativeObject,
@@ -66,6 +68,29 @@ const safe=evaluateTrajectory(trajectoryA,request,[],[]);
 const unsafe=evaluateTrajectory(trajectoryA,request,[makeStaticObject(egoPose,1,1)],[]);
 ok(safe.valid&&!unsafe.valid,'planning: hard collision constraint rejects unsafe candidate');
 ok(selectMinTrajectory([trajectoryA,{...trajectoryA,duration:2}],[5,2]).i===1,'planning: minimum-cost candidate is selected');
+
+// Complete reference graphs prove the boundaries compose into runnable MPC and RL missions.
+const mpcWorld=buildWorld({ctrl:[[10,40],[22,13],[55,6],[91,14],[112,38],[103,65],[70,76],[37,68],[17,58]],half:6.8,mu:1.05});
+const mpcGraph=makeGraph({
+  state:{type:'src.vehicleState'},track:{type:'src.track'},base:{type:'blk.pursuit'},target:{type:'const',params:{value:8}},speed:{type:'blk.speedPid',in:{target:['n','target','v']}},delta:{type:'const',params:{value:0.08}},
+  left:{type:'add',in:{a:['n','base','steer'],b:['n','delta','v']}},right:{type:'sub',in:{a:['n','base','steer'],b:['n','delta','v']}},
+  c1:{type:'command.make',in:{steer:['n','left','v'],throttle:['n','speed','throttle']}},c2:{type:'command.make',in:{steer:['n','right','v'],throttle:['n','speed','throttle']}},
+  horizon:{type:'const',params:{value:0.6}},step:{type:'const',params:{value:0.1}},
+  r1:{type:'trajectory.rollout',in:{state:['n','state','state'],command:['n','c1','command'],horizon:['n','horizon','v'],step:['n','step','v']}},r2:{type:'trajectory.rollout',in:{state:['n','state','state'],command:['n','c2','command'],horizon:['n','horizon','v'],step:['n','step','v']}},
+  p1:{type:'trajectory.progress',in:{trajectory:['n','r1','trajectory'],track:['n','track','track']}},p2:{type:'trajectory.progress',in:{trajectory:['n','r2','trajectory'],track:['n','track','track']}},n1:{type:'neg',in:{x:['n','p1','d']}},n2:{type:'neg',in:{x:['n','p2','d']}},costs:{type:'array.pack2',in:{a:['n','n1','v'],b:['n','n2','v']}},
+  empty:{type:'trajectories.empty'},set1:{type:'trajectories.append',in:{trajectories:['n','empty','trajectories'],trajectory:['n','r1','trajectory']}},set2:{type:'trajectories.append',in:{trajectories:['n','set1','trajectories'],trajectory:['n','r2','trajectory']}},pick:{type:'trajectories.selectMin',in:{trajectories:['n','set2','trajectories'],costs:['n','costs','v']}},zero:{type:'const',params:{value:0}},command:{type:'trajectory.commandAt',in:{trajectory:['n','pick','trajectory'],i:['n','zero','v']}},parts:{type:'command.parts',in:{command:['n','command','command']}},ssink:{type:'sink.steer',in:{x:['n','parts','steer']}},tsink:{type:'sink.throttle',in:{x:['n','parts','throttle']}},
+});
+const mpcRun=runFor(mpcWorld,mpcGraph,1,70);
+ok(mpcRun.bestClean!==null,'integration: two-candidate MPC graph completes a clean lap');
+
+const rlWorld=buildWorld({ctrl:[[8,43],[18,18],[46,8],[78,12],[105,30],[111,55],[91,73],[59,70],[31,79],[13,64]],half:7,mu:1.05});
+const rlGraph=makeGraph({
+  pose:{type:'src.pose'},track:{type:'src.track'},speed:{type:'src.speed'},state:{type:'src.vehicleState'},stateParts:{type:'state.parts',in:{state:['n','state','state']}},
+  cte:{type:'std.crossTrack',in:{pose:['n','pose','pose'],track:['n','track','track']}},heading:{type:'std.headingErr',in:{pose:['n','pose','pose'],track:['n','track','track']}},policy:{type:'policy.linear2',params:{w1:-0.4,w2:1.8,b:0},in:{x1:['n','cte','e'],x2:['n','heading','e']}},limited:{type:'clamp',params:{lo:-1,hi:1},in:{x:['n','policy','action']}},ssink:{type:'sink.steer',in:{x:['n','limited','v']}},
+  target:{type:'const',params:{value:8}},speedctl:{type:'blk.speedPid',in:{target:['n','target','v']}},tsink:{type:'sink.throttle',in:{x:['n','speedctl','throttle']}},reward:{type:'reward.track',in:{speed:['n','speed','v'],cte:['n','cte','e'],onTrack:['n','stateParts','onTrack']}},rewardSink:{type:'sink.reward',in:{x:['n','reward','reward']}},
+});
+const rlRun=runFor(rlWorld,rlGraph,1,70);
+ok(rlRun.bestClean!==null,'integration: policy-action and reward paths complete a clean evaluation lap');
 
 const required=['object.vehicle','objects.nearest','space.blockObject','trajectory.rollout','predict.constantVelocity','intent.passLeft','cost.collision','constraint.track','trajectory.evaluate'];
 ok(required.every(type=>!!NT[type]),'registry: common planning enablers are registered');

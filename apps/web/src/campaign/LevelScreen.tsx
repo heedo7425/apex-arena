@@ -56,6 +56,18 @@ const BRIEFS: Record<string,MissionBrief> = {
     hints:['가장 가까운 차량을 Pass left intent의 target으로 지정하세요.','Intent parts의 offset은 추월 방향을 제어 신호로 꺼내는 경계입니다.','접근 거리 조건으로 추월 offset을 선택해 Pursuit 조향과 합성하세요.'],
     takeaway:'행동 의도와 저수준 조향을 분리하면 추월 방향을 바꿔도 전체 제어기를 다시 만들 필요가 없습니다.',
   },
+  l7:{
+    situation:'하나의 반응식은 지금만 보지만, 모델 예측 제어는 여러 명령이 만들 짧은 미래를 먼저 비교합니다.',
+    question:'후보 순서와 비용 순서를 정확히 맞춘 뒤 선택된 미래만 실행하려면 어떤 경계가 필요할까요?',
+    hints:['기본 Pursuit 조향에 작은 값을 더하고 뺀 두 command를 만드세요. 같은 throttle을 사용해도 됩니다.','각 command를 state에서 rollout하고 progress의 부호를 뒤집어 비용으로 사용하세요. 더 많이 전진할수록 비용이 작아집니다.','두 trajectory와 두 cost를 같은 순서로 append/pack → selectMin → commandAt(i=0) → command.parts → 두 출력에 연결하세요.'],
+    takeaway:'MPC의 핵심은 미래 후보 생성, 동일 기준 채점, 최저 비용 선택, 첫 행동 실행의 반복입니다.',
+  },
+  l8:{
+    situation:'학습된 정책은 훈련 알고리즘 자체가 아니라 관측을 행동으로 바꾸는 함수로 배포됩니다. 평가는 보상식과 분리해야 합니다.',
+    question:'같은 정책 행동을 유지하면서도 보상 기준을 독립적으로 바꿀 수 있게 하려면 어떻게 연결해야 할까요?',
+    hints:['Pose와 Track으로 cross-track error와 heading error를 만들고 각각 정책의 x1·x2에 넣으세요.','Linear policy action은 clamp를 거쳐 STEER로 보냅니다. 기본 가중치는 이 트랙을 위한 시작점입니다.','Vehicle state를 분해해 onTrack을 얻고, speed·cross-track error와 함께 Track reward → REWARD로 연결하세요.'],
+    takeaway:'정책의 관측→행동 경로와 환경의 보상 평가는 분리되어야 안전하게 비교·교체할 수 있습니다.',
+  },
 }
 
 function activeNodeIds(graph: Graph): Set<string> {
@@ -69,7 +81,7 @@ function activeNodeIds(graph: Graph): Set<string> {
   return active
 }
 function requirementMet(graph:Graph, active:Set<string>, req:(typeof LEVELS)[number]['requirements'][number]):boolean {
-  if(req.kind==='node') return [...active].some(id=>graph.nodes[id].type===req.type)
+  if(req.kind==='node') return [...active].filter(id=>graph.nodes[id].type===req.type).length >= (req.count??1)
   return [...active].some(toId=>{
     const to=graph.nodes[toId]
     if(to.type!==req.to) return false

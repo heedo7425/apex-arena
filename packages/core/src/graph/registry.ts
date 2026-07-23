@@ -123,6 +123,30 @@ const SPEEDPID_SUB: Graph = makeGraph({
   thr:{ type:'clamp', params:{ lo:-1, hi:1 }, in:{ x:['n','pid','u'] } },
 });
 
+// A deliberately small policy head: features stay visible and the learned weights
+// are parameters, so this is an inspectable inference boundary rather than an RL algorithm.
+const LINEAR_POLICY_SUB: Graph = makeGraph({
+  x1:{ type:'cin', params:{ port:'x1' } }, x2:{ type:'cin', params:{ port:'x2' } },
+  w1:{ type:'cparam', params:{ param:'w1', fallback:-0.4 } },
+  w2:{ type:'cparam', params:{ param:'w2', fallback:1.8 } },
+  bias:{ type:'cparam', params:{ param:'b', fallback:0 } },
+  term1:{ type:'mul', in:{ a:['n','x1','v'], b:['n','w1','v'] } },
+  term2:{ type:'mul', in:{ a:['n','x2','v'], b:['n','w2','v'] } },
+  sum:{ type:'add', in:{ a:['n','term1','v'], b:['n','term2','v'] } },
+  action:{ type:'add', in:{ a:['n','sum','v'], b:['n','bias','v'] } },
+});
+
+// Reward stays separate from actuation and cannot write a vehicle command directly.
+const TRACK_REWARD_SUB: Graph = makeGraph({
+  speed:{ type:'cin', params:{ port:'speed' } }, cte:{ type:'cin', params:{ port:'cte' } }, onTrack:{ type:'cin', params:{ port:'onTrack' } },
+  weight:{ type:'cparam', params:{ param:'trackingWeight', fallback:1.5 } },
+  penalty:{ type:'cparam', params:{ param:'offtrackPenalty', fallback:-20 } },
+  magnitude:{ type:'abs', in:{ x:['n','cte','v'] } },
+  trackingCost:{ type:'mul', in:{ a:['n','magnitude','v'], b:['n','weight','v'] } },
+  movingReward:{ type:'sub', in:{ a:['n','speed','v'], b:['n','trackingCost','v'] } },
+  reward:{ type:'select', in:{ c:['n','onTrack','v'], a:['n','movingReward','v'], b:['n','penalty','v'] } },
+});
+
 export const NT: Record<string, NodeDef> = {
   // ---- sources (read observation) ----
   'src.scan':  { kind:'source', cat:'Sensors', outs:['ranges','a0','da'], fn:(i,p,s,c)=>{ const sc:any=c.obs.scan; return { ranges:sc.ranges, a0:sc.a0, da:sc.da }; } },
@@ -211,6 +235,7 @@ export const NT: Record<string, NodeDef> = {
     for(let k=0;k<=i.arr.length;k++){const open=k<i.arr.length&&i.arr[k]>=i.min;if(open&&start<0)start=k;if(!open&&start>=0){const width=k-start;if(width>bestWidth){bestStart=start;bestWidth=width}start=-1}}
     return { i:bestWidth?bestStart+Math.floor((bestWidth-1)/2):argmaxArr(i.arr), width:bestWidth };
   } },
+  'array.pack2': { kind:'prim', cat:'Array', ins:['a','b'], outs:['v'], fn:(i)=>({ v:[i.a,i.b] }) },
   'array.centerMin': { kind:'prim', cat:'Array', ins:['arr','w'], outs:['v'], fn:(i)=>{
     const n=i.arr.length, width=Math.max(1,Math.round(i.w)), lo=Math.max(0,Math.floor(n/2)-Math.floor(width/2));
     return { v:n?Math.min(...i.arr.slice(lo,Math.min(n,lo+width))):0 };
@@ -261,6 +286,7 @@ export const NT: Record<string, NodeDef> = {
     pose:{x:i.state.x,y:i.state.y,yaw:i.state.yaw}, velocity:{x:i.state.vx,y:i.state.vy}, speed:i.state.v, yawRate:i.state.r, onTrack:i.state.onTrack,
   }) },
   'command.make': { kind:'prim', cat:'Struct', ins:['steer','throttle'], outs:['command'], fn:(i)=>({ command:{steer:Math.max(-1,Math.min(1,i.steer)),throttle:Math.max(-1,Math.min(1,i.throttle))} }) },
+  'command.parts': { kind:'prim', cat:'Struct', ins:['command'], outs:['steer','throttle'], fn:(i)=>({ steer:i.command?.steer??0, throttle:i.command?.throttle??0 }) },
   'trajectory.rollout': { kind:'prim', cat:'Trajectory', ins:['state','command','horizon','step'], outs:['trajectory'], fn:(i,p,s,c)=>({ trajectory:rolloutTrajectory(i.state,i.command,Math.max(0,i.horizon),Math.max(1/240,i.step),c.world) }) },
   'trajectory.parts': { kind:'prim', cat:'Trajectory', ins:['trajectory'], outs:['duration','length','valid'], fn:(i)=>({ duration:i.trajectory.duration, length:i.trajectory.points.length, valid:i.trajectory.valid }) },
   'trajectory.clearance': { kind:'prim', cat:'Trajectory', ins:['trajectory','objects'], outs:['d'], fn:(i)=>({ d:trajectoryClearance(i.trajectory,i.objects) }) },
@@ -269,6 +295,13 @@ export const NT: Record<string, NodeDef> = {
   'trajectories.empty': { kind:'prim', cat:'Trajectory', outs:['trajectories'], fn:()=>({ trajectories:[] }) },
   'trajectories.append': { kind:'prim', cat:'Trajectory', ins:['trajectories','trajectory'], outs:['trajectories'], fn:(i)=>({ trajectories:[...i.trajectories,i.trajectory] }) },
   'trajectories.selectMin': { kind:'prim', cat:'Trajectory', ins:['trajectories','costs'], outs:['trajectory','i'], fn:(i)=>selectMinTrajectory(i.trajectories,i.costs) },
+  'trajectory.commandAt': { kind:'prim', cat:'Trajectory', ins:['trajectory','i'], outs:['command'], fn:(i)=>{
+    const points=i.trajectory?.points??[];
+    if(!points.length)return { command:{steer:0,throttle:0} };
+    const requested=Number.isFinite(i.i)?Math.round(i.i):0;
+    const k=Math.max(0,Math.min(points.length-1,requested));
+    return { command:{...points[k].command} };
+  } },
 
   // ---- short-horizon prediction remains separate from planning ----
   'predict.constantVelocity': { kind:'prim', cat:'Prediction', ins:['object','horizon','step'], outs:['prediction'], fn:(i)=>({ prediction:predictConstantVelocity(i.object,Math.max(0,i.horizon),Math.max(1/30,i.step)) }) },
@@ -349,6 +382,8 @@ export const NT: Record<string, NodeDef> = {
   // ---- Modules: prior-mission controllers provided as openable blocks (P-b) ----
   'blk.pursuit': composite('Module', [], ['steer'], PURSUIT_SUB, { steer:['steer','v'] }),
   'blk.speedPid': composite('Module', ['target'], ['throttle'], SPEEDPID_SUB, { throttle:['thr','v'] }),
+  'policy.linear2': composite('Policy', ['x1','x2'], ['action'], LINEAR_POLICY_SUB, { action:['action','v'] }),
+  'reward.track': composite('Reward', ['speed','cte','onTrack'], ['reward'], TRACK_REWARD_SUB, { reward:['reward','v'] }),
   // user-made block (encapsulation): inner sub-graph + outMap carried on params
   'blk.user': { kind:'composite', cat:'Module', fn:(inv,p,st,ctx)=>{
     const sub:Graph=p.sub, outMap:Record<string,[string,string]>=p.outMap||{};
@@ -372,4 +407,5 @@ export const NT: Record<string, NodeDef> = {
   // ---- sinks (write command) — coerce unwired/NaN inputs to 0 so a partial graph is safe ----
   'sink.steer':    { kind:'sink', cat:'Output', ins:['x'], fn:(i,p,s,c)=>{ c.cmd.steer=Number.isFinite(i.x)?i.x:0; return {}; } },
   'sink.throttle': { kind:'sink', cat:'Output', ins:['x'], fn:(i,p,s,c)=>{ c.cmd.throttle=Number.isFinite(i.x)?i.x:0; return {}; } },
+  'sink.reward': { kind:'sink', cat:'Reward', ins:['x'], fn:()=>({}) },
 };

@@ -90,6 +90,19 @@ ok(one({ n:{ type:'array.argmin', in:{ arr:L([5,2,9,1,7]) } } }, 'n', 'i') === 3
 { const w = one({ n:{ type:'array.window', in:{ arr:L([0,1,2,3,4]), i:L(3), w:L(4) } } }, 'n', 'v'); ok(JSON.stringify(w)==='[3,4,0,1]', 'window wraps closed track'); }
 { const d = one({ n:{ type:'array.diff', in:{ arr:L([1,4,9,16]) } } }, 'n', 'v'); ok(JSON.stringify(d)==='[3,5,7]', 'diff'); }
 
+// --- planning and learned-policy boundaries ---
+{ const packed=one({n:{type:'array.pack2',in:{a:L(4),b:L(-2)}}},'n','v');
+  ok(JSON.stringify(packed)==='[4,-2]', 'array.pack2 preserves candidate-cost order'); }
+{ const command={steer:0.35,throttle:-0.2}, trajectory={points:[{t:0,state:{} as any,command}],duration:0,valid:true};
+  const selected=one({n:{type:'trajectory.commandAt',in:{trajectory:L(trajectory),i:L(99)}}},'n','command');
+  const parts=one({n:{type:'command.parts',in:{command:L(selected)}}},'n','steer');
+  ok(selected.steer===0.35&&selected.throttle===-0.2&&parts===0.35, 'selected trajectory command can reach scalar outputs'); }
+ok(NT['policy.linear2'].kind==='composite'&&!!NT['policy.linear2'].sub, 'linear policy is openable, not an opaque RL algorithm');
+ok(near(one({n:{type:'policy.linear2',params:{w1:2,w2:-3,b:0.5},in:{x1:L(4),x2:L(1)}}},'n','action'),5.5), 'linear policy computes w1*x1 + w2*x2 + b');
+ok(NT['reward.track'].kind==='composite'&&!!NT['reward.track'].sub, 'track reward is an openable composite');
+ok(near(one({n:{type:'reward.track',params:{trackingWeight:2,offtrackPenalty:-9},in:{speed:L(8),cte:L(-1.5),onTrack:L(true)}}},'n','reward'),5), 'track reward exposes speed minus tracking cost');
+ok(one({n:{type:'reward.track',params:{trackingWeight:2,offtrackPenalty:-9},in:{speed:L(8),cte:L(0),onTrack:L(false)}}},'n','reward')===-9, 'track reward applies off-track penalty');
+
 // --- higher-order with inner lambda subgraphs ---
 const sumLam = makeGraph({ a:{ type:'arg' }, ac:{ type:'argacc' }, s:{ type:'add', in:{ a:['n','a','v'], b:['n','ac','v'] } } }, 's', 'v');
 ok(near(one({ n:{ type:'array.reduce', params:{ lambda:sumLam }, in:{ arr:L([1,2,3,4,5]), init:L(0) } } }, 'n', 'v'), 15), 'reduce(+)=15');

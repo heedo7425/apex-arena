@@ -32,6 +32,7 @@ const PORTS: Record<string, PortShape> = {
   'space.contains': { ins:{ space:'space', pt:'point' }, outs:{ inside:'bool' } },
   'state.parts': { ins:{ state:'state' }, outs:{ pose:'pose', velocity:'point', speed:'num', yawRate:'num', onTrack:'bool' } },
   'command.make': { ins:{ steer:'num', throttle:'num' }, outs:{ command:'command' } },
+  'command.parts': { ins:{ command:'command' }, outs:{ steer:'num', throttle:'num' } },
   'trajectory.rollout': { ins:{ state:'state', command:'command', horizon:'num', step:'num' }, outs:{ trajectory:'trajectory' } },
   'trajectory.parts': { ins:{ trajectory:'trajectory' }, outs:{ duration:'num', length:'num', valid:'bool' } },
   'trajectory.clearance': { ins:{ trajectory:'trajectory', objects:'objects' }, outs:{ d:'num' } },
@@ -40,6 +41,7 @@ const PORTS: Record<string, PortShape> = {
   'trajectories.empty': { outs:{ trajectories:'trajectories' } },
   'trajectories.append': { ins:{ trajectories:'trajectories', trajectory:'trajectory' }, outs:{ trajectories:'trajectories' } },
   'trajectories.selectMin': { ins:{ trajectories:'trajectories', costs:'array<num>' }, outs:{ trajectory:'trajectory', i:'num' } },
+  'trajectory.commandAt': { ins:{ trajectory:'trajectory', i:'num' }, outs:{ command:'command' } },
   'predict.constantVelocity': { ins:{ object:'object', horizon:'num', step:'num' }, outs:{ prediction:'prediction' } },
   'predictions.empty': { outs:{ predictions:'predictions' } },
   'predictions.append': { ins:{ predictions:'predictions', prediction:'prediction' }, outs:{ predictions:'predictions' } },
@@ -132,6 +134,7 @@ const PORTS: Record<string, PortShape> = {
   'array.sanitizeRanges': { ins:{ arr:'array<num>', max:'num' }, outs:{ v:'array<num>' } },
   'array.widestAbove': { ins:{ arr:'array<num>', min:'num' }, outs:{ i:'num', width:'num' } },
   'array.centerMin': { ins:{ arr:'array<num>', w:'num' }, outs:{ v:'num' } },
+  'array.pack2': { ins:{ a:'num', b:'num' }, outs:{ v:'array<num>' } },
   // stateful
   'st.delay': { ins:{ x:'num' }, outs:{ v:'num' } }, 'st.accum': { ins:{ x:'num' }, outs:{ v:'num' } },
   'st.lowpass': { ins:{ x:'num' }, outs:{ v:'num' } }, 'st.rateLimit': { ins:{ x:'num' }, outs:{ v:'num' } },
@@ -140,6 +143,9 @@ const PORTS: Record<string, PortShape> = {
   'cparam': { outs:{ v:'num' } },
   'blk.pursuit': { outs:{ steer:'num' } },
   'blk.speedPid': { ins:{ target:'num' }, outs:{ throttle:'num' } },
+  'policy.linear2': { ins:{ x1:'num', x2:'num' }, outs:{ action:'num' } },
+  'reward.track': { ins:{ speed:'num', cte:'num', onTrack:'bool' }, outs:{ reward:'num' } },
+  'sink.reward': { ins:{ x:'num' } },
 };
 
 export type GraphIssueCode =

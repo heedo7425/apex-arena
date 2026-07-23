@@ -451,3 +451,31 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 ### Next
 - Author dedicated MPC candidate-selection and RL policy-evaluation missions after their output-to-command boundary is specified.
 - Add experiment run naming and lap/clearance summary metrics to the A/B comparison table.
+
+
+## 2026-07-23 - Candidate MPC and RL policy-evaluation missions (complete)
+
+### Why
+- The shared planning types stopped at selected Trajectory, so a player could not execute its Command through scalar actuator ports.
+- MPC and RL existed only as architecture cards; neither had a dedicated mission that preserved the blank-build learning rule.
+
+### Changes
+- Added deterministic `array.pack2`, `trajectory.commandAt`, and `command.parts` L0 boundaries for ordered candidate costs and Trajectory-to-Command execution.
+- Added openable `policy.linear2` and `reward.track` composites; both expose their L0 math and can be forked. Added read-only `sink.reward`, which never modifies vehicle controls.
+- Added Korean metadata, typed port schemas, palette categories, parameter controls, and primitive/composite unit coverage.
+- Added L7 Candidate MPC with only prior Pursuit/Speed blocks preinstalled; players build two rollouts, ordered costs, minimum selection, and command extraction.
+- Added L8 RL Policy Evaluation with only prior speed control preinstalled; players build feature-to-policy steering and an independent state/reward evaluation path.
+- Added unique Prediction Loop and Policy Circuit venues, engineering briefs, progressive hints, campaign cards, and active MPC/RL strategy links.
+- Added complete MPC and RL reference graphs to planning regression tests; both finish clean deterministic laps.
+
+### Verification
+- `prims.ts` passes ordered cost packing, safe command extraction/decomposition, openable policy math, and reward behavior.
+- `planning.ts` passes full two-candidate MPC and policy-action/reward integration laps.
+- Existing drive and block behavior remains under regression, including exact PURSUIT `21.0833s` verification.
+- All four core suites pass; PURSUIT remains exactly `21.0833s`. Production app rebuild passes with `index-BVvSaNRr.js`.
+- Headless Chrome found 9 mission cards; L7/L8 each start with 3 prior-work nodes, both new palettes are present, and Linear policy opens with 8 rendered inner wires plus fork action. Browser errors: 0.
+- Offscreen evidence: `/tmp/apex-l7-mpc.png` and `/tmp/apex-l8-policy-open.png`.
+
+### Next
+- Add more than two candidates via an authorable candidate-list workflow, then expose cost breakdown and constraint events in VISUALIZE.
+- Add offline policy weight import/training artifacts without introducing PPO/SAC turnkey nodes into the runtime palette.
