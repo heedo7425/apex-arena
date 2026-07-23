@@ -1,6 +1,7 @@
 // Sim runner: builds observation, evaluates the graph, steps the plant, times laps.
 import { type World, type PhysicsVersion, DT, PHYSICS_VERSION } from './world.ts';
 import { type CarState, initCar, stepVehicle, castScan } from './vehicle.ts';
+import { collideBoxes, boxForObject, CAR_HL, CAR_HW } from './collision.ts';
 import { type Graph, type EvalCtx, evalGraph } from '../graph/engine.ts';
 import { NT } from '../graph/registry.ts';
 import { makeRng, type Rng } from '../rng.ts';
@@ -36,6 +37,28 @@ function sceneAt(s:SimState){
   })
 }
 
+// physics v2 collision response: push the car out of any penetrating object and
+// remove the velocity component driving into it (deterministic inelastic impulse).
+// Opponents are still kinematic (Phase 2 item 2), so they act as immovable here.
+function resolveCollisions(s: SimState): void {
+  const carBox = { x: s.car.x, y: s.car.y, yaw: s.car.yaw, hl: CAR_HL, hw: CAR_HW };
+  for (const object of s.objects) {
+    const hit = collideBoxes(carBox, boxForObject(object));
+    if (!hit) continue;
+    s.car.x += hit.normal[0] * hit.depth;
+    s.car.y += hit.normal[1] * hit.depth;
+    carBox.x = s.car.x; carBox.y = s.car.y;
+    const ch = Math.cos(s.car.yaw), sh = Math.sin(s.car.yaw);
+    const vwx = s.car.vx*ch - s.car.vy*sh, vwy = s.car.vx*sh + s.car.vy*ch;
+    const vn = vwx*hit.normal[0] + vwy*hit.normal[1];
+    if (vn < 0) {
+      const nvx = vwx - vn*hit.normal[0], nvy = vwy - vn*hit.normal[1];
+      s.car.vx = nvx*ch + nvy*sh; s.car.vy = -nvx*sh + nvy*ch;
+    }
+    s.dirty = true;
+  }
+}
+
 // one control tick (= one physics step) driven by the graph
 export function tick(s: SimState): void {
   const car = s.car, world = s.world;
@@ -44,6 +67,8 @@ export function tick(s: SimState): void {
   const ctx: EvalCtx = { obs, cmd: { steer: 0, throttle: 0 }, state: s.graphState, rng: s.rng, world, car, dt: s.dt };
   s.lastVal = evalGraph(s.graph, ctx, NT);
   s.car = stepVehicle(car, ctx.cmd, world, s.dt);
+  // physics v2: oriented-box narrow-phase collision response (v1 stays detection-only below)
+  if (world.physicsVersion === 2) resolveCollisions(s);
   // lap timing
   s.elapsed += s.dt;
   for(const object of s.objects){

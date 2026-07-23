@@ -135,10 +135,19 @@ Combined slip is verified behaviorally: adding throttle under a saturating steer
 
 ### Phase 2: make racing fair
 
-- Add oriented-box/circle narrow-phase collision, penetration correction, and a
-  deterministic impulse response.
-- Run opponents through the same vehicle model and command interface as players.
-- Replace index-wrap finishes with ordered sectors, checkpoints, and authoritative
+Implementation status: **collision response complete (2026-07-23)**; opponent dynamics and
+checkpoint validation still pending.
+
+- [x] Oriented-box narrow-phase collision (SAT), penetration correction, and a deterministic
+  inelastic impulse — added in `packages/core/src/sim/collision.ts`, applied by the runner only
+  when `world.physicsVersion === 2`. v1 stays detection-only (circumscribed-circle dirty marking,
+  unchanged). The car is separated out of any penetrating oriented box and its into-obstacle
+  velocity component is removed; opponents are still kinematic so they act as immovable here.
+  Verified by `packages/core/test/collision.ts`: v2 car stops at a wall without penetrating and the
+  same setup on v1 passes straight through; response is deterministic. The v2 PURSUIT baseline is
+  unchanged (no objects on that track).
+- [ ] Run opponents through the same `stepVehicle` model and command interface as players.
+- [ ] Replace index-wrap finishes with ordered sectors, checkpoints, and authoritative
   race-state validation.
 
 ### Phase 3: optional fidelity

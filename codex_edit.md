@@ -2,6 +2,37 @@
 
 All entries in this file document changes made by Codex in this repository.
 
+## 2026-07-23 - Physics v2 Phase 2: oriented-box collision response (v2-gated)
+
+### Why
+Continue the versioned physics migration into Phase 2 "make racing fair", starting with the audit's
+first item: real collision response. v1 collision must stay detection-only and frozen; the response
+is opt-in via physics v2 and must be deterministic.
+
+### Changes
+- New packages/core/src/sim/collision.ts: oriented-box SAT (`collideBoxes`) returning the minimum
+  penetration push-out normal and depth, `boxForObject`, and car footprint constants. Pure/deterministic.
+- runner.ts: when `world.physicsVersion === 2`, after stepping, `resolveCollisions` pushes the car out
+  of each penetrating object and removes the velocity component driving into it (inelastic impulse),
+  marking the lap dirty on contact. v1 tick is byte-unchanged (still circle detection-only).
+- Opponents remain kinematic (immovable in the impulse) — bringing them onto the shared vehicle model
+  is Phase 2 item 2. Exported collision helpers from the core index.
+- Tests: added packages/core/test/collision.ts (SAT unit cases incl. rotated boxes; v2 car stops at a
+  wall without penetrating while the same setup on v1 passes through; deterministic). Wired into the
+  core test script.
+- Docs: physics-audit-v1.md Phase 2 marks collision response complete with the remaining items.
+
+### Verification (offscreen only)
+- `pnpm --filter @apex/core test`: all 7 suites pass (adds collision). v1 PURSUIT stays exactly
+  21.083333333332778; v2 PURSUIT baseline unchanged (no objects on that track).
+- `pnpm --filter @apex/web exec tsc --noEmit`: 0 errors. `pnpm --filter @apex/web build`: passes.
+  `git diff --check`: clean.
+
+### Next (Physics v2 Phase 2 continued)
+- Drive opponents through `stepVehicle` with a real command interface (shared dynamics + collision).
+- Object-vs-object and two-body impulse once opponents are physical.
+- Ordered sectors/checkpoints for authoritative lap validation (replace nearest-index wrap).
+
 ## 2026-07-23 - Physics v2 Phase 1 (opt-in corrected model)
 
 ### Why
