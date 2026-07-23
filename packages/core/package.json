@@ -4,5 +4,5 @@
   "type": "module",
   "main": "src/index.ts",
   "exports": { ".": "./src/index.ts" },
-  "scripts": { "test": "node test/drive.ts && node test/prims.ts && node test/blocks.ts && node test/planning.ts && node test/physics.ts && node test/physics-v2.ts && node test/collision.ts && node test/opponents.ts" }
+  "scripts": { "test": "node test/drive.ts && node test/prims.ts && node test/blocks.ts && node test/planning.ts && node test/physics.ts && node test/physics-v2.ts && node test/collision.ts && node test/opponents.ts && node test/checkpoints.ts" }
 }

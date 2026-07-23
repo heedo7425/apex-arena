@@ -135,8 +135,8 @@ Combined slip is verified behaviorally: adding throttle under a saturating steer
 
 ### Phase 2: make racing fair
 
-Implementation status: **collision response + physical opponents complete (2026-07-23)**;
-checkpoint validation still pending.
+Implementation status: **complete (2026-07-23)** — collision response, physical opponents, and
+ordered-checkpoint lap validation are all in (physics v2, opt-in). v1 stays frozen.
 
 - [x] Oriented-box narrow-phase collision (SAT), penetration correction, and a deterministic
   inelastic impulse — added in `packages/core/src/sim/collision.ts`, applied by the runner only
@@ -153,8 +153,11 @@ checkpoint validation still pending.
   kinematic centerline followers, unchanged. Verified by `packages/core/test/opponents.ts`
   (opponent holds a grip-respecting cruise on-track and progresses; deterministic; v1 kinematic
   formula preserved) and the 2-body unit checks in `collision.ts`.
-- [ ] Replace index-wrap finishes with ordered sectors, checkpoints, and authoritative
-  race-state validation.
+- [x] Replace index-wrap finishes with ordered sectors/checkpoints (physics v2). Interior
+  checkpoints at lap-progress fractions [0.25, 0.5, 0.75] must be crossed in order before the
+  finish line; a lap that skips any (an index-wrap shortcut) is marked invalid instead of clean.
+  `advanceCheckpoint` is a pure forward-crossing detector. v1 lap timing is unchanged (the exact
+  PURSUIT lap is preserved). Verified by `packages/core/test/checkpoints.ts`.
 
 ### Phase 3: optional fidelity
 

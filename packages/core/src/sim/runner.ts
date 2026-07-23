@@ -11,6 +11,13 @@ export type Medals = { dev: number; gold: number; silver: number; bronze: number
 export const DEFAULT_MEDALS: Medals = { dev: 20.5, gold: 22.5, silver: 26, bronze: 33 };
 export type LapResult = { t: number; dirty: boolean; physicsVersion: PhysicsVersion };
 
+// physics v2 lap validation: ordered interior checkpoints (lap-progress fractions) that must be
+// crossed in sequence before the finish line, so index-wrap shortcuts cannot register a clean lap.
+export const SECTOR_FRACS = [0.25, 0.5, 0.75];
+export function advanceCheckpoint(prevProg: number, prog: number, cpNext: number, fracs = SECTOR_FRACS): number {
+  return (cpNext < fracs.length && prevProg < fracs[cpNext] && prog >= fracs[cpNext]) ? cpNext + 1 : cpNext;
+}
+
 // physics v2: an opponent is a full vehicle (same stepVehicle model + collision), not a
 // kinematic track follower. It carries its own CarState and a target cruise speed.
 export type OpponentState = { car: CarState; target: number; spec: SceneObject };
@@ -20,7 +27,7 @@ export type SimState = {
   physicsVersion: PhysicsVersion;
   elapsed:number; objects:NonNullable<World['objects']>;
   staticSpecs: SceneObject[]; opponents: OpponentState[];
-  lapT: number; dirty: boolean; prevProg: number;
+  lapT: number; dirty: boolean; prevProg: number; cpNext: number;
   laps: LapResult[]; best: number | null; lastVal: Record<string, any> | null;
   graphState: Record<string, Record<string, unknown>>;
 };
@@ -53,7 +60,7 @@ export function makeSim(world: World, graph: Graph, seed = 1): SimState {
   const staticSpecs = (v2 ? all.filter(o=>!isMover(o)) : all).map(cloneObj);
   return { world, graph, rng: makeRng(seed), car: initCar(world), dt: DT, physicsVersion: v2?2:PHYSICS_VERSION, elapsed:0,
     objects: [], staticSpecs, opponents,
-    lapT: 0, dirty: false, prevProg: 0, laps: [], best: null, lastVal: null, graphState: {} };
+    lapT: 0, dirty: false, prevProg: 0, cpNext: 0, laps: [], best: null, lastVal: null, graphState: {} };
 }
 
 function sceneAt(s:SimState){
@@ -101,11 +108,14 @@ export function tick(s: SimState): void {
   const prog = s.car.idx / world.track.N;
   s.lapT += s.dt;
   if (!s.car.onTrack) s.dirty = true;
+  if (world.physicsVersion === 2) s.cpNext = advanceCheckpoint(s.prevProg, prog, s.cpNext);
   if (s.prevProg > 0.7 && prog < 0.15) {
+    // v2: a finish that skipped ordered checkpoints is an invalid (shortcut) lap
+    if (world.physicsVersion === 2 && s.cpNext < SECTOR_FRACS.length) s.dirty = true;
     const lap: LapResult = { t: s.lapT, dirty: s.dirty, physicsVersion:s.physicsVersion };
     s.laps.push(lap);
     if (!lap.dirty && (s.best === null || lap.t < s.best)) s.best = lap.t;
-    s.lapT = 0; s.dirty = false;
+    s.lapT = 0; s.dirty = false; s.cpNext = 0;
   }
   s.prevProg = prog;
 }

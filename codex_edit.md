@@ -2,6 +2,31 @@
 
 All entries in this file document changes made by Codex in this repository.
 
+## 2026-07-23 - Physics v2 Phase 2: ordered checkpoint lap validation (v2-gated)
+
+### Why
+Phase 2 item 3 (completes Phase 2): nearest-index wrap alone can register shortcut/ambiguous
+finishes. v2 laps must pass ordered checkpoints. v1 lap timing must stay exact.
+
+### Changes
+- runner.ts: `SECTOR_FRACS = [0.25,0.5,0.75]` interior checkpoints and a pure `advanceCheckpoint`
+  forward-crossing detector. In physics v2, `SimState.cpNext` advances only on in-order forward
+  crossings; a finish reached with `cpNext < fracs.length` is forced dirty (invalid shortcut lap).
+  cpNext resets each lap. v1 tick is byte-unchanged (guarded), so the exact PURSUIT lap is preserved.
+- Tests: packages/core/test/checkpoints.ts (pure crossing incl shortcut + backward cases; a real v2
+  lap passes all checkpoints and still registers at the finish).
+
+### Verification (offscreen only)
+- `pnpm --filter @apex/core test`: all 9 suites pass. v1 PURSUIT stays exactly 21.083333333332778;
+  v2 PURSUIT baseline unchanged. tsc --noEmit 0 errors, web build passes, git diff --check clean.
+
+### Next
+- Physics v2 Phase 3 (optional fidelity) — deferred; explicitly optional.
+- v2 gameplay rollout (product decision): a v2-tuned reference controller, retuned medals, and a
+  v2-only leaderboard/season kept fully separate from v1. Needed before missions run on v2.
+- Smaller follow-ups: LiDAR oriented-box under v2, editor lambda authoring UI, and driving the
+  trajectory/prediction overlays through the real L7 MPC mission graph.
+
 ## 2026-07-23 - Physics v2 Phase 2: physical opponents + 2-body impulse (v2-gated)
 
 ### Why
