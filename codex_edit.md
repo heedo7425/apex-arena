@@ -510,3 +510,20 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 
 ### Next
 - Continue only the items still marked TODO/DOING in `design/improvements-40.md`: replay/scrubber, parameter sweeps, scenario editor, uncertainty, policy artifacts, stronger generic/unit types, graph diff, and timeline synchronization.
+
+## 2026-07-23 - Control foundations before Rule, MPC, and RL
+
+### Why
+- The beginner course introduced feedback in one screen and moved to planning strategies before explaining what control itself is.
+- A new player needs target, state, actuator, error sign, closed-loop feedback, PID roles, saturation, overshoot, and oscillation before Rule/MPC/RL has useful meaning.
+
+### Changes
+- Expanded the beginner course from 10 to 14 concept steps and moved Rule/MPC/RL after the complete control-foundation sequence.
+- Added dedicated screens for control goals, STEER/THROTTLE actuator semantics, open versus closed loop, signed error, P/I/D roles, and safe tuning with clamp and VISUALIZE.
+- Reframed the first build as an intentional open-loop experiment whose limitation motivates Speed/error/PID feedback in the following mission.
+- Updated the beginner curriculum contract and made the 14-step rail wrap safely on mobile.
+
+### Verification
+- Production web build passes and emits `index-IPIx8opK.js` and `index-C8DQNrkD.css`.
+- Headless verification confirms all 14 steps and the order control goal → closed loop → PID → Rule/MPC/RL, plus first-mission handoff and the existing 11-node/12-wire open PID view with zero browser errors.
+- A 390×844 mobile run confirms all 14 progress controls wrap, the dialog stays within the viewport, and no horizontal overflow occurs. Evidence: `/tmp/apex-beginner-course.png`, `/tmp/apex-control-tutorial-mobile.png`.

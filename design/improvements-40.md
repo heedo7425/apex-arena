@@ -70,13 +70,16 @@
 
 1. 자율주행 알고리즘은 왜 `관찰 → 계산 → 판단 → 행동` 흐름인가?
 2. 값, 타입, 단위, 좌표계는 무엇이며 왜 아무 포트나 연결할 수 없는가?
-3. open loop와 feedback의 차이는 무엇인가?
-4. path tracking, local planning, control은 각각 무엇을 결정하는가?
-5. Rule, MPC, RL은 무엇이 다르고 어떤 공통 입출력을 쓰는가?
-6. simulation 결과 하나가 좋은 알고리즘을 증명하지 못하는 이유는 무엇인가?
-7. VISUALIZE, replay, A/B 실험으로 실패 원인을 어떻게 찾는가?
+3. 제어에서 target, state, command와 actuator는 각각 무엇인가?
+4. open loop와 closed-loop feedback의 차이는 무엇인가?
+5. `error = target - current`의 크기와 부호는 무엇을 뜻하는가?
+6. PID의 P/I/D 항, gain, saturation, overshoot, oscillation은 무엇인가?
+7. path tracking, local planning, control은 각각 무엇을 결정하는가?
+8. Rule, MPC, RL은 무엇이 다르고 어떤 공통 입출력을 쓰는가?
+9. simulation 결과 하나가 좋은 알고리즘을 증명하지 못하는 이유는 무엇인가?
+10. VISUALIZE, replay, A/B 실험으로 실패 원인을 어떻게 찾는가?
 
-튜토리얼은 읽기 전용 설명으로 끝내지 않는다. 각 개념은 짧은 그림, 한 문장 정의, 실제 APEX block 예시, 확인 질문 또는 첫 미션 행동으로 연결한다. 전문 용어는 처음 등장할 때 한국어 설명과 단위를 함께 제공한다.
+Rule/MPC/RL은 위 기본 제어 개념 뒤에만 소개한다. 튜토리얼은 읽기 전용 설명으로 끝내지 않는다. 각 개념은 짧은 그림, 한 문장 정의, 실제 APEX block 예시, 확인 질문 또는 첫 미션 행동으로 연결한다. 전문 용어는 처음 등장할 때 한국어 설명과 단위를 함께 제공한다.
 
 ## Delivery order
 
