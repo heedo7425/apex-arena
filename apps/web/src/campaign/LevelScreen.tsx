@@ -6,8 +6,9 @@ import { coreToRF } from '../editor/compile'
 import { metaOf } from '../editor/nodeMeta'
 import { Viewport } from '../sim/Viewport'
 import { useDesignLibrary, useGame, useLive, useTut, useVisualization } from '../store'
-import { levelById, LEVELS } from './levels'
+import { levelById, LEVELS, ACADEMY_LEVELS, RACE_LEVELS } from './levels'
 import { missionVenue } from './worlds'
+import { hashDesign, playerId, submitRun } from '../race/raceOnline'
 
 type MissionBrief = {
   situation:string; question:string; hints:[string,string,string]
@@ -80,7 +81,8 @@ function activeNodeIds(graph: Graph): Set<string> {
   graph.order.filter(id => graph.nodes[id].type.startsWith('sink.')).forEach(visit)
   return active
 }
-function requirementMet(graph:Graph, active:Set<string>, req:(typeof LEVELS)[number]['requirements'][number]):boolean {
+function requirementMet(graph:Graph, active:Set<string>, skills:Set<string>, req:(typeof LEVELS)[number]['requirements'][number]):boolean {
+  if(req.kind==='skill')return skills.has(req.skill)
   if(req.kind==='node') return [...active].filter(id=>graph.nodes[id].type===req.type).length >= (req.count??1)
   return [...active].some(toId=>{
     const to=graph.nodes[toId]
@@ -113,10 +115,11 @@ export function LevelScreen({ id }: { id: string }) {
   const [editorRevision,setEditorRevision]=useState(0)
   const initial = useMemo(() => coreToRF(editorGraph), [editorGraph])
   const [graph, setGraph] = useState<Graph>(level.starter)
-  const [hud, setHud] = useState({ speed:0, best:null as number | null, hold:0 })
+  const [hud, setHud] = useState({ speed:0, best:null as number | null, hold:0, position:1, field:1 })
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [hintLevel, setHintLevel] = useState(0)
   const [tutMoved, setTutMoved] = useState(false)
+  const [skills,setSkills]=useState<Set<string>>(new Set())
   const [pane, setPane] = useState<'graph'|'sim'>('graph')
   const [split, setSplit] = useState(60)
   const [simKey, setSimKey] = useState(0)
@@ -131,32 +134,32 @@ export function LevelScreen({ id }: { id: string }) {
   const saveDesign=useDesignLibrary(s=>s.saveDesign)
   const [designName,setDesignName]=useState('My setup')
   const [designNotice,setDesignNotice]=useState('')
-  const nextLevel = LEVELS.find(l => l.n === level.n + 1)
+  const levelSet=level.path==='academy'?ACADEMY_LEVELS:level.path==='race'?RACE_LEVELS:LEVELS
+  const nextLevel = levelSet.find(l => l.n === level.n + 1)
   const isTut = level.id === 'tut'
   const isL1 = level.id === 'l1'
   const isL2 = level.id === 'l2'
   const isL3 = level.id === 'l3'
-  const requiredOutputs = useMemo(() => isTut || isL1 ? ['sink.throttle']
-    : undefined, [isTut, isL1])
+  const requiredOutputs = useMemo(() => level.requiredOutputs ?? (isL1 ? ['sink.throttle'] : undefined), [level.requiredOutputs,isL1])
   const issues = useMemo(() => validateGraph(graph, NT, {
     requireOutputs:!requiredOutputs, requiredOutputs,
   }), [graph, requiredOutputs])
   const activeIds = useMemo(() => activeNodeIds(graph), [graph])
-  const checks = level.requirements.map(req => ({ ...req, ok:requirementMet(graph,activeIds,req) }))
+  const checks = level.requirements.map(req => ({ ...req, ok:requirementMet(graph,activeIds,skills,req) }))
   const requirementsMet = checks.every(c => c.ok)
-  const outputReady = isTut || isL1 ? throttleWired(graph) : issues.length === 0
+  const outputReady = requiredOutputs?.length===1&&requiredOutputs[0]==='sink.throttle' ? throttleWired(graph) : issues.length === 0
   const canRun = issues.length === 0 && requirementsMet && outputReady
-  const brief = BRIEFS[level.id]
+  const brief = BRIEFS[level.id]??{situation:level.teach,question:'필요한 신호가 어떤 순서로 행동 출력까지 흘러야 할까요?',hints:['미션 체크 항목을 데이터 흐름 순서로 읽어보세요.','출력에서 시작해 필요한 입력을 거꾸로 찾아보세요.','Parts Bay 설명과 포트 타입을 확인해 연결하세요.'],takeaway:level.unlock}
   const editorPalette = level.palette
   const simGraph = graph
   const wiringIssue = issueLabel(issues[0] ?? { code:'unwired-input', message:'필수 노드를 출력 경로에 연결하세요.' },graph)
   const waitingMessage = `회로 대기 · ${wiringIssue}`
 
   useEffect(() => {
-    setGraph(level.starter);setEditorGraph(level.starter);setEditorRevision(r=>r+1);setHintLevel(0);setTutMoved(false);setPane('graph');setResult(null);useVisualization.getState().clearAll()
+    setGraph(level.starter);setEditorGraph(level.starter);setEditorRevision(r=>r+1);setHintLevel(0);setTutMoved(false);setSkills(new Set());setPane('graph');setResult(null);useVisualization.getState().clearAll()
   }, [id, level.starter])
 
-  const finishTut = () => { complete('tut', 60); useGame.getState().goLevel('l1') }
+  const finishTut = () => { complete('tut', 60); useGame.getState().goAcademy() }
   const handleGraph = (next:Graph) => { setGraph(next); setResult(null); useVisualization.getState().clearSamples() }
   const retry = () => { setResult(null); useVisualization.getState().clearSamples(); setSimKey(k => k + 1) }
 
@@ -170,22 +173,26 @@ export function LevelScreen({ id }: { id: string }) {
     setDesignNotice(`${saved.name} v${saved.version} 복원됨`)
   }
   const onSpeedTrial = (t:number) => {
-    if (!isL1) return
+    if (level.objective.type!=='speed') return
     useVisualization.getState().setRunLap(t)
     complete(level.id, t)
     setResult({ ok:true, msg:'8 m/s 고정 성공 · ' + t.toFixed(2) + 's' })
   }
 
-  const onLap = (t: number, dirty: boolean) => {
-    if (isTut) return
+  const onLap = (t: number, dirty: boolean, position=1) => {
+    if (level.objective.type==='motion'||level.objective.type==='skills') return
     if (!dirty) useVisualization.getState().setRunLap(t)  // latest clean lap → A/B run capture
     if (dirty) { setResult({ ok:false, msg:`트랙 이탈 · ${t.toFixed(2)}s` }); return }
+    if(level.path==='race'&&level.id!=='rt'&&position>1){setResult({ok:false,msg:`P${position} FINISH · 1위로 완주해야 승리합니다.`});return}
     if (level.objective.type === 'time' && t > level.objective.target) {
       setResult({ ok:false, msg:`클린 랩 ${t.toFixed(2)}s · 목표까지 ${(t-level.objective.target).toFixed(2)}s` }); return
     }
     complete(level.id, t)
+    if(level.id==='rt')void submitRun({version:1,mode:'time-trial',playerId:playerId(),designHash:hashDesign(graph),seed:1,lapTime:t,dirty:false,inputsHash:'autonomous-graph'}).catch(()=>{})
     setResult({ ok:true, msg:`클리어 · ${t.toFixed(2)}s` })
   }
+
+  useEffect(()=>{if(level.objective.type==='skills'&&requirementsMet&&!result){complete(level.id,0);setResult({ok:true,msg:'그래프 도구 실습 완료'})}},[level.objective.type,requirementsMet,result,complete,level.id])
 
   const resize = (e:React.PointerEvent) => {
     if (!resizing.current || !bodyRef.current) return
@@ -196,7 +203,7 @@ export function LevelScreen({ id }: { id: string }) {
   return (
     <div className="level">
       <div className="lv-top">
-        <button className="back" onClick={goMap}>← 캠페인</button>
+        <button className="back" onClick={()=>level.path==='academy'?useGame.getState().goAcademy():level.path==='race'?useGame.getState().goRace():goMap()}>← {level.path==='academy'?'아카데미':level.path==='race'?'레이스 허브':'캠페인'}</button>
         <div className="lv-title-wrap">
           <span className="eyebrow">{level.kicker}</span>
           <div className="lv-title"><b>0{level.n}</b> {level.title}</div>
@@ -234,7 +241,7 @@ export function LevelScreen({ id }: { id: string }) {
         onPointerMove={resize} onPointerUp={() => { resizing.current=false }} onPointerCancel={() => { resizing.current=false }}>
         <div className={'lv-pane editor-pane' + (pane !== 'graph' ? ' mobile-hidden' : '')}>
           <Editor key={`${id}-${editorRevision}`} initial={initial} palette={editorPalette} onGraph={handleGraph}
-            nodeDefaults={isL1 ? { const:{value:8} } : undefined} requiredOutputs={requiredOutputs} />
+            nodeDefaults={isL1||id==='a2' ? { const:{value:8} } : undefined} requiredOutputs={requiredOutputs} onSkill={skill=>setSkills(prev=>new Set(prev).add(skill))} />
         </div>
         <button className="split-handle" aria-label="그래프와 시뮬레이션 영역 너비 조절"
           onPointerDown={(e) => { resizing.current=true; e.currentTarget.setPointerCapture(e.pointerId) }}
@@ -243,12 +250,12 @@ export function LevelScreen({ id }: { id: string }) {
         </button>
         <div className={'lv-pane lv-right' + (pane !== 'sim' ? ' mobile-hidden' : '')}>
           <div className="circuit-head"><div><span>{venue.name}</span><b>{venue.layout}</b></div><em><i /> TELEMETRY ONLINE</em></div>
-          <Viewport key={simKey} world={world} graph={simGraph} canRun={canRun}
+          <Viewport key={simKey} world={world} graph={simGraph} canRun={canRun} raceField={level.path==='race'&&level.id!=='rt'}
             trial={level.objective.type === 'speed' ? level.objective : undefined} onTrial={onSpeedTrial}
             onValues={(vals, info) => {
-              setVals(vals); setHud({ speed:info.speed, best:info.best, hold:info.hold })
+              setVals(vals); setHud({ speed:info.speed, best:info.best, hold:info.hold, position:info.position, field:info.field })
               useVisualization.getState().sample(info.simTime,vals)
-              if (isTut && info.speed > 2) setTutMoved(true)
+              if (level.objective.type==='motion' && info.speed > level.objective.target) { setTutMoved(true); if(!result){complete(level.id,info.simTime);setResult({ok:true,msg:'차량 움직임 확인 · 신호가 행동으로 전달됐습니다.'})} }
             }}
             onLap={onLap} />
           <div className="coach inquiry">
@@ -262,20 +269,20 @@ export function LevelScreen({ id }: { id: string }) {
               <button className="hint-btn" disabled={hintLevel===3} onClick={()=>setHintLevel(n=>Math.min(3,n+1))}>
                 {hintLevel===3?'모든 힌트 공개됨':hintLevel===0?'힌트 보기':'다음 힌트'}
               </button>
-              {isTut&&tutMoved&&<button className="coach-go" onClick={finishTut}>원리 확인 · 레벨 1로 →</button>}
+              {isTut&&tutMoved&&<button className="coach-go" onClick={finishTut}>원리 확인 · 아카데미로 →</button>}
             </div>
             {isTut&&tutMoved&&<p className="takeaway">WHY IT WORKED · {brief.takeaway}</p>}
           </div>
           <div className="lv-hud mono">
             <span><small>SPEED</small><b>{Math.round(hud.speed*3.6)}</b> km/h</span>
-            <span><small>OBJECTIVE</small><b>{isTut ? 'CREATE MOTION' : level.objective.type === 'time' ? 'CLEAN ≤ ' + level.objective.target + 's' : level.objective.type === 'speed' ? Math.round(level.objective.target*3.6) + ' km/h · ' + level.objective.hold + 's' : 'CLEAN LAP'}</b></span>
-            <span><small>{isTut ? 'OBSERVATION' : isL1 ? 'TARGET HOLD' : 'SESSION BEST'}</small><b>{isTut ? (tutMoved ? 'MOTION DETECTED' : 'NO MOTION') : isL1 ? Math.min(hud.hold, level.objective.type === 'speed' ? level.objective.hold : 0).toFixed(1) + ' / 2.0s' : hud.best != null ? hud.best.toFixed(2)+'s' : '—'}</b></span>
+            <span><small>OBJECTIVE</small><b>{level.path==='race'&&level.id!=='rt'?'FINISH P1':level.objective.type==='motion' ? 'CREATE MOTION' : level.objective.type==='skills' ? 'USE GRAPH TOOLS' : level.objective.type === 'time' ? 'CLEAN ≤ ' + level.objective.target + 's' : level.objective.type === 'speed' ? Math.round(level.objective.target*3.6) + ' km/h · ' + level.objective.hold + 's' : 'CLEAN LAP'}</b></span>
+            <span><small>{level.path==='race'&&level.id!=='rt'?'RACE POSITION':isTut ? 'OBSERVATION' : isL1 ? 'TARGET HOLD' : 'SESSION BEST'}</small><b>{level.path==='race'&&level.id!=='rt'?`P${hud.position} / ${hud.field}`:level.objective.type==='motion' ? (tutMoved ? 'MOTION DETECTED' : 'NO MOTION') : isL1||id==='a2' ? Math.min(hud.hold, level.objective.type === 'speed' ? level.objective.hold : 0).toFixed(1) + ' / 2.0s' : hud.best != null ? hud.best.toFixed(2)+'s' : '—'}</b></span>
           </div>
           {result && <div ref={resultRef} className={'lv-result ' + (result.ok ? 'ok' : 'bad')}>
             <span><small>{result.ok ? 'MISSION COMPLETE' : 'TRY AGAIN'}</small>{result.msg}{result.ok&&<em>{brief.takeaway}</em>}</span>
             {!result.ok && <button onClick={retry}>↻ 다시 시작</button>}
             {result.ok && nextLevel && <button onClick={() => useGame.getState().goLevel(nextLevel.id)}>다음 레벨 →</button>}
-            {result.ok && !nextLevel && <button onClick={goMap}>캠페인으로</button>}
+            {result.ok && !nextLevel && <button onClick={()=>level.path==='academy'?useGame.getState().goAcademy():level.path==='race'?useGame.getState().goRace():goMap()}>{level.path==='academy'?'아카데미로':level.path==='race'?'레이스 허브로':'캠페인으로'}</button>}
           </div>}
         </div>
       </div>

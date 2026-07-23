@@ -95,3 +95,8 @@ Rule/MPC/RL은 위 기본 제어 개념 뒤에만 소개한다. 튜토리얼은 
 완료: F01/F02/F03/F05, S04/S05/S07, U01/U03/U04/U05/U09, A03–A08. 부분 진행: F04, S01/S03/S06, U02/U06/U10, A09/A10.
 
 이번 checkpoint는 나머지를 완료했다고 간주하지 않는다. F06–F10과 graph diff/replay/scenario/policy provider는 별도 기능 패스로 남으며, 이 문서의 합격 기준을 만족할 때만 `DONE`으로 바꾼다.
+
+
+## Competition extension
+
+Graph Academy와 세 경기 모드의 클라이언트·공정성 계약은 `design/race-modes-v1.md`를 따른다. 온라인 서버가 배포되기 전에는 로컬 AI 경기만 실제 기능으로 표시하며 global leaderboard/PvP를 완료로 간주하지 않는다.

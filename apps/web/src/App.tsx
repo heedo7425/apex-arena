@@ -3,6 +3,8 @@ import { useGame, useTut } from './store'
 import { CampaignMap } from './campaign/CampaignMap'
 import { LevelScreen } from './campaign/LevelScreen'
 import { Tutorial } from './Tutorial'
+import { AcademyMap } from './academy/AcademyMap'
+import { RaceHub } from './race/RaceHub'
 
 type Theme = 'light' | 'dark'
 function initialTheme():Theme {
@@ -30,7 +32,7 @@ export function App() {
         onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
         <span>{theme === 'dark' ? '☼' : '◐'}</span>{theme === 'dark' ? 'LIGHT' : 'DARK'}
       </button>
-      {screen === 'level' && levelId ? <LevelScreen id={levelId} /> : <CampaignMap />}
+      {screen === 'level' && levelId ? <LevelScreen id={levelId} /> : screen === 'academy' ? <AcademyMap /> : screen === 'race' ? <RaceHub /> : <CampaignMap />}
       {tutOpen && <Tutorial />}
     </>
   )

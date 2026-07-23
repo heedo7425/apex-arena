@@ -34,13 +34,32 @@ const venue = (name:string, layout:string, kind:MissionVenue['kind'], ctrl:Vec2[
 }
 
 export function missionVenue(id:string): MissionVenue {
-  if (id === 'tut') return venue('IGNITION PAD', 'PIT APRON · BAY 00', 'pad', [
+  if (id === 'tut' || id === 'a3') return venue('IGNITION PAD', 'PIT APRON · BAY 00', 'pad', [
     [0,0],[38,0],[62,18],[62,48],[38,66],[0,66],[-24,48],[-24,18],
   ], { half:10, flat:true })
 
-  if (id === 'l1') return venue('VELOCITY LAB', 'FLAT STRAIGHT · 01', 'dyno', [
+  if (id === 'l1' || id === 'a2') return venue('VELOCITY LAB', 'FLAT STRAIGHT · 01', 'dyno', [
     [0,0],[100,0],[200,0],[260,40],[200,80],[100,80],[0,80],[-60,40],[-100,0],
   ], { half:7, flat:true })
+
+  if (id === 'a4') return venue('OPEN BLOCK LAB', 'INSPECTION LOOP · A04', 'circuit', [
+    [18,46],[28,18],[62,8],[102,18],[122,43],[108,70],[72,82],[34,72],
+  ], { half:7, mu:1.05, flat:true })
+
+  if (id === 'rt') return venue('CHRONO RING', 'TIME TRIAL · SOLO', 'circuit', [
+    [10,40],[24,12],[59,6],[96,15],[116,41],[103,69],[66,78],[31,66],
+  ], {half:7,mu:1.05,flat:true})
+
+  if (id === 'rh') return venue('DUEL RING', 'HEAD-TO-HEAD · 1V1', 'circuit', [
+    [12,42],[24,14],[58,7],[96,12],[120,38],[110,68],[74,79],[36,70],
+  ], {half:7.2,mu:1.05,flat:true,scene:[{id:'ai-duelist',kind:'vehicle',at:4,offset:2.4,speed:8.5,length:4.2,width:1.9}]})
+
+  if (id === 'rg') return venue('STARTING GRID', 'GRID START · SIX CARS', 'circuit', [
+    [8,43],[18,18],[46,8],[78,12],[105,30],[111,55],[91,73],[59,70],[31,79],[13,64],
+  ], {half:8.5,mu:1.05,flat:true,scene:[
+    {id:'grid-02',kind:'vehicle',at:3,offset:2.4,speed:7.6},{id:'grid-03',kind:'vehicle',at:7,offset:-2.4,speed:7.8},
+    {id:'grid-04',kind:'vehicle',at:11,offset:2.4,speed:8},{id:'grid-05',kind:'vehicle',at:15,offset:-2.4,speed:8.2},{id:'grid-06',kind:'vehicle',at:19,offset:2.4,speed:8.4},
+  ]})
 
   if (id === 'l2') return venue('ORBIT CIRCUIT', 'FLOW LOOP · 02', 'circuit', [
     [18,46],[28,18],[62,8],[102,18],[122,43],[108,70],[72,82],[34,72],

@@ -91,8 +91,8 @@ function signalUnit(type:string,port:string){
   if(port==='x'||port==='y'||port==='s'||port==='d'||port==='width')return 'm'
   return ''
 }
-function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, nodeDefaults, requiredOutputs }:
-  { initial:{nodes:RFNode[];edges:RFEdge[]}; palette:string[]; onGraph:(g:Graph)=>void; decorate?:Decorate; highlightPalette?:string; nodeDefaults?:Record<string,Record<string,number>>; requiredOutputs?:string[] }) {
+function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, nodeDefaults, requiredOutputs, onSkill }:
+  { initial:{nodes:RFNode[];edges:RFEdge[]}; palette:string[]; onGraph:(g:Graph)=>void; decorate?:Decorate; highlightPalette?:string; nodeDefaults?:Record<string,Record<string,number>>; requiredOutputs?:string[]; onSkill?:(skill:string)=>void }) {
 
   const { fitView } = useReactFlow()
   const frameBuild = () => requestAnimationFrame(() => fitView({ padding:0.2, duration:250 }))
@@ -128,13 +128,13 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     setUndoCount(history.current.length)
   }
   const onParam = useCallback((id:string,key:string,val:number)=>{
-    remember()
+    onSkill?.('param');remember()
     setNodes((nds:any)=>nds.map((n:any)=>n.id===id?{...n,data:{...n.data,params:{...n.data.params,[key]:val}}}:n))
     // eslint-disable-next-line
   },[])
   const pending = useRef<{node:string;handle:string;kind:'source'|'target'}|null>(null)
   const deleteNode = useCallback((id:string, save=true)=>{
-    if(save)remember()
+    onSkill?.('delete');if(save)remember()
     setNodes((nds:any)=>nds.filter((n:any)=>n.id!==id))
     setEdges((eds:any)=>eds.filter((e:any)=>e.source!==id&&e.target!==id))
     if(pending.current?.node===id){pending.current=null;usePending.getState().setSel(null)}
@@ -155,7 +155,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
       if(issue){setNotice(issue);pending.current=null;usePending.getState().setSel(null);return}
       remember()
       setEdges((eds:any)=>addEdge({id:`${src.node}.${src.handle}->${tgt.node}.${tgt.handle}`,source:src.node,sourceHandle:src.handle,target:tgt.node,targetHandle:tgt.handle},eds))
-      setNotice('링크 체결 완료 · 데이터 신호가 흐릅니다.')
+      setNotice('링크 체결 완료 · 데이터 신호가 흐릅니다.');onSkill?.('connect')
       pending.current=null;usePending.getState().setSel(null)
     }else{
       pending.current={node,handle,kind};usePending.getState().setSel(`${node}|${handle}|${kind}`)
@@ -213,8 +213,8 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     if(issue){setNotice(issue);return}
     remember()
     setEdges((eds:any)=>addEdge({...c,id:`${c.source}.${c.sourceHandle}->${c.target}.${c.targetHandle}`},eds))
-    setNotice('링크 체결 완료 · 데이터 신호가 흐릅니다.')
-  },[setEdges])
+    setNotice('링크 체결 완료 · 데이터 신호가 흐릅니다.');onSkill?.('connect')
+  },[setEdges,onSkill])
 
   const sigRef=useRef('')
   useEffect(()=>{
@@ -224,6 +224,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
 
   const forkOpen = () => {
     if(!openNode) return
+    onSkill?.('fork')
     const core = rfToCore(latest.current.nodes as any, latest.current.edges as any)
     const inlined = inlineComposite(core, openNode.id, NT)
     const rf = coreToRF(inlined)
@@ -235,7 +236,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     const sub = (NT[type]?.sub ?? rfNode?.data?.params?.sub) as Graph | undefined
     if(!sub) return
     const label = rfNode?.data?.label || (type==='blk.user' ? (rfNode?.data?.params?.label || '▣ 내 블록') : metaOf(type).label)
-    setOpenNode({ id, type, label, sub, params:{...(rfNode?.data?.params||{})} })
+    setOpenNode({ id, type, label, sub, params:{...(rfNode?.data?.params||{})} });onSkill?.('open')
   }
   const groupSelected = () => {
     const ids = selectedIds.filter(id => latest.current.nodes.some(n=>n.id===id))
@@ -250,7 +251,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     setSelectedIds([]); setNotice(`${ids.length}개 노드를 블록으로 묶었어요. (더블클릭해 열기)`); frameBuild()
   }
   const addNode=(type:string)=>{
-    remember();setRecentParts(r=>[type,...r.filter(x=>x!==type)].slice(0,5))
+    onSkill?.('add');remember();setRecentParts(r=>[type,...r.filter(x=>x!==type)].slice(0,5))
     const index=nodes.length
     const nn=newNode(type,compact?10+(index%2)*225:70+(index%3)*260,compact?70+Math.floor(index/2)*138:70+(Math.floor(index/3)%4)*128)
     setNodes((nds:any)=>nds.concat({...nn,data:{coreType:type,params:{...defaultParams(type),...(nodeDefaults?.[type]??{})},onParam,onPort,onHover:showHover,onHoverEnd:hideHover}}))
@@ -421,6 +422,6 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   )
 }
 
-export function Editor(props:{initial:{nodes:RFNode[];edges:RFEdge[]};palette:string[];onGraph:(g:Graph)=>void;decorate?:Decorate;highlightPalette?:string;nodeDefaults?:Record<string,Record<string,number>>;requiredOutputs?:string[]}){
+export function Editor(props:{initial:{nodes:RFNode[];edges:RFEdge[]};palette:string[];onGraph:(g:Graph)=>void;decorate?:Decorate;highlightPalette?:string;nodeDefaults?:Record<string,Record<string,number>>;requiredOutputs?:string[];onSkill?:(skill:string)=>void}){
   return <ReactFlowProvider><EditorInner {...props}/></ReactFlowProvider>
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { makeSim, tick, castScan, DT } from '@apex/core'
+import { makeSim, tick, castScan, nearestIndex, DT } from '@apex/core'
 import type { World, Graph } from '@apex/core'
 import { computeCam, buildTerrain, renderSim, type Cam } from './render'
 import { useVisualization } from '../store'
@@ -9,14 +9,15 @@ type Props = {
   graph: Graph
   seed?: number
   canRun?: boolean
-  onValues?: (lastVal: Record<string, any> | null, info: { speed:number; lapT:number; simTime:number; best:number|null; hold:number }) => void
-  onLap?: (t: number, dirty: boolean) => void
+  onValues?: (lastVal: Record<string, any> | null, info: { speed:number; lapT:number; simTime:number; best:number|null; hold:number; position:number; field:number }) => void
+  onLap?: (t: number, dirty: boolean, position:number) => void
   trial?: { target:number; hold:number; tolerance:number }
   onTrial?: (t: number) => void
+  raceField?: boolean
 }
 const CW = 1200, CH = 760
 
-export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLap, trial, onTrial }: Props) {
+export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLap, trial, onTrial, raceField=false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const simRef = useRef<ReturnType<typeof makeSim> | null>(null)
   const terrainRef = useRef<HTMLCanvasElement | null>(null)
@@ -51,6 +52,14 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
     setLapMsg(canRun ? (trial ? 'SPEED TEST READY' : 'READY') : 'WIRE GRAPH')
   }, [graph, world, seed, canRun])
 
+  const racePosition=(s:ReturnType<typeof makeSim>)=>{
+    if(!raceField)return {position:1,field:1}
+    const track=world.track,player=s.laps.length*track.N+nearestIndex(track,s.car.x,s.car.y).i
+    const progress=[{id:'player',v:player},...world.objects.filter(o=>o.trackIndex!=null&&o.trackSpeed!=null).map(o=>({id:o.id,v:(o.trackIndex??0)+(o.trackSpeed??0)*s.elapsed/track.spacing}))]
+    progress.sort((a,b)=>b.v-a.v)
+    return {position:progress.findIndex(p=>p.id==='player')+1,field:progress.length}
+  }
+
   useEffect(() => { if (!canRun) setRunning(false) }, [canRun])
   useEffect(() => { runRef.current = running }, [running])
   useEffect(() => { speedRef.current = speed }, [speed])
@@ -70,7 +79,7 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
           if (s.laps.length > prevLaps && !trial) {
             const lp = s.laps[s.laps.length - 1]
             setLapMsg((lp.dirty ? 'DIRTY ' : 'LAP ') + lp.t.toFixed(3) + 's')
-            onLapRef.current?.(lp.t, lp.dirty)
+            onLapRef.current?.(lp.t, lp.dirty, racePosition(s).position)
           }
           if (trial && !completedRef.current) {
             holdRef.current = Math.abs(s.car.vx - trial.target) <= trial.tolerance ? holdRef.current + g * DT : 0
@@ -88,7 +97,7 @@ export function Viewport({ world, graph, seed = 1, canRun = true, onValues, onLa
         const overlays=Object.values(useVisualization.getState().latest)
         renderSim(ctx, world, s.car, scan, gap, cam, terrainRef.current, s.objects, overlays)
         valAcc += dt
-        if (valAcc > 0.1) { valAcc = 0; onValuesRef.current?.(s.lastVal, { speed: s.car.vx, lapT: s.lapT, simTime:simTimeRef.current, best: s.best, hold: holdRef.current }) }
+        if (valAcc > 0.1) { valAcc = 0; onValuesRef.current?.(s.lastVal, { speed: s.car.vx, lapT: s.lapT, simTime:simTimeRef.current, best: s.best, hold: holdRef.current, ...racePosition(s) }) }
       }
       raf = requestAnimationFrame(loop)
     }

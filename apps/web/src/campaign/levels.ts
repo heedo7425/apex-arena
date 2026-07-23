@@ -1,14 +1,17 @@
-import { makeGraph } from '@apex/core'
+import { makeGraph, PURSUIT } from '@apex/core'
 import type { Graph } from '@apex/core'
 
 export type Objective = { type: 'clean' } | { type: 'time'; target: number }
   | { type: 'speed'; target: number; hold: number; tolerance: number }
+  | { type:'motion'; target:number } | { type:'skills' }
 export type Requirement =
   | { kind:'node'; type:string; label:string; count?:number }
   | { kind:'edge'; from:string; fromPort:string; to:string; toPort:string; label:string }
+  | { kind:'skill'; skill:'add'|'connect'|'param'|'open'|'fork'|'delete'; label:string }
 export type Level = {
   id:string; n:number; title:string; kicker:string; teach:string; palette:string[]
   objective:Objective; starter:Graph; requirements:Requirement[]; unlock:string
+  path?:'campaign'|'academy'|'race'; requiredOutputs?:string[]
 }
 
 // L1: speed control is built and tested on a straight proving ground.
@@ -68,9 +71,6 @@ const L8: Graph = makeGraph({
 const TUT: Graph = makeGraph({})
 
 export const LEVELS: Level[] = [
-  { id:'tut', n:0, title:'첫 시동', kicker:'FIRST IGNITION',
-    teach:'빈 캔버스에 동력과 출력을 직접 장착해, 네 첫 제어 신호로 차량을 움직여라.',
-    palette:['const','sink.throttle'], objective:{type:'clean'}, starter:TUT, requirements:[], unlock:'Const · THROTTLE' },
   { id:'l1', n:1, title:'속도를 붙잡아라', kicker:'THROTTLE CONTROL',
     teach:'직선 성능시험장에서 목표속도 8 m/s를 만들고 2초 동안 안정적으로 유지하세요.',
     palette:['const','sub','ctrl.pid','clamp','src.speed','sink.throttle'],
@@ -105,4 +105,20 @@ export const LEVELS: Level[] = [
     palette:['src.pose','src.track','src.speed','src.vehicleState','state.parts','std.crossTrack','std.headingErr','policy.linear2','reward.track','clamp','sink.steer','sink.reward'], objective:{type:'clean'}, starter:L8,
     requirements:[{kind:'edge',from:'std.crossTrack',fromPort:'e',to:'policy.linear2',toPort:'x1',label:'횡오차를 정책 관측 x1에 입력'},{kind:'edge',from:'std.headingErr',fromPort:'e',to:'policy.linear2',toPort:'x2',label:'헤딩오차를 정책 관측 x2에 입력'},{kind:'edge',from:'clamp',fromPort:'v',to:'sink.steer',toPort:'x',label:'정책 행동을 안전 범위로 제한'},{kind:'edge',from:'reward.track',fromPort:'reward',to:'sink.reward',toPort:'x',label:'보상 신호를 평가 출력에 연결'}], unlock:'Policy · Reward boundary' },
 ]
-export const levelById = (id: string) => LEVELS.find(l => l.id === id)!
+export const ACADEMY_LEVELS:Level[]=[
+  {id:'tut',n:1,title:'신호를 행동으로',kicker:'GRAPH ACADEMY · 01',path:'academy',teach:'파트를 직접 놓고 출력 포트를 입력 포트에 연결해 첫 데이터 흐름을 만드세요.',palette:['const','sink.throttle'],objective:{type:'motion',target:2},starter:TUT,requiredOutputs:['sink.throttle'],requirements:[{kind:'skill',skill:'add',label:'Parts Bay에서 블록 장착'},{kind:'skill',skill:'connect',label:'출력→입력 포트 연결'},{kind:'edge',from:'const',fromPort:'v',to:'sink.throttle',toPort:'x',label:'Const를 THROTTLE에 연결'}],unlock:'배치 · 연결 · 실행'},
+  {id:'a2',n:2,title:'목표와 현재를 비교',kicker:'GRAPH ACADEMY · 02',path:'academy',teach:'Speed를 다시 읽는 closed loop를 만들고 목표 8 m/s를 안정적으로 유지하세요.',palette:['const','src.speed','sub','ctrl.pid','clamp','sink.throttle'],objective:{type:'speed',target:8,hold:2,tolerance:.45},starter:makeGraph({}),requiredOutputs:['sink.throttle'],requirements:[{kind:'node',type:'sub',label:'target−current 오차 계산'},{kind:'node',type:'ctrl.pid',label:'PID feedback'},{kind:'edge',from:'clamp',fromPort:'v',to:'sink.throttle',toPort:'x',label:'제한된 command 실행'}],unlock:'Feedback · PID'},
+  {id:'a3',n:3,title:'두 행동 출력',kicker:'GRAPH ACADEMY · 03',path:'academy',teach:'STEER와 THROTTLE을 각각 만들고 파라미터를 바꿔 두 actuator의 역할을 확인하세요.',palette:['const','sink.steer','sink.throttle'],objective:{type:'motion',target:2},starter:makeGraph({}),requiredOutputs:['sink.steer','sink.throttle'],requirements:[{kind:'node',type:'const',count:2,label:'서로 다른 command 두 개'},{kind:'skill',skill:'param',label:'Const 파라미터 조정'},{kind:'edge',from:'const',fromPort:'v',to:'sink.steer',toPort:'x',label:'STEER 연결'},{kind:'edge',from:'const',fromPort:'v',to:'sink.throttle',toPort:'x',label:'THROTTLE 연결'}],unlock:'두 출력 · 파라미터'},
+  {id:'a4',n:4,title:'블록 안을 열어라',kicker:'GRAPH ACADEMY · 04',path:'academy',teach:'완성된 composite를 더블클릭해 내부 배선을 읽고, 편집 가능한 primitive 그래프로 펼치세요.',palette:['blk.pursuit','blk.speedPid','const','sink.steer','sink.throttle'],objective:{type:'skills'},starter:makeGraph({target:{type:'const',params:{value:8}},speed:{type:'blk.speedPid',in:{target:['n','target','v']}},throttle:{type:'sink.throttle',in:{x:['n','speed','throttle']}},pursuit:{type:'blk.pursuit'},steer:{type:'sink.steer',in:{x:['n','pursuit','steer']}}}),requirements:[{kind:'skill',skill:'open',label:'composite 더블클릭해 열기'},{kind:'skill',skill:'fork',label:'편집 가능한 그래프로 펼치기'}],unlock:'Open · Fork · 내부 배선'},
+]
+
+const RACE_PALETTE=['const','src.pose','src.track','src.speed','src.scan','src.objects','std.lookahead','std.tocar','std.curvAhead','std.gripSpeed','std.crossTrack','std.headingErr','lidar.preprocess','lidar.widestGap','objects.nearest','object.relative','ctrl.pid','ctrl.pursuit','ctrl.speed','add','sub','mul','div','clamp','select','lt','sink.steer','sink.throttle']
+
+export const RACE_LEVELS:Level[]=[
+  {id:'rt',n:1,title:'Time Trial',kicker:'SOLO QUALIFYING',path:'race',teach:'같은 차량·트랙·seed에서 오직 네 알고리즘의 가장 빠른 클린 랩을 기록하세요.',palette:RACE_PALETTE,objective:{type:'clean'},starter:PURSUIT,requirements:[],unlock:'개인 기록 · 결정론 검증'},
+  {id:'rh',n:2,title:'Head-to-Head',kicker:'DUEL PRACTICE',path:'race',teach:'한 대의 라이벌과 동시에 출발해 접촉 없이 먼저 클린 랩을 완주하세요.',palette:RACE_PALETTE,objective:{type:'clean'},starter:PURSUIT,requirements:[],unlock:'1 VS 1 레이스'},
+  {id:'rg',n:3,title:'Grid Start',kicker:'SIX-CAR PRACTICE',path:'race',teach:'여섯 대가 함께 출발하는 혼잡한 첫 코너에서 살아남아 클린 랩을 완주하세요.',palette:RACE_PALETTE,objective:{type:'clean'},starter:PURSUIT,requirements:[],unlock:'멀티카 레이스'},
+]
+
+export const ALL_LEVELS=[...ACADEMY_LEVELS,...LEVELS,...RACE_LEVELS]
+export const levelById = (id: string) => ALL_LEVELS.find(l => l.id === id)!

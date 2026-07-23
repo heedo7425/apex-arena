@@ -527,3 +527,24 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Production web build passes and emits `index-IPIx8opK.js` and `index-C8DQNrkD.css`.
 - Headless verification confirms all 14 steps and the order control goal → closed loop → PID → Rule/MPC/RL, plus first-mission handoff and the existing 11-node/12-wire open PID view with zero browser errors.
 - A 390×844 mobile run confirms all 14 progress controls wrap, the dialog stays within the viewport, and no horizontal overflow occurs. Evidence: `/tmp/apex-beginner-course.png`, `/tmp/apex-control-tutorial-mobile.png`.
+
+## 2026-07-23 - Hands-on Graph Academy and competitive Race Hub
+
+### Why
+- The concept course still taught graph usage by reading; players needed optional levels where placement, wiring, parameters, feedback, outputs, and composite editing are performed directly.
+- The product had campaign lap times but no explicit competition surface, race formats, field position, leaderboard boundary, or real-time matchmaking contract.
+
+### Changes
+- Separated the optional four-level Graph Academy from the eight-mission algorithm campaign: signal-to-actuator, feedback PID, dual outputs/parameters, and composite open/fork.
+- Added editor skill events so academy requirements verify actual add, connect, parameter, delete, open, and fork interactions rather than node presence alone.
+- Added a Race Hub with Time Trial, Head-to-Head, and Grid Start rules, local records, clearly labeled AI benchmarks, and honest offline service state.
+- Added three editable race levels. Head-to-Head has a 2-car field; Grid Start has six cars; both calculate deterministic live position and require a clean P1 finish.
+- Added versioned run submission and match ticket contracts, global leaderboard fetch, Time Trial run submission, and WebSocket queue join behind `VITE_RACE_API_URL`/`VITE_RACE_WS_URL`.
+- Added `design/race-modes-v1.md` with fairness, server authority, anti-cheat verification, and deployment requirements.
+
+### Verification
+- `drive.ts`, `prims.ts`, `blocks.ts`, and `planning.ts` all pass; PURSUIT remains exactly `21.0833s`. Production build emits `index-BysEmcLP.js` and `index-BixNawXK.css`.
+- Headless interaction places and connects Academy A01 blocks and confirms all three action requirements plus enabled run state.
+- Headless interaction opens and forks Academy A04, confirms completion, finds all three race modes, and loads editable 2-car and 6-car race fields with live field counts and zero browser errors.
+- A full offscreen Time Trial finishes clean in `23.25s` and persists `best.rt`, proving the mode is executable rather than a menu mock.
+- Mobile 390×844 checks show one-column Academy/Race layouts with no horizontal overflow. Evidence: `/tmp/apex-graph-academy.png`, `/tmp/apex-academy-first-build.png`, `/tmp/apex-race-hub.png`, `/tmp/apex-academy-mobile.png`, `/tmp/apex-race-mobile.png`, `/tmp/apex-time-trial-finish.png`.

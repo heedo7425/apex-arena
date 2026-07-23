@@ -47,4 +47,4 @@ git add -A && git commit && git push origin main                                
 - composite 내부는 breadcrumb, 파트 설명, live signal, 자동 배치 fork를 제공한다. 유저 블록은 Parts Bay 보관함에 저장되어 모든 미션에서 재사용할 수 있고 그래프 오류는 해당 블록·포트 단위로 안내된다.
 - 에디터 VISUALIZE는 출력 신호를 읽기 전용으로 수집한다. simulation 시간만 사용하며 graph 계산·랩 결과에 영향을 주면 안 된다.
 - **P-c 일부/P-d enabler 완료**: vehicle state 기반 결정론 trajectory rollout과 Scene ObjectSet, DrivableSpace, PredictionSet, Intent, PlanningRequest, Cost/Constraint 블록이 registry·typed validation·master palette에 구현됐다. turnkey planner/알고리즘 노드는 금지한다.
-- **현재**: static avoidance(L5), overtaking(L6), candidate MPC(L7), RL evaluation(L8)과 기본 Path 저작까지 완료. 40항목 후속 프로그램은 `design/improvements-40.md`가 기준이며 replay, parameter sweep, scenario editor, uncertainty, policy provider는 남아 있다.
+- **현재**: static avoidance(L5), overtaking(L6), candidate MPC(L7), RL evaluation(L8)과 기본 Path 저작, 선택형 4단계 Graph Academy, 로컬 Time Trial/Head-to-Head/Grid Start Race Hub까지 완료. 40항목 후속 프로그램은 `design/improvements-40.md`가 기준이며 replay, parameter sweep, scenario editor, uncertainty, policy provider는 남아 있다.

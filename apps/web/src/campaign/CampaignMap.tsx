@@ -3,7 +3,7 @@ import { useGame, useTut } from '../store'
 import { LEVELS } from './levels'
 
 export function CampaignMap() {
-  const { completed, best, goLevel } = useGame()
+  const { completed, best, goLevel, goAcademy, goRace } = useGame()
   const showTut = useTut((s) => s.show)
   const isOpen = (i:number) => i === 0 || completed.includes(LEVELS[i-1].id)
   const cleared = LEVELS.filter(l => completed.includes(l.id)).length
@@ -22,7 +22,9 @@ export function CampaignMap() {
           <button className="map-primary" onClick={() => goLevel(LEVELS[Math.min(cleared, LEVELS.length-1)].id)}>
             {cleared ? '계속하기' : '첫 시동 걸기'} <span>→</span>
           </button>
-          <button className="map-secondary" onClick={showTut}>그래프 사용법</button>
+          <button className="map-secondary" onClick={goAcademy}>그래프 아카데미</button>
+          <button className="map-secondary" onClick={showTut}>개념 읽기</button>
+          <button className="map-race" onClick={goRace}>RACE HUB <span>↗</span></button>
         </div>
         <div className="progress-block">
           <div><span>ACT 01–03 · CONTROL TO LEARNING</span><b>{cleared}/{LEVELS.length} MISSIONS</b></div>

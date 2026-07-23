@@ -156,23 +156,25 @@ function load(): Saved { try { return JSON.parse(localStorage.getItem(KEY) || ''
 function save(s: Saved) { try { localStorage.setItem(KEY, JSON.stringify(s)) } catch {} }
 
 type Game = {
-  screen: 'map' | 'level'
+  screen: 'map' | 'level' | 'academy' | 'race'
   levelId: string | null
   completed: string[]
   best: Record<string, number>
   goMap: () => void
+  goAcademy: () => void
+  goRace: () => void
   goLevel: (id: string) => void
   complete: (id: string, time: number) => void
 }
 export const useGame = create<Game>((set, get) => {
   const s = load()
-  // first-ever visit → drop straight into the tutorial level (no "where do I start")
-  const onboarded = (() => { try { return !!localStorage.getItem('apex_onboard') } catch { return true } })()
-  try { localStorage.setItem('apex_onboard', '1') } catch {}
+  // Academy is optional: every player starts at the main map and opts into hands-on basics.
   return {
-    screen: onboarded ? 'map' : 'level', levelId: onboarded ? null : 'tut',
+    screen: 'map', levelId: null,
     completed: s.completed, best: s.best,
     goMap: () => set({ screen: 'map', levelId: null }),
+    goAcademy: () => set({ screen:'academy', levelId:null }),
+    goRace: () => set({ screen:'race', levelId:null }),
     goLevel: (id) => set({ screen: 'level', levelId: id }),
     complete: (id, time) => {
       const st = get()
