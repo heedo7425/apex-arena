@@ -2,6 +2,37 @@
 
 All entries in this file document changes made by Codex in this repository.
 
+## 2026-07-23 - Follow-up: spatial-overlay verification, A/B naming/lap, VISUALIZE crash fix
+
+### Why
+지난 패스에서 남긴 후속 3건 중 tractable 2건 진행: (1) 공간 Visualize overlay end-to-end 검증,
+(2) A/B에 run 이름 + lap 요약. (3) MPC/RL 전용 미션은 output→command 경계 미확정·turnkey 위험으로 보류 유지.
+
+### ★Critical bug found & fixed
+- **VisualizePanel이 신호가 하나라도 추가되면 통째로 크래시**했다. `const spatial=…`/`const spatialCount=…`
+  선언이 `return <section>` **뒤**(JSX 자식 위치)에 잘못 들어가 있어 `spatial`이 미정의 → 렌더 시 ReferenceError.
+  ErrorBoundary가 삼켜서 pageerror에 안 잡혔고(이전 검증이 신호 없는 패널만 확인해 놓침), 실제로는 VISUALIZE 기능이
+  신호를 넣는 순간 사라졌다. 선언을 return 앞으로 이동해 수정. Codex 중단 패치의 잔재로 추정.
+
+### Changes
+- VisualizePanel: 위 크래시 수정. A/B 비교에 **run 이름 입력 + 저장 슬롯별 이름·lap·duration·signal수 요약** 추가
+  (기존 공통 numeric mean-diff 테이블 유지).
+- store.ts: ExperimentRun에 name·lap·duration 추가, runLap 상태 + setRunLap, saveRun(slot,name)로 확장.
+  clearAll이 runLap도 리셋. 오프스크린 검증용 `window.__apexViz` 디버그 핸들 추가.
+- LevelScreen: 클린 랩/스피드트라이얼 완료 시 setRunLap(t) 호출 → A/B run이 랩타임을 캡처.
+
+### Verification (오프스크린, DISPLAY 제거 / Playwright headless)
+- 코어 4종 PASS(변경 없음). 프로덕션 빌드 PASS: index-ijKRXYbq.js.
+- ① 공간 overlay: latest에 궤적/예측/차단영역 주입 → sim 캔버스에 파란 점선 궤적·분홍 예측선·주황 차단폴리곤이
+  실제로 렌더됨(스크린샷 확인). render.ts overlay 경로 정상.
+- ★크래시 회귀: L5에서 Scene objects 노드 추가 → viz-port 클릭 시 패널·토글·카드 모두 생존(이전엔 크래시).
+- ② A/B: 두 run(Baseline 28.40s / Wider gap 26.10s) 저장 → 이름·lap·요약 표시 + mean-diff 테이블(clearance Δ+1.000). page error 0.
+
+### Next (실제 후속)
+- MPC 후보선택 / RL 정책평가 전용 미션(output→command 경계 확정 후). 이 미션이 생기면 trajectory/prediction/space
+  overlay가 실제 그래프로도 구동돼 end-to-end로 쓰인다(현재는 render 경로만 주입 검증).
+- A/B 비교에 clearance 등 도메인 지표 자동 캡처(현재는 유저가 visualize한 numeric 신호 기준).
+
 ## 2026-07-22 - Finalization pass (10-improvements handoff completed)
 
 ### Why

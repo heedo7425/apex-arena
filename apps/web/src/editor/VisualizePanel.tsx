@@ -20,14 +20,16 @@ function linePath(points:VisualizationPoint[]){
 
 export function VisualizePanel(){
   const {signals,samples,latest,runs,open,removeSignal,clearSamples,saveRun,toggle}=useVisualization()
+  const [runName,setRunName]=React.useState('')
   if(!open)return null
   return <aside className="visualize-panel" aria-label="VISUALIZE 신호 그래프">
     <header className="vz-head">
       <div><small>EXPERIMENT TELEMETRY</small><b>VISUALIZE</b></div>
       <span>{signals.length} SIGNALS</span>
       <button onClick={clearSamples} disabled={!signals.length}>기록 지우기</button>
-      <button onClick={()=>saveRun('A')} disabled={!signals.length}>A 저장</button>
-      <button onClick={()=>saveRun('B')} disabled={!signals.length}>B 저장</button>
+      <input className="vz-runname" value={runName} onChange={e=>setRunName(e.target.value)} placeholder="실험 이름" aria-label="실험 이름"/>
+      <button onClick={()=>saveRun('A',runName)} disabled={!signals.length}>A 저장</button>
+      <button onClick={()=>saveRun('B',runName)} disabled={!signals.length}>B 저장</button>
       <button className="vz-close" onClick={toggle} aria-label="VISUALIZE 닫기">×</button>
     </header>
     {!signals.length&&<div className="vz-empty">
@@ -36,6 +38,12 @@ export function VisualizePanel(){
     </div>}
     {(runs.A||runs.B)&&<div className="vz-ab">
       <b>A/B EXPERIMENT</b>
+      <div className="vz-ab-runs">
+        {(['A','B'] as const).map(slot=>{const r=runs[slot];return <div key={slot} className={'vz-run'+(r?'':' empty')}>
+          <span className="vz-run-slot">{slot}</span>
+          {r?<><b>{r.name}</b><em>{r.lap!=null?r.lap.toFixed(2)+'s lap':'lap —'} · {r.duration.toFixed(1)}s · {Object.keys(r.stats).length} sig</em></>:<em>미저장</em>}
+        </div>})}
+      </div>
       {runs.A&&runs.B?(()=>{
         const common=Object.keys(runs.A!.stats).filter(k=>k in runs.B!.stats)
         if(!common.length)return <p>A·B에 공통 numeric 신호가 없어요.</p>
@@ -48,9 +56,9 @@ export function VisualizePanel(){
     <div className="vz-signals">{signals.map(signal=>{
       const points=samples[signal.id]||[], values=points.map(p=>p.value)
       const current=values.at(-1), lo=values.length?Math.min(...values):null, hi=values.length?Math.max(...values):null
-      return <section className="vz-card" key={signal.id} style={{['--signal' as any]:signal.color}}>
       const spatial=signal.valueType!=='num', raw=latest[signal.id]
       const spatialCount=Array.isArray(raw)?raw.length:raw&&typeof raw==='object'?1:0
+      return <section className="vz-card" key={signal.id} style={{['--signal' as any]:signal.color}}>
         <div className="vz-card-h">
           <i/><span><b>{signal.label}</b><small>{signal.nodeId}.{signal.port}</small></span>
           <strong>{spatial?spatialCount:(current==null?'—':fmt(current))}<em>{spatial?signal.valueType:signal.unit}</em></strong>

@@ -17,7 +17,7 @@ export type VisualizedSignal = {
   color:string
 }
 export type VisualizationPoint = { t:number; value:number }
-export type ExperimentRun={slot:'A'|'B';capturedAt:number;stats:Record<string,{min:number;max:number;mean:number;samples:number}>}
+export type ExperimentRun={slot:'A'|'B';name:string;capturedAt:number;lap:number|null;duration:number;stats:Record<string,{min:number;max:number;mean:number;samples:number}>}
 type SignalDraft = Omit<VisualizedSignal,'id'|'color'>
 type Visualization = {
   signals:VisualizedSignal[]
@@ -26,17 +26,19 @@ type Visualization = {
   runs:Partial<Record<'A'|'B',ExperimentRun>>
   open:boolean
   lastTime:number|null
+  runLap:number|null
   addSignal:(signal:SignalDraft)=>void
   removeSignal:(id:string)=>void
   sample:(time:number,values:Record<string,any>|null)=>void
   clearSamples:()=>void
   clearAll:()=>void
   toggle:()=>void
-  saveRun:(slot:'A'|'B')=>void
+  setRunLap:(t:number|null)=>void
+  saveRun:(slot:'A'|'B',name?:string)=>void
 }
 const VIS_COLORS=['#1FDDC9','#F0B541','#69AEEB','#F27D62','#B7DB67','#E78FD0']
 export const useVisualization=create<Visualization>((set,get)=>({
-  signals:[],samples:{},latest:{},runs:{},open:false,lastTime:null,
+  signals:[],samples:{},latest:{},runs:{},open:false,lastTime:null,runLap:null,
   addSignal:(draft)=>{
     const id=`${draft.nodeId}.${draft.port}`
     const current=get().signals
@@ -65,17 +67,25 @@ export const useVisualization=create<Visualization>((set,get)=>({
     set({samples,latest,lastTime:time})
   },
   clearSamples:()=>set(state=>({samples:Object.fromEntries(state.signals.map(s=>[s.id,[]])),latest:{},lastTime:null})),
-  clearAll:()=>set({signals:[],samples:{},latest:{},runs:{},open:false,lastTime:null}),
-  saveRun:(slot)=>set(state=>{
+  clearAll:()=>set({signals:[],samples:{},latest:{},runs:{},open:false,lastTime:null,runLap:null}),
+  setRunLap:(t)=>set({runLap:t}),
+  saveRun:(slot,name)=>set(state=>{
     const stats:ExperimentRun['stats']={}
+    let duration=0
     for(const signal of state.signals){
-      const values=(state.samples[signal.id]??[]).map(p=>p.value)
+      const points=state.samples[signal.id]??[]
+      if(points.length>1)duration=Math.max(duration,points[points.length-1].t-points[0].t)
+      const values=points.map(p=>p.value)
       if(values.length)stats[signal.id]={min:Math.min(...values),max:Math.max(...values),mean:values.reduce((a,b)=>a+b,0)/values.length,samples:values.length}
     }
-    return {runs:{...state.runs,[slot]:{slot,capturedAt:Date.now(),stats}}}
+    const label=(name&&name.trim())||`설정 ${slot}`
+    return {runs:{...state.runs,[slot]:{slot,name:label,capturedAt:Date.now(),lap:state.runLap,duration,stats}}}
   }),
   toggle:()=>set(state=>({open:!state.open})),
 }))
+
+// debug/test handle: lets off-screen verification inject spatial overlays into `latest`.
+if (typeof window !== 'undefined') (window as any).__apexViz = useVisualization
 
 // ---- reusable player-made blocks (persisted across missions) ----
 export type SavedBlock = { id:string; label:string; params:Record<string,any> }

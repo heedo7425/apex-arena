@@ -159,12 +159,14 @@ export function LevelScreen({ id }: { id: string }) {
   }
   const onSpeedTrial = (t:number) => {
     if (!isL1) return
+    useVisualization.getState().setRunLap(t)
     complete(level.id, t)
     setResult({ ok:true, msg:'8 m/s 고정 성공 · ' + t.toFixed(2) + 's' })
   }
 
   const onLap = (t: number, dirty: boolean) => {
     if (isTut) return
+    if (!dirty) useVisualization.getState().setRunLap(t)  // latest clean lap → A/B run capture
     if (dirty) { setResult({ ok:false, msg:`트랙 이탈 · ${t.toFixed(2)}s` }); return }
     if (level.objective.type === 'time' && t > level.objective.target) {
       setResult({ ok:false, msg:`클린 랩 ${t.toFixed(2)}s · 목표까지 ${(t-level.objective.target).toFixed(2)}s` }); return
