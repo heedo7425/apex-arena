@@ -6,10 +6,10 @@ import type { Rng } from '../rng.ts';
 
 export type Ref = ['lit', unknown] | ['n', string, string];
 export type GNode = { type: string; params?: Record<string, unknown>; pos?: [number, number]; in?: Record<string, Ref> };
-export type Graph = { nodes: Record<string, GNode>; order: string[]; outNode?: string; outPort?: string };
+export type Graph = { version?: 1; nodes: Record<string, GNode>; order: string[]; outNode?: string; outPort?: string };
 
 // node kind — hook #3: builtin (opaque, e.g. solver/policy) vs composite (openable subgraph)
-export type NodeKind = 'source' | 'sink' | 'prim' | 'std' | 'higher' | 'builtin' | 'composite';
+export type NodeKind = 'source' | 'sink' | 'metric' | 'prim' | 'std' | 'higher' | 'builtin' | 'composite';
 export type EvalCtx = {
   obs: Record<string, unknown>;
   cmd: { steer: number; throttle: number };
@@ -18,6 +18,7 @@ export type EvalCtx = {
   world: World;
   car: CarState;
   dt: number;
+  metrics?: Record<string, unknown>;
   __arg?: unknown;    // higher-order lambda: current element
   __arg2?: unknown;   // zipWith: paired element
   __argAcc?: unknown; // reduce: accumulator
@@ -41,7 +42,18 @@ export function makeGraph(nodes: Record<string, GNode>, outNode?: string, outPor
     tmp[id] = false; vis[id] = true; order.push(id);
   }
   for (const id in nodes) visit(id);
-  return { nodes, order, outNode, outPort };
+  return { version:1, nodes, order, outNode, outPort };
+}
+
+export function migrateGraph(input:any):Graph{
+  const source=input&&typeof input==='object'?input:{nodes:{}}
+  const nodes:Record<string,GNode>={}
+  for(const [id,raw] of Object.entries(source.nodes??{})){
+    const node=raw as GNode,params={...(node.params??{})} as Record<string,unknown>
+    if(params.sub)params.sub=migrateGraph(params.sub)
+    nodes[id]={type:node.type,params,pos:node.pos?[node.pos[0],node.pos[1]]:undefined,in:{...(node.in??{})}}
+  }
+  return makeGraph(nodes,source.outNode,source.outPort)
 }
 
 function resolveRef(ref: Ref | undefined, val: Record<string, any>): any {

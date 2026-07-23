@@ -45,7 +45,15 @@ ok(near(one({ n:{ type:'vec.dot', in:{ a:L({x:1,y:2}), b:L({x:3,y:4}) } } }, 'n'
   ok(nearest===sourceIndex, 'path.nearestIndex finds exact centerline point');
   const distance=6, advanced=one({ n:{type:'path.advanceByDist',in:{track:L(T),i:L(nearest),d:L(distance)}} },'n','pt');
   const target=(sourceIndex+Math.max(1,Math.round(distance/T.spacing)))%T.N;
-  ok(advanced.x===T.pts[target][0]&&advanced.y===T.pts[target][1], 'path.advanceByDist matches track spacing'); }
+  ok(advanced.x===T.pts[target][0]&&advanced.y===T.pts[target][1], 'path.advanceByDist matches track spacing');
+  const same=one({n:{type:'path.advanceByDist',in:{track:L(T),i:L(sourceIndex),d:L(0)}}},'n','pt');
+  ok(same.x===pt.x&&same.y===pt.y, 'path.advanceByDist preserves position for d=0');
+  const back=one({n:{type:'path.advanceByDist',in:{track:L(T),i:L(sourceIndex),d:L(-T.spacing)}}},'n','i2');
+  ok(back===sourceIndex-1, 'path.advanceByDist supports negative distance');
+  const half=one({n:{type:'path.advanceByDist',in:{track:L(T),i:L(sourceIndex),d:L(T.spacing/2)}}},'n','pt');
+  ok(near(half.x,(T.pts[sourceIndex][0]+T.pts[sourceIndex+1][0])/2)&&near(half.y,(T.pts[sourceIndex][1]+T.pts[sourceIndex+1][1])/2), 'path.advanceByDist interpolates sub-spacing distance'); }
+{ const i2=one({pts:{type:'points.empty'},path:{type:'path.fromPoints',in:{points:['n','pts','points'],half:L(4.6)}},advance:{type:'path.advanceByDist',in:{track:['n','path','track'],i:L(0),d:L(2)}}},'advance','i2');
+  ok(i2===-1, 'path.advanceByDist safely rejects an empty authored path'); }
 { const T=world.track, idx=7;
   const w=one({n:{type:'path.at',in:{track:L(T),i:L(idx)}}},'n','waypoint');
   ok(w.x===T.pts[idx][0]&&w.y===T.pts[idx][1]&&w.kappa===T.curv[idx], 'path.at exposes a typed waypoint');
@@ -53,6 +61,7 @@ ok(near(one({ n:{ type:'vec.dot', in:{ a:L({x:1,y:2}), b:L({x:3,y:4}) } } }, 'n'
   ok(curve===curvAheadAt(T,idx,18), 'path.maxCurvature preserves world formula'); }
 
 // --- shipped L1 geometry is openable and numerically equivalent to the old formulas ---
+ok(NT['ctrl.pid'].kind==='composite'&&!!NT['ctrl.pid'].sub, 'ctrl.pid is an openable dt-aware composite');
 ok(NT['std.lookahead'].kind==='composite'&&!!NT['std.lookahead'].sub, 'std.lookahead is an openable composite');
 ok(NT['std.tocar'].kind==='composite'&&!!NT['std.tocar'].sub, 'std.tocar is an openable composite');
 ok(NT['std.curvAhead'].kind==='composite'&&!!NT['std.curvAhead'].sub, 'std.curvAhead is an openable composite');

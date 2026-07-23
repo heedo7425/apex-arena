@@ -480,3 +480,33 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 ### Next
 - Add more than two candidates via an authorable candidate-list workflow, then expose cost breakdown and constraint events in VISUALIZE.
 - Add offline policy weight import/training artifacts without introducing PPO/SAC turnkey nodes into the runtime palette.
+
+
+## 2026-07-23 - Forty-item improvement program and beginner foundations
+
+### Why
+- The product needed one authoritative list covering capabilities, authoring architecture, UX/design, and whether the current blocks are structurally appropriate.
+- Several temporary teaching boundaries could produce misleading behavior: fixed-rate opaque PID, zero-distance empty objects, snapped forward-only path advance, invalid trajectory selection, two-candidate-only MPC, and a no-op reward sink.
+- The existing help modal explained gestures but not the autonomous-driving concepts a complete beginner needs before building an algorithm.
+
+### Changes
+- Added `design/improvements-40.md` with exactly 40 scoped items, priorities, status, acceptance criteria, delivery order, and a beginner curriculum contract.
+- Converted PID to an openable composite with deterministic dt-aware integral and derivative state primitives while preserving the exact shipped lap.
+- Fixed path advance for zero, negative, and sub-spacing distances without changing existing positive lookahead snapping.
+- Made trajectory selection reject invalid or unscored candidates and made empty nearest-object distance `Infinity`.
+- Added deterministic N-command steering lattices, batch candidate rollout, time-varying command-sequence rollout, batch evaluation, valid-aware selection, cost breakdowns, and timestamped constraint violations.
+- Added typed point-list Path authoring with closed-path construction, midpoint, lateral offset, and uniform resampling primitives.
+- Added explicit-input Pursuit and Speed controller composites while retaining prior `blk.*` compatibility wrappers.
+- Added graph schema versioning/migration, static composite contract validation, and a metric Reward sink that preserves and re-exports its value without affecting controls.
+- Added Parts Bay search and recent parts, automatic graph layout, semantic zoom, active sink-path styling, inline error nodes, richer port title semantics, and one-click parameter reset.
+- Extended VISUALIZE with cost-term and constraint-violation diagnostic tables.
+- Replaced the five-page gesture help with a ten-step beginner concept course covering signal flow, type/unit/frame, feedback, autonomy layers, Rule/MPC/RL, open composites, debugging, experiments, and a direct handoff to the blank first mission.
+
+### Verification
+- `drive.ts`, `prims.ts`, `blocks.ts`, and `planning.ts` all pass, including Path construction/offset/resample/midpoints and empty-path safety, open PID, composite contracts, command sequences, N-candidate order, invalid-safe selection, empty scene semantics, diagnostics, migration, and reward metrics.
+- PURSUIT remains exactly `21.0833s`; the production build emits `index-DPyRbngA.js` and `index-B9p9THOZ.css`.
+- Headless Playwright verifies the 10-step course, Parts Bay search, inline errors, auto-layout, PID inner graph (11 nodes, 12 wires, 23 handles), fork action, and zero browser errors.
+- A separate headless run injects a cost breakdown and confirms the VISUALIZE diagnostic group, `COST TERMS`, and `TOTAL` with zero browser errors. Evidence: `/tmp/apex-beginner-course.png`, `/tmp/apex-editor-search-error.png`, `/tmp/apex-open-pid.png`, `/tmp/apex-cost-diagnostics.png`.
+
+### Next
+- Continue only the items still marked TODO/DOING in `design/improvements-40.md`: replay/scrubber, parameter sweeps, scenario editor, uncertainty, policy artifacts, stronger generic/unit types, graph diff, and timeline synchronization.

@@ -105,6 +105,9 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   const latest = useRef<{nodes:RFNode[];edges:RFEdge[]}>({nodes:arranged,edges:initial.edges})
   const [notice,setNotice] = useState<string|null>(null)
   const [bayOpen,setBayOpen] = useState(true)
+  const [paletteQuery,setPaletteQuery] = useState('')
+  const [recentParts,setRecentParts] = useState<string[]>([])
+  const [zoom,setZoom] = useState(1)
   const [info,setInfo]=useState<string|null>(null)
   const [openNode,setOpenNode]=useState<OpenNode|null>(null)
   const [selectedIds,setSelectedIds]=useState<string[]>([])
@@ -172,7 +175,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     const node=latest.current.nodes.find(n=>n.id===nodeId)
     if(!node)return
     const valueType=portType(node.data.coreType,port,'out')||'unknown'
-    if(!['num','objects','trajectory','trajectories','prediction','predictions','space'].includes(valueType)){
+    if(!['num','objects','trajectory','trajectories','prediction','predictions','space','breakdown','breakdowns','violations','violationSets'].includes(valueType)){
       setNotice(`${valueType} 신호는 아직 VISUALIZE 표시를 지원하지 않습니다.`)
       return
     }
@@ -247,13 +250,19 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     setSelectedIds([]); setNotice(`${ids.length}개 노드를 블록으로 묶었어요. (더블클릭해 열기)`); frameBuild()
   }
   const addNode=(type:string)=>{
-    remember()
+    remember();setRecentParts(r=>[type,...r.filter(x=>x!==type)].slice(0,5))
     const index=nodes.length
     const nn=newNode(type,compact?10+(index%2)*225:70+(index%3)*260,compact?70+Math.floor(index/2)*138:70+(Math.floor(index/3)%4)*128)
     setNodes((nds:any)=>nds.concat({...nn,data:{coreType:type,params:{...defaultParams(type),...(nodeDefaults?.[type]??{})},onParam,onPort,onHover:showHover,onHoverEnd:hideHover}}))
     setNotice(`${metaOf(type).label} 파트를 장착했습니다.`)
     if(compact)setBayOpen(false)
     frameBuild()
+  }
+  const autoLayout=()=>{
+    const core=rfToCore(latest.current.nodes as any,latest.current.edges as any)
+    for(const node of Object.values(core.nodes))delete node.pos
+    const rf=coreToRF(core)
+    remember();setNodes(withCb(rf.nodes) as any);setEdges(rf.edges as any);setNotice('센서에서 출력 방향으로 그래프를 자동 정렬했습니다.');frameBuild()
   }
   const addSavedBlock=(saved:(typeof blocks)[number])=>{
     remember()
@@ -272,15 +281,20 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   }
 
 
+  const issues=graphIssues(nodes as any,edges as any,requiredOutputs)
+  const issueNodeIds=new Set(issues.map(i=>i.nodeId).filter(Boolean))
+  const activePathIds=new Set<string>()
+  const visitActive=(id:string)=>{if(activePathIds.has(id))return;activePathIds.add(id);for(const edge of edges as RFEdge[])if(edge.target===id)visitActive(edge.source)}
+  for(const node of nodes as RFNode[])if(node.data.coreType.startsWith('sink.'))visitActive(node.id)
+  const renderedEdges=(edges as RFEdge[]).map(edge=>activePathIds.has(edge.source)&&activePathIds.has(edge.target)?{...edge,className:'active-path'}:edge)
   const renderedNodes = (nodes as RFNode[]).map(n => {
     const visualized=vizSignals.filter(s=>s.nodeId===n.id).map(s=>s.port)
-    const base={...n,data:{...n.data,onVisualize:visualizeSignal,visualized}}
+    const base={...n,data:{...n.data,onVisualize:visualizeSignal,visualized,issue:issueNodeIds.has(n.id),semanticCompact:zoom<0.76,activePath:activePathIds.has(n.id)}}
     if (n.data.coreType !== 'const') return base
     const targets = [...new Set((edges as RFEdge[]).filter(e => e.source === n.id && e.sourceHandle === 'v').map(e => e.targetHandle))]
     const label = targets.length === 1 ? "value → " + targets[0] : "value"
     return {...base,data:{...base.data,outputLabels:{v:label}}}
   })
-  const issues=graphIssues(nodes as any,edges as any,requiredOutputs)
   const issue=issues[0]
   const issueNode=issue?.nodeId?(nodes as RFNode[]).find(n=>n.id===issue.nodeId):null
   let buildMessage=issue?.message||'출력 링크를 완성하세요.'
@@ -311,9 +325,12 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
           <div><span>GARAGE LOADOUT</span><b>제어 파트 장착</b></div>
           <button aria-label="파트 베이 닫기" onClick={()=>setBayOpen(false)}>×</button>
         </div>
+        <div className="parts-search"><input value={paletteQuery} onChange={e=>setPaletteQuery(e.target.value)} placeholder="파트 이름·역할 검색" aria-label="Parts Bay 검색"/>{paletteQuery&&<button onClick={()=>setPaletteQuery('')}>×</button>}</div>
         <div className="parts-grid">
+          {!paletteQuery&&recentParts.length>0&&<div className="pal-cat recent-parts"><div className="pal-cat-h">RECENT</div><div className="pal-chips">{recentParts.map(t=><button key={t} className="pal-chip" onClick={()=>addNode(t)} style={{['--part' as any]:colorOf(t)}}><i>+</i><span>{metaOf(t).label}</span></button>)}</div></div>}
           {PALETTE_CATS.map(g=>{
-            const types=g.types.filter(t=>palette.includes(t))
+            const q=paletteQuery.trim().toLowerCase()
+            const types=g.types.filter(t=>palette.includes(t)&&(!q||`${t} ${metaOf(t).label} ${metaOf(t).desc||''}`.toLowerCase().includes(q)))
             if(!types.length)return null
             return <div className="pal-cat" key={g.cat}>
               <div className="pal-cat-h" style={{color:colorOf(types[0])}}>{g.cat}</div>
@@ -341,6 +358,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
         <div className="editor-actions">
           {selectedIds.length>=2 && <button className="group-btn" onClick={groupSelected} aria-label="선택한 노드를 블록으로 묶기">▣ 블록으로 묶기 ({selectedIds.length})</button>}
           <button onClick={undo} disabled={undoCount === 0} aria-label="마지막 변경 되돌리기">↶ UNDO</button>
+          <button onClick={autoLayout} aria-label="그래프 자동 정렬">⇥ 정렬</button>
           <button onClick={resetBuild} aria-label="미션 그래프 초기화">↻ RESET</button>
         </div>
         <div className="editor-topbar">
@@ -360,7 +378,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
         <div ref={trashRef} className={`trash-drop${draggingNode?" dragging":""}${trashHot?" hot":""}`} aria-label="블록 삭제 영역">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg><span>{trashHot?"놓아서 삭제":"여기로 끌어 삭제"}</span>
         </div>
-        <ReactFlow nodes={renderedNodes} edges={edges} nodeTypes={nodeTypes} deleteKeyCode={["Backspace","Delete"]}
+        <ReactFlow nodes={renderedNodes} edges={renderedEdges} nodeTypes={nodeTypes} deleteKeyCode={["Backspace","Delete"]}
           onNodeDragStart={()=>{remember();setDraggingNode(true)}} onNodeDrag={e=>setTrashHot(isOverTrash(e))}
           onNodeDragStop={(e,node)=>{const remove=isOverTrash(e);setDraggingNode(false);setTrashHot(false);if(remove)deleteNode(node.id,false)}}
           onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange} onConnect={onConnect}
@@ -370,6 +388,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
           isValidConnection={c=>!!c.source&&!!c.sourceHandle&&!!c.target&&!!c.targetHandle&&!connectionIssue(latest.current.nodes,latest.current.edges,c.source,c.sourceHandle,c.target,c.targetHandle)}
           onNodeClick={(_,node:any)=>{setHover(null);setInfo(node.data.coreType)}} onPaneClick={clearPending}
           onNodeDoubleClick={(_,node:any)=>openBlock(node.id,node.data.coreType)}
+          onMove={(_,viewport)=>setZoom(viewport.zoom)}
           fitView minZoom={0.58} maxZoom={2} proOptions={{hideAttribution:true}}>
           <Background color="#314052" gap={24} size={1}/>
           <Controls showInteractive={false}/>

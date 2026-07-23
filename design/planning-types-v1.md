@@ -158,9 +158,12 @@ Control     → Command
 - Objective: progress/collision/clearance/tracking/smoothness/control 비용과 track/collision/speed/steer 제약, trajectory 평가.
 - 모든 타입은 `validate.ts`의 서로 다른 포트 타입으로 검사되며 `nodeMeta.ts` 마스터 팔레트에 한국어 설명과 함께 노출된다.
 - 현재 shape 생성 노드는 box 기반이다. polygon 생성/불확실성 팽창은 후속 perception·prediction 웨이브에서 추가한다.
+- Path: `points.empty/append`로 점열을 조립하고 `path.fromPoints/midpoints/offset/resample`로 닫힌 reference path를 생성·변형한다. waypoint의 s/heading/curvature는 결정론적으로 재계산한다.
+- rollout은 일정 command와 시간별 `CommandSequence`를 모두 지원한다. `commands.steerLattice`→`trajectories.rolloutLattice`로 결정론적 N개 후보를 생성할 수 있다.
+- `trajectory.evaluate`와 batch `trajectories.evaluate`는 raw/weighted cost breakdown 및 constraint violation의 시점·위치를 반환한다. valid-aware 선택은 invalid 후보를 제외한다.
 - 현재 rollout은 일정 command 후보용 기본 enabler다. `array.pack2`로 후보 비용 순서를 고정하고 `trajectory.commandAt`→`command.parts`로 선택된 첫 명령을 actuator에 전달한다.
 - RL 배포 경계는 열리는 `policy.linear2` composite이며, `reward.track`→`sink.reward` 평가 경로는 command와 분리된다. PPO/SAC 같은 학습 알고리즘은 여전히 노드로 제공하지 않는다.
-- `test/planning.ts`가 전체 데이터 흐름, 결정론, hard constraint, 최소 비용 선택, turnkey 노드 부재와 완성된 MPC/RL 참조 그래프의 클린 랩을 검증한다.
+- `test/planning.ts`가 Path 생성·offset·resample·midpoint 복원과 전체 데이터 흐름, 결정론, hard constraint, 최소 비용 선택, turnkey 노드 부재와 완성된 MPC/RL 참조 그래프의 클린 랩을 검증한다.
 
 ## 9. VISUALIZE contract
 

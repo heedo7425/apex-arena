@@ -1,16 +1,16 @@
 // Shared planning-enabler checks for rule-based, RL, and MPC graphs.
 import { buildWorld } from '../src/sim/world.ts';
-import { makeGraph } from '../src/graph/engine.ts';
+import { makeGraph, migrateGraph } from '../src/graph/engine.ts';
 import { runFor } from '../src/sim/runner.ts';
 import { initCar } from '../src/sim/vehicle.ts';
 import {
-  makeVehicleObject, makeStaticObject, nearestObject, objectsInRadius, relativeObject,
-  spaceFromTrack, blockObject, spaceContains, rolloutTrajectory, predictConstantVelocity,
+  trackFromPoints, resampleTrack, offsetTrack, midpointTrack, makeVehicleObject, makeStaticObject, nearestObject, objectsInRadius, relativeObject,
+  spaceFromTrack, blockObject, spaceContains, rolloutTrajectory, rolloutCommandSequence, predictConstantVelocity,
   trajectoryClearance, trajectoryProgress, predictionClearance, selectMinTrajectory, makeIntent,
   requestFromIntent, evaluateTrajectory, type CostTerm, type Constraint,
 } from '../src/planning/types.ts';
 import { NT } from '../src/graph/registry.ts';
-import { portType } from '../src/graph/validate.ts';
+import { portType, validateCompositeRegistry } from '../src/graph/validate.ts';
 
 let failed=0;
 function ok(condition:boolean,message:string){console.log((condition?'PASS ':'FAIL ')+message);if(!condition)failed++}
@@ -28,6 +28,12 @@ ok(nearest.found&&nearest.object.id==='cone','scene: nearest object selects by s
 ok(objectsInRadius(objects,egoPose,5).length===1,'scene: radius query filters distant objects');
 const relative=relativeObject(moving,egoPose);
 ok(near(relative.e.x,8)&&near(relative.e.y,0),'scene: relative object uses ego frame');
+
+const square=trackFromPoints([{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}],3);
+ok(square.N===4&&square.total===40,'path: point list builds a closed typed track');
+const offset=offsetTrack(square,1),resampled=resampleTrack(square,2),mid=midpointTrack([{x:0,y:1},{x:10,y:1},{x:10,y:11},{x:0,y:11}],[{x:0,y:-1},{x:10,y:-1},{x:10,y:9},{x:0,y:9}],3);
+ok(offset.N===square.N&&resampled.N===20,'path: lateral offset and uniform resample preserve valid geometry');
+ok(near(mid.pts[0][0],0)&&near(mid.pts[0][1],0),'path: bounds midpoints recover center path');
 
 const openSpace=spaceFromTrack(world.track,12);
 ok(spaceContains(openSpace,{x:car.x,y:car.y}),'space: track center is drivable');
@@ -48,6 +54,11 @@ ok(rolloutTrajectory(car,command,0,0.1,world).points.length===1,'trajectory: zer
 }
 
 
+const sequence=rolloutCommandSequence(car,[{steer:-0.1,throttle:0.2},{steer:0.3,throttle:0.4}],0.1,world);
+ok(sequence.points.length===3&&sequence.points[0].command.steer===-0.1&&sequence.points[1].command.steer===0.3,'trajectory: command sequence applies time-varying controls in order');
+const lattice=NT['commands.steerLattice'].fn({baseSteer:0,throttle:0.5,span:0.2,count:5},{},{},{} as any).commands;
+ok(lattice.length===5&&near(lattice[0].steer,-0.2)&&near(lattice[4].steer,0.2),'trajectory: deterministic N-candidate steer lattice preserves order');
+
 const prediction=predictConstantVelocity(moving,1,0.1);
 const predictedEnd=prediction.hypotheses[0].trajectory.points.at(-1)!.state;
 ok(near(predictedEnd.x,moving.pose.x+moving.velocity.x),'prediction: constant velocity advances object position');
@@ -67,7 +78,12 @@ const request=requestFromIntent(makeIntent('follow',8,0,2),world.track,costs,con
 const safe=evaluateTrajectory(trajectoryA,request,[],[]);
 const unsafe=evaluateTrajectory(trajectoryA,request,[makeStaticObject(egoPose,1,1)],[]);
 ok(safe.valid&&!unsafe.valid,'planning: hard collision constraint rejects unsafe candidate');
+ok('progress' in safe.breakdown.raw&&safe.breakdown.total===safe.cost,'planning: evaluation exposes raw and weighted cost breakdown');
+ok(unsafe.violations.some(v=>v.kind==='collision'),'planning: evaluation reports the violated constraint and location');
 ok(selectMinTrajectory([trajectoryA,{...trajectoryA,duration:2}],[5,2]).i===1,'planning: minimum-cost candidate is selected');
+ok(selectMinTrajectory([{...trajectoryA,valid:false},trajectoryB],[1,2]).i===1,'planning: invalid low-cost candidate is never selected');
+ok(selectMinTrajectory([trajectoryA],[]).i===-1,'planning: missing candidate cost returns no selection');
+ok(!nearestObject([],egoPose).found&&nearestObject([],egoPose).d===Infinity,'scene: empty nearest result cannot masquerade as a zero-distance obstacle');
 
 // Complete reference graphs prove the boundaries compose into runnable MPC and RL missions.
 const mpcWorld=buildWorld({ctrl:[[10,40],[22,13],[55,6],[91,14],[112,38],[103,65],[70,76],[37,68],[17,58]],half:6.8,mu:1.05});
@@ -92,7 +108,13 @@ const rlGraph=makeGraph({
 const rlRun=runFor(rlWorld,rlGraph,1,70);
 ok(rlRun.bestClean!==null,'integration: policy-action and reward paths complete a clean evaluation lap');
 
+const migrated=migrateGraph({nodes:{n:{type:'const',params:{value:3}}},order:['broken']});
+ok(migrated.version===1&&migrated.order[0]==='n','graph: legacy saved graph migrates to the current schema and recomputes order');
+const metricCtx:any={metrics:{}};const metric=NT['sink.reward'].fn({x:4.2},{},{},metricCtx);
+ok(metric.value===4.2&&metricCtx.metrics.reward===4.2,'reward: metric sink preserves and re-exports the episode value');
+
 const required=['object.vehicle','objects.nearest','space.blockObject','trajectory.rollout','predict.constantVelocity','intent.passLeft','cost.collision','constraint.track','trajectory.evaluate'];
+ok(validateCompositeRegistry(NT).length===0,'registry: every shipped composite interface is internally valid');
 ok(required.every(type=>!!NT[type]),'registry: common planning enablers are registered');
 ok(portType('object.vehicle','object','out')==='object'&&portType('trajectory.rollout','state','in')==='state','validation: planning ports keep distinct types');
 ok(!Object.keys(NT).some(type=>/mppi|ppo|sac|overtake|staticAvoidance|localPlanner/i.test(type)),'architecture: no turnkey planner or algorithm node leaked into L0/L1');

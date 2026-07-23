@@ -3,10 +3,10 @@ import type { Graph, NodeDef } from './engine.ts';
 
 export type PortType =
   | 'num' | 'bool' | 'pose' | 'waypoint' | 'track' | 'scan' | 'point'
-  | 'state' | 'command' | 'object' | 'objects' | 'corridor' | 'space'
+  | 'state' | 'command' | 'points' | 'object' | 'objects' | 'corridor' | 'space'
   | 'trajectory' | 'trajectories' | 'prediction' | 'predictions'
   | 'intent' | 'request' | 'cost' | 'costs' | 'constraint' | 'constraints'
-  | 'array<num>' | 'any';
+  | 'commands' | 'breakdown' | 'breakdowns' | 'violations' | 'violationSets' | 'array<num>' | 'array<bool>' | 'any';
 
 type PortShape = { ins?: Record<string, PortType>; outs?: Record<string, PortType> };
 
@@ -32,7 +32,12 @@ const PORTS: Record<string, PortShape> = {
   'space.contains': { ins:{ space:'space', pt:'point' }, outs:{ inside:'bool' } },
   'state.parts': { ins:{ state:'state' }, outs:{ pose:'pose', velocity:'point', speed:'num', yawRate:'num', onTrack:'bool' } },
   'command.make': { ins:{ steer:'num', throttle:'num' }, outs:{ command:'command' } },
+  'commands.steerLattice': { ins:{ baseSteer:'num', throttle:'num', span:'num', count:'num' }, outs:{ commands:'commands' } },
+  'commands.empty': { outs:{ commands:'commands' } },
+  'commands.append': { ins:{ commands:'commands', command:'command' }, outs:{ commands:'commands' } },
   'command.parts': { ins:{ command:'command' }, outs:{ steer:'num', throttle:'num' } },
+  'trajectories.rolloutLattice': { ins:{ state:'state', commands:'commands', horizon:'num', step:'num' }, outs:{ trajectories:'trajectories' } },
+  'trajectory.rolloutCommands': { ins:{ state:'state', commands:'commands', step:'num' }, outs:{ trajectory:'trajectory' } },
   'trajectory.rollout': { ins:{ state:'state', command:'command', horizon:'num', step:'num' }, outs:{ trajectory:'trajectory' } },
   'trajectory.parts': { ins:{ trajectory:'trajectory' }, outs:{ duration:'num', length:'num', valid:'bool' } },
   'trajectory.clearance': { ins:{ trajectory:'trajectory', objects:'objects' }, outs:{ d:'num' } },
@@ -40,6 +45,8 @@ const PORTS: Record<string, PortShape> = {
   'trajectory.collides': { ins:{ trajectory:'trajectory', objects:'objects', margin:'num' }, outs:{ collision:'bool' } },
   'trajectories.empty': { outs:{ trajectories:'trajectories' } },
   'trajectories.append': { ins:{ trajectories:'trajectories', trajectory:'trajectory' }, outs:{ trajectories:'trajectories' } },
+  'trajectories.evaluate': { ins:{ trajectories:'trajectories', request:'request', objects:'objects', predictions:'predictions' }, outs:{ costs:'array<num>', valids:'array<bool>', breakdowns:'breakdowns', violationSets:'violationSets' } },
+  'trajectories.selectEvaluated': { ins:{ trajectories:'trajectories', costs:'array<num>', valids:'array<bool>' }, outs:{ trajectory:'trajectory', i:'num' } },
   'trajectories.selectMin': { ins:{ trajectories:'trajectories', costs:'array<num>' }, outs:{ trajectory:'trajectory', i:'num' } },
   'trajectory.commandAt': { ins:{ trajectory:'trajectory', i:'num' }, outs:{ command:'command' } },
   'predict.constantVelocity': { ins:{ object:'object', horizon:'num', step:'num' }, outs:{ prediction:'prediction' } },
@@ -68,7 +75,7 @@ const PORTS: Record<string, PortShape> = {
   'constraints.append': { ins:{ constraints:'constraints', constraint:'constraint' }, outs:{ constraints:'constraints' } },
   'request.make': { ins:{ intent:'intent', track:'track', costs:'costs', constraints:'constraints' }, outs:{ request:'request' } },
   'request.parts': { ins:{ request:'request' }, outs:{ targetSpeed:'num', offset:'num', costs:'costs', constraints:'constraints' } },
-  'trajectory.evaluate': { ins:{ trajectory:'trajectory', request:'request', objects:'objects', predictions:'predictions' }, outs:{ cost:'num', valid:'bool', clearance:'num' } },
+  'trajectory.evaluate': { ins:{ trajectory:'trajectory', request:'request', objects:'objects', predictions:'predictions' }, outs:{ cost:'num', valid:'bool', clearance:'num', breakdown:'breakdown', violations:'violations' } },
   'add': { ins:{ a:'num', b:'num' }, outs:{ v:'num' } },
   'sub': { ins:{ a:'num', b:'num' }, outs:{ v:'num' } },
   'mul': { ins:{ a:'num', b:'num' }, outs:{ v:'num' } },
@@ -83,10 +90,18 @@ const PORTS: Record<string, PortShape> = {
   'array.max': { ins:{ arr:'array<num>' }, outs:{ v:'num' } },
   'pose.parts': { ins:{ pose:'pose' }, outs:{ x:'num', y:'num', yaw:'num' } },
   'wpt.parts': { ins:{ waypoint:'waypoint' }, outs:{ x:'num', y:'num', s:'num', kappa:'num', psi:'num', vref:'num' } },
+  'points.empty': { outs:{points:'points'} },
+  'points.append': { ins:{points:'points',point:'point'},outs:{points:'points'} },
+  'path.fromPoints': { ins:{points:'points',half:'num'},outs:{track:'track'} },
+  'path.midpoints': { ins:{left:'points',right:'points',half:'num'},outs:{track:'track'} },
+  'path.offset': { ins:{track:'track',offset:'num'},outs:{track:'track'} },
+  'path.resample': { ins:{track:'track',spacing:'num'},outs:{track:'track'} },
   'path.nearestIndex': { ins:{ track:'track', pt:'point' }, outs:{ i:'num' } },
   'path.advanceByDist': { ins:{ track:'track', i:'num', d:'num' }, outs:{ pt:'point', i2:'num' } },
   'path.at': { ins:{ track:'track', i:'num' }, outs:{ waypoint:'waypoint' } },
   'path.maxCurvature': { ins:{ track:'track', i:'num', d:'num' }, outs:{ k:'num' } },
+  'ctrl.pursuit': { ins:{ pose:'pose', track:'track', Ld:'num' }, outs:{ steer:'num' } },
+  'ctrl.speed': { ins:{ speed:'num', target:'num' }, outs:{ throttle:'num' } },
   'std.lookahead': { ins:{ pose:'pose', track:'track', Ld:'num' }, outs:{ pt:'point', idx:'num' } },
   'std.tocar': { ins:{ pt:'point', pose:'pose' }, outs:{ e:'point' } },
   'std.curvAhead': { ins:{ pose:'pose', track:'track' }, outs:{ k:'num' } },
@@ -136,6 +151,7 @@ const PORTS: Record<string, PortShape> = {
   'array.centerMin': { ins:{ arr:'array<num>', w:'num' }, outs:{ v:'num' } },
   'array.pack2': { ins:{ a:'num', b:'num' }, outs:{ v:'array<num>' } },
   // stateful
+  'st.pidIntegral': { ins:{ x:'num' }, outs:{ v:'num' } }, 'st.pidDerivative': { ins:{ x:'num' }, outs:{ v:'num' } },
   'st.delay': { ins:{ x:'num' }, outs:{ v:'num' } }, 'st.accum': { ins:{ x:'num' }, outs:{ v:'num' } },
   'st.lowpass': { ins:{ x:'num' }, outs:{ v:'num' } }, 'st.rateLimit': { ins:{ x:'num' }, outs:{ v:'num' } },
   // composite / modules
@@ -145,8 +161,33 @@ const PORTS: Record<string, PortShape> = {
   'blk.speedPid': { ins:{ target:'num' }, outs:{ throttle:'num' } },
   'policy.linear2': { ins:{ x1:'num', x2:'num' }, outs:{ action:'num' } },
   'reward.track': { ins:{ speed:'num', cte:'num', onTrack:'bool' }, outs:{ reward:'num' } },
-  'sink.reward': { ins:{ x:'num' } },
+  'sink.reward': { ins:{ x:'num' }, outs:{ value:'num' } },
 };
+
+
+export type CompositeContractIssue = { type:string; message:string };
+export function validateCompositeRegistry(registry: Record<string, NodeDef>): CompositeContractIssue[] {
+  const issues:CompositeContractIssue[]=[]
+  for(const [type,def] of Object.entries(registry)){
+    if(def.kind!=='composite'||!def.sub)continue // dynamic blk.user carries its schema per instance
+    const externalIns=new Set(def.ins??[]),externalOuts=new Set(def.outs??[])
+    for(const node of Object.values(def.sub.nodes)){
+      if(node.type==='cin'){
+        const port=String(node.params?.port??'')
+        if(!externalIns.has(port))issues.push({type,message:`cin port ${port} is not declared by the composite`})
+      }
+    }
+    for(const [port,[nodeId,nodePort]] of Object.entries(def.outMap??{})){
+      if(!externalOuts.has(port))issues.push({type,message:`outMap port ${port} is not declared by the composite`})
+      const node=def.sub.nodes[nodeId],source=node&&registry[node.type]
+      if(!node)issues.push({type,message:`outMap references missing node ${nodeId}`})
+      else if(!(source?.outs??[]).includes(nodePort))issues.push({type,message:`outMap references missing port ${nodeId}.${nodePort}`})
+    }
+    for(const port of externalOuts)if(!def.outMap?.[port])issues.push({type,message:`output ${port} has no outMap entry`})
+    for(const issue of validateGraph(def.sub,registry))issues.push({type,message:`inner graph: ${issue.message}`})
+  }
+  return issues
+}
 
 export type GraphIssueCode =
   | 'unknown-node' | 'unknown-port' | 'missing-source' | 'type-mismatch'

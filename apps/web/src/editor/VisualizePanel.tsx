@@ -18,6 +18,14 @@ function linePath(points:VisualizationPoint[]){
   }).join(' ')
 }
 
+function Diagnostic({type,value}:{type:string;value:any}){
+  if(value==null)return <div className="vz-empty"><p>실행하면 평가 상세가 표시됩니다.</p></div>
+  const breakdowns=type==='breakdown'?[value]:type==='breakdowns'?value:[]
+  const violationSets=type==='violations'?[value]:type==='violationSets'?value:[]
+  if(breakdowns.length)return <div className="vz-diagnostics">{breakdowns.map((b:any,index:number)=><div key={index} className="vz-diag-group"><b>{breakdowns.length>1?`CANDIDATE ${index}`:'COST TERMS'}</b>{Object.keys(b?.weighted??{}).map(k=><span key={k}><em>{k}</em><strong>{fmt(b.raw[k])}</strong><small>weighted {fmt(b.weighted[k])}</small></span>)}<span className="total"><em>TOTAL</em><strong>{fmt(b?.total??0)}</strong></span></div>)}</div>
+  return <div className="vz-diagnostics">{violationSets.map((items:any[],index:number)=><div key={index} className="vz-diag-group"><b>{violationSets.length>1?`CANDIDATE ${index}`:'CONSTRAINTS'}</b>{!items?.length?<span className="safe">NO VIOLATIONS</span>:items.map((v:any,k:number)=><span key={k}><em>{v.kind}</em><strong>{fmt(v.value)} / {fmt(v.limit)}</strong><small>t={fmt(v.t)}s · ({fmt(v.point.x)}, {fmt(v.point.y)})</small></span>)}</div>)}</div>
+}
+
 export function VisualizePanel(){
   const {signals,samples,latest,runs,open,removeSignal,clearSamples,saveRun,toggle}=useVisualization()
   const [runName,setRunName]=React.useState('')
@@ -56,7 +64,7 @@ export function VisualizePanel(){
     <div className="vz-signals">{signals.map(signal=>{
       const points=samples[signal.id]||[], values=points.map(p=>p.value)
       const current=values.at(-1), lo=values.length?Math.min(...values):null, hi=values.length?Math.max(...values):null
-      const spatial=signal.valueType!=='num', raw=latest[signal.id]
+      const spatial=signal.valueType!=='num', diagnostic=['breakdown','breakdowns','violations','violationSets'].includes(signal.valueType), raw=latest[signal.id]
       const spatialCount=Array.isArray(raw)?raw.length:raw&&typeof raw==='object'?1:0
       return <section className="vz-card" key={signal.id} style={{['--signal' as any]:signal.color}}>
         <div className="vz-card-h">
@@ -64,7 +72,7 @@ export function VisualizePanel(){
           <strong>{spatial?spatialCount:(current==null?'—':fmt(current))}<em>{spatial?signal.valueType:signal.unit}</em></strong>
           <button onClick={()=>removeSignal(signal.id)} aria-label={`${signal.label} Visualize에서 제거`}>×</button>
         </div>
-        {spatial?<div className="vz-empty">
+        {diagnostic?<Diagnostic type={signal.valueType} value={raw}/>:spatial?<div className="vz-empty">
           <b>SIMULATION OVERLAY ACTIVE</b>
           <p>{signal.valueType} 데이터가 트랙 위에 실시간으로 표시됩니다.</p>
         </div>:<>

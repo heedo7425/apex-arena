@@ -96,7 +96,7 @@ Follow-the-Gap `argmax→각도` · 완성 속도정책. (2026-07-21 `std.pursui
   고차(map/filter/reduce/zipWith)는 core엔 있으나 **에디터 람다 저작 UI 전까지 팔레트 미노출**. Struct 생성(make.waypoint/make.command)은 P-c(Path)와 함께.
 - **P-b ✅ 완료(2026-07-22)** — shipped `lookahead`·`tocar`·`curvAhead`·`gripSpeed`와 신규 `nearestWpt`·`crossTrack`·`headingErr`, LiDAR 3종을 전부 L0 서브그래프 기반 composite로 전환. `path.at` 등 경계 프리미티브와 파라미터 fork 치환까지 포함하며 기존 결정론 랩을 완전히 보존.
   에디터는 중첩 breadcrumb, 내부 PART GUIDE, 실시간 신호, 충돌 회피 fork 배치, 원인별 회로 진단, 사용자 블록 이름 지정·영구 보관함을 지원.
-- **P-c 🟡 일부 완료(2026-07-22)** — 현재 vehicle state와 command로 결정론적 `trajectory.rollout` 후보를 생성한다. Path 생성(`midpoints`·`resample`·make waypoint)은 남아 있다.
+- **P-c ✅ 핵심 완료(2026-07-23)** — vehicle state와 일정/시간별 command로 결정론적 trajectory 후보를 생성한다. `points.empty/append`, `path.fromPoints`, `path.midpoints`, `path.offset`, `path.resample`로 경계·점열에서 reference path를 저작하며 N-candidate lattice와 valid-aware 평가까지 연결된다. 고급 racing-line 반복 최적화는 별도 확장이다.
 - **P-d enabler ✅ 완료(2026-07-22)** — Scene ObjectSet, Corridor/DrivableSpace, TrajectorySet, PredictionSet, BehaviorIntent, PlanningRequest, CostTerm, Constraint를 실제 registry·포트 검증·팔레트에 구현했다.
   static avoidance와 overtaking은 이 블록들의 예제 그래프/미션으로 조립하며 turnkey Planner·Overtake·MPPI·PPO·SAC 노드는 두지 않는다. 전용 `test/planning.ts`가 장면→공간→예측→행동→평가 흐름과 결정론을 검증한다.
   static avoidance(L5), overtaking(L6), 후보 선택 MPC(L7), 정책 평가 RL(L8) 미션까지 구현했다.

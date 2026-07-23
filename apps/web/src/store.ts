@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { migrateGraph } from '@apex/core'
 import type { Graph } from '@apex/core'
 
 // live node output values (from the running sim) — read by editor node probes, ~10fps
@@ -90,7 +91,7 @@ if (typeof window !== 'undefined') (window as any).__apexViz = useVisualization
 // ---- reusable player-made blocks (persisted across missions) ----
 export type SavedBlock = { id:string; label:string; params:Record<string,any> }
 const BLOCK_KEY = 'apex_block_library_v1'
-function loadBlocks():SavedBlock[]{ try { const v=JSON.parse(localStorage.getItem(BLOCK_KEY)||'[]'); return Array.isArray(v)?v:[] } catch { return [] } }
+function loadBlocks():SavedBlock[]{ try { const v=JSON.parse(localStorage.getItem(BLOCK_KEY)||'[]'); return Array.isArray(v)?v.map((b:any)=>({...b,params:{...b.params,...(b.params?.sub?{sub:migrateGraph(b.params.sub)}:{})}})):[] } catch { return [] } }
 function persistBlocks(blocks:SavedBlock[]){ try { localStorage.setItem(BLOCK_KEY,JSON.stringify(blocks)) } catch {} }
 type BlockLibrary = {
   blocks:SavedBlock[]
@@ -115,7 +116,7 @@ export const useBlockLibrary=create<BlockLibrary>((set,get)=>({
 // ---- complete control-graph designs, versioned per mission ----
 export type SavedDesign={id:string;name:string;levelId:string;version:number;createdAt:number;graph:Graph}
 const DESIGN_KEY='apex_design_library_v1'
-function loadDesigns():SavedDesign[]{try{const v=JSON.parse(localStorage.getItem(DESIGN_KEY)||'[]');return Array.isArray(v)?v:[]}catch{return []}}
+function loadDesigns():SavedDesign[]{try{const v=JSON.parse(localStorage.getItem(DESIGN_KEY)||'[]');return Array.isArray(v)?v.map((d:any)=>({...d,graph:migrateGraph(d.graph)})):[]}catch{return []}}
 function persistDesigns(designs:SavedDesign[]){try{localStorage.setItem(DESIGN_KEY,JSON.stringify(designs))}catch{}}
 type DesignLibrary={
   designs:SavedDesign[]

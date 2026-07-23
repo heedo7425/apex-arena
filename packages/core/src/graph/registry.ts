@@ -7,8 +7,9 @@ import { uniform, gaussian } from '../rng.ts';
 import {
   makeVehicleObject, makeStaticObject, relativeObject, nearestObject, objectsInRadius,
   corridorFromTrack, spaceFromTrack, blockObject, spaceContains, currentState,
-  rolloutTrajectory, predictConstantVelocity, trajectoryClearance, trajectoryProgress,
+  rolloutTrajectory, rolloutCommandSequence, predictConstantVelocity, trajectoryClearance, trajectoryProgress,
   predictionClearance, selectMinTrajectory, makeIntent, requestFromIntent, evaluateTrajectory,
+  trackFromPoints, resampleTrack, offsetTrack, midpointTrack,
   type CostTerm, type Constraint,
 } from '../planning/types.ts';
 
@@ -104,6 +105,24 @@ const FREE_AHEAD_SUB: Graph = makeGraph({
   clear:{ type:'array.centerMin', in:{ arr:['n','rangesIn','v'], w:['n','width','v'] } },
 });
 
+// Explicit-input controller vocabulary for virtual states, alternate paths and testing.
+const PURSUIT_CTRL_SUB: Graph = makeGraph({
+  pose:{ type:'cin', params:{ port:'pose' } }, track:{ type:'cin', params:{ port:'track' } }, Ld:{ type:'cin', params:{ port:'Ld' } },
+  look:{ type:'std.lookahead', in:{ pose:['n','pose','v'], track:['n','track','v'], Ld:['n','Ld','v'] } },
+  local:{ type:'std.tocar', in:{ pt:['n','look','pt'], pose:['n','pose','v'] } },
+  xy:{ type:'vec.xy', in:{ e:['n','local','e'] } }, dist:{ type:'vec.len', in:{ e:['n','local','e'] } },
+  two:{ type:'const', params:{ value:2 } }, twoY:{ type:'mul', in:{ a:['n','two','v'], b:['n','xy','y'] } },
+  dsq:{ type:'mul', in:{ a:['n','dist','v'], b:['n','dist','v'] } }, curve:{ type:'div', in:{ a:['n','twoY','v'], b:['n','dsq','v'] } },
+  gain:{ type:'cparam', params:{ param:'gain', fallback:5.2 } }, raw:{ type:'mul', in:{ a:['n','curve','v'], b:['n','gain','v'] } },
+  steer:{ type:'clamp', params:{ lo:-1, hi:1 }, in:{ x:['n','raw','v'] } },
+});
+const SPEED_CTRL_SUB: Graph = makeGraph({
+  speed:{ type:'cin', params:{ port:'speed' } }, target:{ type:'cin', params:{ port:'target' } },
+  error:{ type:'sub', in:{ a:['n','target','v'], b:['n','speed','v'] } },
+  pid:{ type:'ctrl.pid', params:{ kp:0.6,ki:0.06,kd:0 }, in:{ err:['n','error','v'] } },
+  throttle:{ type:'clamp', params:{ lo:-1,hi:1 }, in:{ x:['n','pid','u'] } },
+});
+
 // Inner sub-graph: Pure Pursuit steering (what the player builds in L2) → steer.
 const PURSUIT_SUB: Graph = makeGraph({
   pose:{ type:'src.pose' }, track:{ type:'src.track' }, Ld:{ type:'const', params:{ value:6 } },
@@ -121,6 +140,22 @@ const SPEEDPID_SUB: Graph = makeGraph({
   verr:{ type:'sub', in:{ a:['n','tgt','v'], b:['n','sp','v'] } },
   pid:{ type:'ctrl.pid', params:{ kp:0.6, ki:0.06, kd:0 }, in:{ err:['n','verr','v'] } },
   thr:{ type:'clamp', params:{ lo:-1, hi:1 }, in:{ x:['n','pid','u'] } },
+});
+
+// PID remains a reusable controller but its P/I/D structure is inspectable.
+// The two state primitives own only the irreducible tick memory.
+const PID_SUB: Graph = makeGraph({
+  err:{ type:'cin', params:{ port:'err' } },
+  kp:{ type:'cparam', params:{ param:'kp', fallback:0.6 } },
+  ki:{ type:'cparam', params:{ param:'ki', fallback:0.06 } },
+  kd:{ type:'cparam', params:{ param:'kd', fallback:0 } },
+  integral:{ type:'st.pidIntegral', in:{ x:['n','err','v'] } },
+  derivative:{ type:'st.pidDerivative', in:{ x:['n','err','v'] } },
+  pTerm:{ type:'mul', in:{ a:['n','err','v'], b:['n','kp','v'] } },
+  iTerm:{ type:'mul', in:{ a:['n','integral','v'], b:['n','ki','v'] } },
+  dTerm:{ type:'mul', in:{ a:['n','derivative','v'], b:['n','kd','v'] } },
+  pi:{ type:'add', in:{ a:['n','pTerm','v'], b:['n','iTerm','v'] } },
+  u:{ type:'add', in:{ a:['n','pi','v'], b:['n','dTerm','v'] } },
 });
 
 // A deliberately small policy head: features stay visible and the learned weights
@@ -248,11 +283,20 @@ export const NT: Record<string, NodeDef> = {
   }) },
 
   // ---- L0/L1 boundary: deterministic operations over the provided centerline ----
+  'points.empty': { kind:'prim', cat:'Path', outs:['points'], fn:()=>({points:[]}) },
+  'points.append': { kind:'prim', cat:'Path', ins:['points','point'], outs:['points'], fn:(i)=>({points:[...i.points,i.point]}) },
+  'path.fromPoints': { kind:'prim', cat:'Path', ins:['points','half'], outs:['track'], fn:(i)=>({track:trackFromPoints(i.points,i.half)}) },
+  'path.midpoints': { kind:'prim', cat:'Path', ins:['left','right','half'], outs:['track'], fn:(i)=>({track:midpointTrack(i.left,i.right,i.half)}) },
+  'path.offset': { kind:'prim', cat:'Path', ins:['track','offset'], outs:['track'], fn:(i)=>({track:offsetTrack(i.track,i.offset)}) },
+  'path.resample': { kind:'prim', cat:'Path', ins:['track','spacing'], outs:['track'], fn:(i)=>({track:resampleTrack(i.track,i.spacing)}) },
   'path.nearestIndex': { kind:'prim', cat:'Path', ins:['track','pt'], outs:['i'], fn:(i)=>({ i:nearestIndex(i.track,i.pt.x,i.pt.y,undefined).i }) },
   'path.advanceByDist': { kind:'prim', cat:'Path', ins:['track','i','d'], outs:['pt','i2'], fn:(i)=>{
-    const T=i.track, steps=Math.max(1,Math.round(i.d/T.spacing));
-    const i2=((Math.round(i.i)+steps)%T.N+T.N)%T.N;
-    return { pt:{x:T.pts[i2][0],y:T.pts[i2][1]}, i2 };
+    const T=i.track;
+    if(!T?.N)return { pt:{x:0,y:0}, i2:-1 };
+    const ratio=(Number.isFinite(i.d)?i.d:0)/Math.max(T.spacing,1e-9);
+    const step=Math.abs(ratio)<1?ratio:Math.round(ratio),raw=(Number.isFinite(i.i)?i.i:0)+step;
+    const wrapped=((raw%T.N)+T.N)%T.N, lo=Math.floor(wrapped), hi=(lo+1)%T.N, t=wrapped-lo;
+    return { pt:{x:T.pts[lo][0]+(T.pts[hi][0]-T.pts[lo][0])*t,y:T.pts[lo][1]+(T.pts[hi][1]-T.pts[lo][1])*t}, i2:wrapped };
   } },
   'path.at': { kind:'prim', cat:'Path', ins:['track','i'], outs:['waypoint'], fn:(i)=>{
     const T=i.track, k=((Math.round(i.i)%T.N)+T.N)%T.N, p=T.pts[k], t=T.tan[k];
@@ -286,7 +330,12 @@ export const NT: Record<string, NodeDef> = {
     pose:{x:i.state.x,y:i.state.y,yaw:i.state.yaw}, velocity:{x:i.state.vx,y:i.state.vy}, speed:i.state.v, yawRate:i.state.r, onTrack:i.state.onTrack,
   }) },
   'command.make': { kind:'prim', cat:'Struct', ins:['steer','throttle'], outs:['command'], fn:(i)=>({ command:{steer:Math.max(-1,Math.min(1,i.steer)),throttle:Math.max(-1,Math.min(1,i.throttle))} }) },
+  'commands.steerLattice': { kind:'prim', cat:'Trajectory', ins:['baseSteer','throttle','span','count'], outs:['commands'], fn:(i)=>{ const n=Math.max(1,Math.min(41,Math.round(i.count))),span=Math.max(0,i.span); return { commands:Array.from({length:n},(_,k)=>({steer:Math.max(-1,Math.min(1,i.baseSteer+(n===1?0:(k/(n-1)*2-1)*span))),throttle:Math.max(-1,Math.min(1,i.throttle))})) }; } },
+  'commands.empty': { kind:'prim', cat:'Trajectory', outs:['commands'], fn:()=>({commands:[]}) },
+  'commands.append': { kind:'prim', cat:'Trajectory', ins:['commands','command'], outs:['commands'], fn:(i)=>({commands:[...i.commands,i.command]}) },
   'command.parts': { kind:'prim', cat:'Struct', ins:['command'], outs:['steer','throttle'], fn:(i)=>({ steer:i.command?.steer??0, throttle:i.command?.throttle??0 }) },
+  'trajectories.rolloutLattice': { kind:'prim', cat:'Trajectory', ins:['state','commands','horizon','step'], outs:['trajectories'], fn:(i,p,s,c)=>({trajectories:i.commands.map((command:any)=>rolloutTrajectory(i.state,command,Math.max(0,i.horizon),Math.max(1/240,i.step),c.world))}) },
+  'trajectory.rolloutCommands': { kind:'prim', cat:'Trajectory', ins:['state','commands','step'], outs:['trajectory'], fn:(i,p,s,c)=>({trajectory:rolloutCommandSequence(i.state,i.commands,Math.max(1/240,i.step),c.world)}) },
   'trajectory.rollout': { kind:'prim', cat:'Trajectory', ins:['state','command','horizon','step'], outs:['trajectory'], fn:(i,p,s,c)=>({ trajectory:rolloutTrajectory(i.state,i.command,Math.max(0,i.horizon),Math.max(1/240,i.step),c.world) }) },
   'trajectory.parts': { kind:'prim', cat:'Trajectory', ins:['trajectory'], outs:['duration','length','valid'], fn:(i)=>({ duration:i.trajectory.duration, length:i.trajectory.points.length, valid:i.trajectory.valid }) },
   'trajectory.clearance': { kind:'prim', cat:'Trajectory', ins:['trajectory','objects'], outs:['d'], fn:(i)=>({ d:trajectoryClearance(i.trajectory,i.objects) }) },
@@ -294,6 +343,8 @@ export const NT: Record<string, NodeDef> = {
   'trajectory.collides': { kind:'prim', cat:'Trajectory', ins:['trajectory','objects','margin'], outs:['collision'], fn:(i)=>({ collision:trajectoryClearance(i.trajectory,i.objects)<Math.max(0,i.margin) }) },
   'trajectories.empty': { kind:'prim', cat:'Trajectory', outs:['trajectories'], fn:()=>({ trajectories:[] }) },
   'trajectories.append': { kind:'prim', cat:'Trajectory', ins:['trajectories','trajectory'], outs:['trajectories'], fn:(i)=>({ trajectories:[...i.trajectories,i.trajectory] }) },
+  'trajectories.evaluate': { kind:'prim', cat:'Cost', ins:['trajectories','request','objects','predictions'], outs:['costs','valids','breakdowns','violationSets'], fn:(i)=>{ const results=i.trajectories.map((trajectory:any)=>evaluateTrajectory(trajectory,i.request,i.objects,i.predictions)); return {costs:results.map((r:any)=>r.cost),valids:results.map((r:any)=>r.valid),breakdowns:results.map((r:any)=>r.breakdown),violationSets:results.map((r:any)=>r.violations)} } },
+  'trajectories.selectEvaluated': { kind:'prim', cat:'Trajectory', ins:['trajectories','costs','valids'], outs:['trajectory','i'], fn:(i)=>selectMinTrajectory(i.trajectories,i.costs.map((cost:number,k:number)=>i.valids[k]?cost:Infinity)) },
   'trajectories.selectMin': { kind:'prim', cat:'Trajectory', ins:['trajectories','costs'], outs:['trajectory','i'], fn:(i)=>selectMinTrajectory(i.trajectories,i.costs) },
   'trajectory.commandAt': { kind:'prim', cat:'Trajectory', ins:['trajectory','i'], outs:['command'], fn:(i)=>{
     const points=i.trajectory?.points??[];
@@ -337,7 +388,7 @@ export const NT: Record<string, NodeDef> = {
   'request.parts': { kind:'prim', cat:'Behavior', ins:['request'], outs:['targetSpeed','offset','costs','constraints'], fn:(i)=>({
     targetSpeed:i.request.targetSpeed, offset:i.request.preferredOffset, costs:i.request.costs, constraints:i.request.constraints,
   }) },
-  'trajectory.evaluate': { kind:'prim', cat:'Cost', ins:['trajectory','request','objects','predictions'], outs:['cost','valid','clearance'], fn:(i)=>evaluateTrajectory(i.trajectory,i.request,i.objects,i.predictions) },
+  'trajectory.evaluate': { kind:'prim', cat:'Cost', ins:['trajectory','request','objects','predictions'], outs:['cost','valid','clearance','breakdown','violations'], fn:(i)=>evaluateTrajectory(i.trajectory,i.request,i.objects,i.predictions) },
 
   // vec2 decomposition — reusable geometry primitives so any car-frame vector can be opened
   'vec.make': { kind:'prim', cat:'Vector', ins:['x','y'], outs:['e'], fn:(i)=>({ e:{ x:i.x, y:i.y } }) },
@@ -353,6 +404,8 @@ export const NT: Record<string, NodeDef> = {
   'vec.dist': { kind:'prim', cat:'Vector', ins:['a','b'], outs:['v'], fn:(i)=>({ v:Math.hypot(i.a.x-i.b.x,i.a.y-i.b.y) }) },
 
   // ---- L1 standard library: shipped, openable composites ----
+  'ctrl.pursuit': composite('Control', ['pose','track','Ld'], ['steer'], PURSUIT_CTRL_SUB, { steer:['steer','v'] }),
+  'ctrl.speed': composite('Control', ['speed','target'], ['throttle'], SPEED_CTRL_SUB, { throttle:['throttle','v'] }),
   'std.lookahead': composite('Geometry', ['pose','track','Ld'], ['pt','idx'], LOOKAHEAD_SUB, { pt:['ahead','pt'], idx:['nearest','i'] }),
   'std.tocar': composite('Geometry', ['pt','pose'], ['e'], TOCAR_SUB, { e:['local','e'] }),
   'std.curvAhead': composite('Geometry', ['pose','track'], ['k'], CURVAHEAD_SUB, { k:['curve','k'] }),
@@ -364,12 +417,11 @@ export const NT: Record<string, NodeDef> = {
   'lidar.preprocess': composite('LiDAR', ['ranges'], ['ranges'], LIDAR_PREPROCESS_SUB, { ranges:['clean','v'] }),
   'lidar.freeAhead': composite('LiDAR', ['ranges'], ['d'], FREE_AHEAD_SUB, { d:['clear','v'] }),
 
-  'ctrl.pid': { kind:'std', cat:'Control', ins:['err'], outs:['u'], fn:(i,p,s)=>{
-    s.int=Math.max(-6,Math.min(6,(s.int||0)+i.err*(1/120))); const d=(i.err-(s.prev||0))*120; s.prev=i.err;
-    return { u:p.kp*i.err + (p.ki||0)*s.int + (p.kd||0)*d };
-  } },
+  'ctrl.pid': composite('Control', ['err'], ['u'], PID_SUB, { u:['u','v'] }),
 
   // ---- L0 primitives: stateful (deterministic; state resets to 0). Cycles MUST pass through these. ----
+  'st.pidIntegral': { kind:'std', cat:'State', ins:['x'], outs:['v'], fn:(i,p,s,c)=>{ s.v=Math.max(-6,Math.min(6,(s.v||0)+i.x*c.dt)); return { v:s.v }; } },
+  'st.pidDerivative': { kind:'std', cat:'State', ins:['x'], outs:['v'], fn:(i,p,s,c)=>{ const prev=s.prev||0; s.prev=i.x; return { v:(i.x-prev)/Math.max(c.dt,1e-9) }; } },
   'st.delay': { kind:'std', cat:'State', ins:['x'], outs:['v'], fn:(i,p,s)=>{ const prev=s.prev??0; s.prev=i.x; return { v:prev }; } },
   'st.accum': { kind:'std', cat:'State', ins:['x'], outs:['v'], fn:(i,p,s,c)=>{ s.acc=(s.acc||0)+i.x*c.dt; return { v:s.acc }; } },
   'st.lowpass': { kind:'std', cat:'State', ins:['x'], outs:['v'], fn:(i,p,s)=>{ const a=p.alpha??0.1; s.y=(s.y==null)?i.x:a*i.x+(1-a)*s.y; return { v:s.y }; } },
@@ -407,5 +459,5 @@ export const NT: Record<string, NodeDef> = {
   // ---- sinks (write command) — coerce unwired/NaN inputs to 0 so a partial graph is safe ----
   'sink.steer':    { kind:'sink', cat:'Output', ins:['x'], fn:(i,p,s,c)=>{ c.cmd.steer=Number.isFinite(i.x)?i.x:0; return {}; } },
   'sink.throttle': { kind:'sink', cat:'Output', ins:['x'], fn:(i,p,s,c)=>{ c.cmd.throttle=Number.isFinite(i.x)?i.x:0; return {}; } },
-  'sink.reward': { kind:'sink', cat:'Reward', ins:['x'], fn:()=>({}) },
+  'sink.reward': { kind:'metric', cat:'Reward', ins:['x'], outs:['value'], fn:(i,p,s,c)=>{ (c.metrics??={}).reward=Number.isFinite(i.x)?i.x:0; return {value:(c.metrics.reward as number)} } },
 };

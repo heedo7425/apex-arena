@@ -76,7 +76,7 @@
 `Track corridor` · `Drivable space` · `Block obstacle` · `Point is drivable`.
 
 **Trajectory / Prediction:** `Vehicle state` · `Control command` · `Rollout trajectory` · `Trajectory parts/clearance/progress/collides` ·
-`Trajectories empty/append/selectMin` · `Trajectory commandAt(i)→command` · `Constant velocity prediction` · `Predictions empty/append` · `Future clearance`.
+`Command sequence empty/append` · `Steer candidate lattice` · `Trajectories empty/append/selectMin/selectValid` · `Trajectory commandAt(i)→command` · `Constant velocity prediction` · `Predictions empty/append` · `Future clearance`.
 
 **Policy / Reward:** `Linear policy(x1,x2)→action`은 가중합 내부가 열리는 배포 추론 경계이며 학습 알고리즘이 아니다. `Track reward(speed,cte,onTrack)→reward`와 `Reward sink`는 차량 command를 변경하지 않는 평가 경로다.
 
@@ -84,7 +84,7 @@
 Intent는 목적만 표현하며 경로 생성·후보 선택·제어를 내부에서 수행하지 않는다.
 
 **Cost / Constraint:** progress·collision·clearance·tracking·smoothness·control 비용 항과 track·collision·speed·steer 하드 제약.
-`Trajectory evaluate`가 독립 항을 합산하고, `selectMin`이 후보를 고른다.
+`Trajectory evaluate`가 독립 항을 합산하고 raw/weighted breakdown과 constraint 위반 시점·위치를 낸다. batch evaluate와 valid-aware selection으로 invalid 후보 실행을 막는다.
 
 > 금지: `Overtake`, `StaticAvoidance`, `LocalPlanner`, `MPPI`, `PPO`, `SAC` 같은 turnkey 노드.
 > Rule-based/RL/MPC는 위 공통 데이터 경계를 사용하되 의사결정과 후보 생성 방식을 그래프로 드러낸다.

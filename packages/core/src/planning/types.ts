@@ -32,6 +32,9 @@ export type DrivableSpace = { reference:Corridor; regions:Polygon[]; blocked:Pol
 export type TrajectoryPoint = { t:number; state:CarState; command:Control }
 export type Trajectory = { points:TrajectoryPoint[]; duration:number; valid:boolean }
 export type TrajectorySet = Trajectory[]
+export type CommandSequence = Control[]
+export type CostBreakdown = { raw:Record<string,number>; weighted:Record<string,number>; total:number }
+export type ConstraintViolation = { kind:ConstraintKind; t:number; point:Point2; value:number; limit:number }
 export type TimedPolygon = { t:number; polygon:Polygon }
 export type PredictionHypothesis = { trajectory:Trajectory; occupancy:TimedPolygon[]; probability:number }
 export type Prediction = { objectId:string; hypotheses:PredictionHypothesis[] }
@@ -48,6 +51,30 @@ export type Constraint = { kind:ConstraintKind; hard:boolean; params:Record<stri
 export type PlanningRequest = {
   referencePath:Track; targetProgress:number; targetSpeed:number; preferredOffset:number; targetObjectId:string
   costs:CostTerm[]; constraints:Constraint[]; commitUntil:number
+}
+
+export function trackFromPoints(points:Point2[],half=4.6):Track{
+  if(points.length<3)return {pts:[],tan:[],nrm:[],curv:[],spacing:1,N:0,total:0,half}
+  const pts=points.map(p=>[p.x,p.y] as [number,number]),N=pts.length,tan:[number,number][]=[],nrm:[number,number][]=[],curv:number[]=[]
+  let total=0;for(let i=0;i<N;i++)total+=Math.hypot(pts[(i+1)%N][0]-pts[i][0],pts[(i+1)%N][1]-pts[i][1])
+  const spacing=total/N
+  for(let i=0;i<N;i++){const a=pts[(i-1+N)%N],b=pts[(i+1)%N],dx=b[0]-a[0],dy=b[1]-a[1],d=Math.hypot(dx,dy)||1;tan.push([dx/d,dy/d]);nrm.push([-dy/d,dx/d])}
+  for(let i=0;i<N;i++){const a=tan[(i-1+N)%N],b=tan[(i+1)%N];curv.push((a[0]*b[1]-a[1]*b[0])/(2*Math.max(spacing,1e-6)))}
+  return {pts,tan,nrm,curv,spacing,N,total,half:Math.max(0,half)}
+}
+export function resampleTrack(track:Track,targetSpacing:number):Track{
+  if(track.N<3)return trackFromPoints([],track.half)
+  const spacing=Math.max(0.05,targetSpacing),segments:number[]=[],cum=[0];let total=0
+  for(let i=0;i<track.N;i++){const a=track.pts[i],b=track.pts[(i+1)%track.N],d=Math.hypot(b[0]-a[0],b[1]-a[1]);segments.push(d);total+=d;cum.push(total)}
+  const count=Math.max(3,Math.round(total/spacing)),out:Point2[]=[]
+  for(let k=0;k<count;k++){const d=k/count*total;let i=0;while(i<segments.length-1&&cum[i+1]<d)i++;const t=(d-cum[i])/Math.max(segments[i],1e-9),a=track.pts[i],b=track.pts[(i+1)%track.N];out.push({x:a[0]+(b[0]-a[0])*t,y:a[1]+(b[1]-a[1])*t})}
+  return trackFromPoints(out,track.half)
+}
+export function offsetTrack(track:Track,offset:number):Track{
+  return trackFromPoints(track.pts.map((p,i)=>({x:p[0]+track.nrm[i][0]*offset,y:p[1]+track.nrm[i][1]*offset})),track.half)
+}
+export function midpointTrack(left:Point2[],right:Point2[],half=4.6):Track{
+  const n=Math.min(left.length,right.length);return trackFromPoints(Array.from({length:n},(_,i)=>({x:(left[i].x+right[i].x)/2,y:(left[i].y+right[i].y)/2})),half)
 }
 
 export function objectRadius(object:SceneObject){
@@ -70,7 +97,7 @@ export function relativeObject(object:SceneObject,pose:Pose2){
 export function nearestObject(objects:ObjectSet,pose:Pose2){
   let best:SceneObject|undefined,d=Infinity
   for(const object of objects){const q=Math.hypot(object.pose.x-pose.x,object.pose.y-pose.y)-objectRadius(object);if(q<d){best=object;d=q}}
-  return {object:best??makeStaticObject({x:0,y:0,yaw:0},0,0,''),d:best?Math.max(0,d):0,found:!!best}
+  return {object:best??makeStaticObject({x:0,y:0,yaw:0},0,0,''),d:best?Math.max(0,d):Infinity,found:!!best}
 }
 export function objectsInRadius(objects:ObjectSet,pose:Pose2,radius:number){
   return objects.filter(object=>Math.hypot(object.pose.x-pose.x,object.pose.y-pose.y)-objectRadius(object)<=radius)
@@ -115,6 +142,17 @@ export function rolloutTrajectory(state:CarState,command:Control,horizon:number,
   }
   return {points,duration:Math.max(0,horizon),valid:points.every(p=>Number.isFinite(p.state.x)&&Number.isFinite(p.state.y))}
 }
+export function rolloutCommandSequence(state:CarState,commands:CommandSequence,step:number,world:World):Trajectory{
+  if(!commands.length)return {points:[],duration:0,valid:false}
+  const dt=Math.max(1/240,step),points:TrajectoryPoint[]=[];let car={...state}
+  for(let i=0;i<commands.length;i++){
+    const command={...commands[i]};points.push({t:i*dt,state:{...car},command})
+    car=stepDynamics(car,command,world,dt)
+  }
+  points.push({t:commands.length*dt,state:{...car},command:{...commands.at(-1)!}})
+  return {points,duration:commands.length*dt,valid:points.every(p=>Number.isFinite(p.state.x)&&Number.isFinite(p.state.y))}
+}
+
 function stateFromObject(object:SceneObject,t:number):CarState{
   const x=object.pose.x+object.velocity.x*t,y=object.pose.y+object.velocity.y*t,yaw=object.pose.yaw+object.yawRate*t
   const speed=Math.hypot(object.velocity.x,object.velocity.y)
@@ -169,9 +207,12 @@ export function predictionClearance(trajectory:Trajectory,predictions:Prediction
   return best
 }
 export function selectMinTrajectory(trajectories:TrajectorySet,costs:number[]){
-  if(!trajectories.length)return {trajectory:{points:[],duration:0,valid:false} as Trajectory,i:0}
-  let index=0,best=Infinity
-  for(let i=0;i<trajectories.length;i++){const cost=Number.isFinite(costs[i])?costs[i]:Infinity;if(cost<best){best=cost;index=i}}
+  let index=-1,best=Infinity
+  for(let i=0;i<trajectories.length;i++){
+    const cost=costs[i]
+    if(trajectories[i]?.valid&&Number.isFinite(cost)&&cost<best){best=cost;index=i}
+  }
+  if(index<0)return {trajectory:{points:[],duration:0,valid:false} as Trajectory,i:-1}
   return {trajectory:trajectories[index],i:index}
 }
 
@@ -185,6 +226,7 @@ export function requestFromIntent(intent:BehaviorIntent,track:Track,costs:CostTe
 export function evaluateTrajectory(trajectory:Trajectory,request:PlanningRequest,objects:ObjectSet,predictions:PredictionSet){
   const track=request.referencePath,clearance=Math.min(trajectoryClearance(trajectory,objects),predictionClearance(trajectory,predictions))
   let total=0,valid=trajectory.valid
+  const raw:Record<string,number>={},weighted:Record<string,number>={}
   for(const term of request.costs){
     let value=0
     if(term.kind==='progress')value=-trajectoryProgress(trajectory,track)
@@ -193,16 +235,18 @@ export function evaluateTrajectory(trajectory:Trajectory,request:PlanningRequest
     else if(term.kind==='tracking')value=trajectory.points.reduce((sum,p)=>sum+nearestIndex(track,p.state.x,p.state.y).dist,0)/Math.max(1,trajectory.points.length)
     else if(term.kind==='smoothness')value=trajectorySmoothness(trajectory)
     else if(term.kind==='control')value=trajectory.points.reduce((sum,p)=>sum+Math.abs(p.command.steer)+Math.abs(p.command.throttle),0)/Math.max(1,trajectory.points.length)
-    total+=term.weight*value
+    raw[term.kind]=(raw[term.kind]??0)+value;weighted[term.kind]=(weighted[term.kind]??0)+term.weight*value;total+=term.weight*value
   }
+  const violations:ConstraintViolation[]=[]
   for(const constraint of request.constraints){
-    let satisfied=true
-    if(constraint.kind==='track')satisfied=trajectory.points.every(p=>nearestIndex(track,p.state.x,p.state.y).dist<=track.half-(constraint.params.margin??0))
-    else if(constraint.kind==='collision')satisfied=clearance>=(constraint.params.margin??0)
-    else if(constraint.kind==='speed')satisfied=trajectory.points.every(p=>p.state.vx<=(constraint.params.max??Infinity))
-    else if(constraint.kind==='steer')satisfied=trajectory.points.every(p=>Math.abs(p.command.steer)<=(constraint.params.max??1))
-    else if(constraint.kind==='accel')satisfied=trajectory.points.every(p=>Math.abs(p.command.throttle)<=(constraint.params.max??1))
-    if(!satisfied){if(constraint.hard)valid=false;else total+=constraint.params.penalty??1000}
+    let index=-1,value=0,limit=0
+    if(constraint.kind==='track'){limit=track.half-(constraint.params.margin??0);index=trajectory.points.findIndex(p=>(value=nearestIndex(track,p.state.x,p.state.y).dist)>limit)}
+    else if(constraint.kind==='collision'){limit=constraint.params.margin??0;if(clearance<limit){index=0;value=clearance}}
+    else if(constraint.kind==='speed'){limit=constraint.params.max??Infinity;index=trajectory.points.findIndex(p=>(value=p.state.vx)>limit)}
+    else if(constraint.kind==='steer'){limit=constraint.params.max??1;index=trajectory.points.findIndex(p=>(value=Math.abs(p.command.steer))>limit)}
+    else if(constraint.kind==='accel'){limit=constraint.params.max??1;index=trajectory.points.findIndex(p=>(value=Math.abs(p.command.throttle))>limit)}
+    if(index>=0){const point=trajectory.points[index]??trajectory.points[0];violations.push({kind:constraint.kind,t:point?.t??0,point:{x:point?.state.x??0,y:point?.state.y??0},value,limit});if(constraint.hard)valid=false;else total+=constraint.params.penalty??1000}
   }
-  return {cost:total,valid,clearance:Number.isFinite(clearance)?clearance:0}
+  const breakdown:CostBreakdown={raw,weighted,total}
+  return {cost:total,valid,clearance:Number.isFinite(clearance)?clearance:0,breakdown,violations}
 }
