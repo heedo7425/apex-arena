@@ -16,11 +16,14 @@ export type VehicleParams = {
   CF: number; CR: number; FXDRIVE: number; FXBRAKE: number; DRAGC: number; ROLL: number;
   MAXSTEER: number; MAXSTEERVEL: number;
 };
-export type World = { track: Track; height: Height; vp: VehicleParams; mu: number; muGrass: number; objects?: SceneObject[] };
+export type PhysicsVersion = 1 | 2;
+export type World = { track: Track; height: Height; vp: VehicleParams; mu: number; muGrass: number; objects?: SceneObject[]; physicsVersion?: PhysicsVersion };
 
 export const G = 9.81;
 export const DT = 1 / 120;
+// v1 is the frozen contract; v2 is the corrected model (opt-in via world.physicsVersion).
 export const PHYSICS_VERSION = 1 as const;
+export const PHYSICS_LATEST: PhysicsVersion = 2;
 
 export const DEFAULT_VP: VehicleParams = {
   M: 1000, IZ: 1400, LF: 1.25, LR: 1.35, L: 2.6, HCG: 0.5,
@@ -71,7 +74,7 @@ export function makeHeight(): Height {
   return { at, grad, zmin: 0, zmax: 0, zlo, zhi };
 }
 
-export function buildWorld(opts: { ctrl?: Vec2[]; spacing?: number; half?: number; mu?: number; vp?: VehicleParams } = {}): World {
+export function buildWorld(opts: { ctrl?: Vec2[]; spacing?: number; half?: number; mu?: number; vp?: VehicleParams; physicsVersion?: PhysicsVersion } = {}): World {
   const ctrl = opts.ctrl ?? DEFAULT_CTRL;
   const spacing = opts.spacing ?? 1.0;
   const half = opts.half ?? 4.6;
@@ -89,7 +92,7 @@ export function buildWorld(opts: { ctrl?: Vec2[]; spacing?: number; half?: numbe
   for (let i = 0; i < N; i++) { const z = height.at(cl.pts[i][0], cl.pts[i][1]); if (z<zmin)zmin=z; if (z>zmax)zmax=z; }
   height.zmin = zmin; height.zmax = zmax;
   const track: Track = { pts: cl.pts, tan, nrm, curv, spacing: cl.spacing, N, total: cl.total, half };
-  return { track, height, vp: opts.vp ?? DEFAULT_VP, mu: opts.mu ?? 1.0, muGrass: 0.45 };
+  return { track, height, vp: opts.vp ?? DEFAULT_VP, mu: opts.mu ?? 1.0, muGrass: 0.45, physicsVersion: opts.physicsVersion };
 }
 
 export function nearestIndex(track: Track, x: number, y: number, hint?: number): { i: number; dist: number } {

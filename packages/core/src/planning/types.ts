@@ -1,7 +1,7 @@
 import type { Track, World } from '../sim/world.ts'
 import { nearestIndex } from '../sim/world.ts'
 import type { CarState, Control } from '../sim/vehicle.ts'
-import { stepDynamics } from '../sim/vehicle.ts'
+import { stepVehicle } from '../sim/vehicle.ts'
 
 export type Point2 = { x:number; y:number }
 export type Pose2 = Point2 & { yaw:number }
@@ -138,7 +138,7 @@ export function rolloutTrajectory(state:CarState,command:Control,horizon:number,
   const points:TrajectoryPoint[]=[];let car={...state}
   for(let i=0;i<=count;i++){
     const t=Math.min(horizon,i*dt);points.push({t,state:{...car},command:{...command}})
-    if(i<count)car=stepDynamics(car,command,world,Math.min(dt,horizon-i*dt))
+    if(i<count)car=stepVehicle(car,command,world,Math.min(dt,horizon-i*dt))
   }
   return {points,duration:Math.max(0,horizon),valid:points.every(p=>Number.isFinite(p.state.x)&&Number.isFinite(p.state.y))}
 }
@@ -147,7 +147,7 @@ export function rolloutCommandSequence(state:CarState,commands:CommandSequence,s
   const dt=Math.max(1/240,step),points:TrajectoryPoint[]=[];let car={...state}
   for(let i=0;i<commands.length;i++){
     const command={...commands[i]};points.push({t:i*dt,state:{...car},command})
-    car=stepDynamics(car,command,world,dt)
+    car=stepVehicle(car,command,world,dt)
   }
   points.push({t:commands.length*dt,state:{...car},command:{...commands.at(-1)!}})
   return {points,duration:commands.length*dt,valid:points.every(p=>Number.isFinite(p.state.x)&&Number.isFinite(p.state.y))}

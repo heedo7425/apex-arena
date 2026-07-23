@@ -98,11 +98,40 @@ Implementation status: **complete (2026-07-23)**.
 
 ### Phase 1: correct core forces
 
+Implementation status: **complete (2026-07-23)**.
+
 - Clamp each axle longitudinal force by `mu * Fz`, then compute lateral capacity
   from the remaining combined-slip budget.
 - Correct bank gravity direction and normalize grade/bank using the road tangent.
 - Recompute track and terrain observations after integration.
 - Expose `longitudinalSpeed` and `groundSpeed` as separate typed signals.
+
+Delivered as an **opt-in** model, selected by `world.physicsVersion` (`buildWorld({ physicsVersion: 2 })`
+and `PHYSICS_LATEST = 2`). v1 `stepDynamics` is byte-unchanged and remains the default; a `stepVehicle`
+dispatcher routes the sim, `sim.predict`, and trajectory rollouts to the chosen model. `PHYSICS_VERSION`
+(the frozen v1 contract) stays `1` and every run/lap/summary still records the version actually used.
+
+Measured v2 vs v1 on the same probes (`packages/core/test/physics-v2.ts`):
+
+| Check | v1 | v2 | v2 limit |
+| --- | ---: | ---: | ---: |
+| Asphalt full-brake tire decel (20 m/s) | -17.540 m/s2 | -6.766 m/s2 | `mu*g = 9.810` |
+| Grass full-drive tire accel | 8.585 m/s2 | 4.414 m/s2 | `muGrass*g = 4.415` |
+| 10% cross-slope, uphill +y | `vy = +0.008134` (uphill) | `vy = -0.008134` (downhill) | sign corrected |
+| Longitudinal downhill grade from rest | n/a | `vx > 0` | accelerates downhill |
+| Post-step nearest index / on-track / grade | one tick stale | matches integrated pose | — |
+| Sideslip speed signals | `speed = vx` only | `v = vx`, `groundSpeed = |v|` distinct | — |
+| 120 Hz vs 240 Hz over 5 s (steer+throttle) | — | 0.263 m | within 0.5 m tolerance |
+
+Combined slip is verified behaviorally: adding throttle under a saturating steer reduces the cornering
+(yaw) response, because the front longitudinal force consumes part of the axle friction budget.
+
+### Baseline lap times (never compared across versions)
+
+- **physics v1 PURSUIT**: `bestClean = 21.083333333332778 s` (frozen contract, still exact).
+- **physics v2 PURSUIT**: the v1-tuned Pure Pursuit exceeds v2's stricter combined-slip grip and has
+  **no clean lap** (`bestClean = null`); its single lap is a deterministic `21.6167 s` **dirty** lap.
+  A v2-tuned controller and v2-specific medals/leaderboards are future work (do not compare with v1).
 
 ### Phase 2: make racing fair
 

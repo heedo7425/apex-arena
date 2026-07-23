@@ -1,17 +1,17 @@
 // Sim runner: builds observation, evaluates the graph, steps the plant, times laps.
-import { type World, DT, PHYSICS_VERSION } from './world.ts';
-import { type CarState, initCar, stepDynamics, castScan } from './vehicle.ts';
+import { type World, type PhysicsVersion, DT, PHYSICS_VERSION } from './world.ts';
+import { type CarState, initCar, stepVehicle, castScan } from './vehicle.ts';
 import { type Graph, type EvalCtx, evalGraph } from '../graph/engine.ts';
 import { NT } from '../graph/registry.ts';
 import { makeRng, type Rng } from '../rng.ts';
 
 export type Medals = { dev: number; gold: number; silver: number; bronze: number };
 export const DEFAULT_MEDALS: Medals = { dev: 20.5, gold: 22.5, silver: 26, bronze: 33 };
-export type LapResult = { t: number; dirty: boolean; physicsVersion: typeof PHYSICS_VERSION };
+export type LapResult = { t: number; dirty: boolean; physicsVersion: PhysicsVersion };
 
 export type SimState = {
   world: World; graph: Graph; rng: Rng; car: CarState; dt: number;
-  physicsVersion: typeof PHYSICS_VERSION;
+  physicsVersion: PhysicsVersion;
   elapsed:number; objects:NonNullable<World['objects']>;
   lapT: number; dirty: boolean; prevProg: number;
   laps: LapResult[]; best: number | null; lastVal: Record<string, any> | null;
@@ -19,7 +19,7 @@ export type SimState = {
 };
 
 export function makeSim(world: World, graph: Graph, seed = 1): SimState {
-  return { world, graph, rng: makeRng(seed), car: initCar(world), dt: DT, physicsVersion:PHYSICS_VERSION, elapsed:0,
+  return { world, graph, rng: makeRng(seed), car: initCar(world), dt: DT, physicsVersion:world.physicsVersion ?? PHYSICS_VERSION, elapsed:0,
     objects:(world.objects??[]).map(o=>({...o,pose:{...o.pose},velocity:{...o.velocity},shape:{...o.shape}})),
     lapT: 0, dirty: false, prevProg: 0, laps: [], best: null, lastVal: null, graphState: {} };
 }
@@ -40,10 +40,10 @@ function sceneAt(s:SimState){
 export function tick(s: SimState): void {
   const car = s.car, world = s.world;
   s.objects=sceneAt(s)
-  const obs = { scan: castScan(car, world, 21, 2, s.objects), speed: car.vx, pose: { x: car.x, y: car.y, yaw: car.yaw }, track: world.track, objects:s.objects };
+  const obs = { scan: castScan(car, world, 21, 2, s.objects), speed: car.vx, groundSpeed: car.groundSpeed ?? Math.hypot(car.vx, car.vy), pose: { x: car.x, y: car.y, yaw: car.yaw }, track: world.track, objects:s.objects };
   const ctx: EvalCtx = { obs, cmd: { steer: 0, throttle: 0 }, state: s.graphState, rng: s.rng, world, car, dt: s.dt };
   s.lastVal = evalGraph(s.graph, ctx, NT);
-  s.car = stepDynamics(car, ctx.cmd, world, s.dt);
+  s.car = stepVehicle(car, ctx.cmd, world, s.dt);
   // lap timing
   s.elapsed += s.dt;
   for(const object of s.objects){
@@ -62,7 +62,7 @@ export function tick(s: SimState): void {
   s.prevProg = prog;
 }
 
-export type RunSummary = { physicsVersion:typeof PHYSICS_VERSION; laps: LapResult[]; bestClean: number | null; maxV: number; nan: boolean };
+export type RunSummary = { physicsVersion:PhysicsVersion; laps: LapResult[]; bestClean: number | null; maxV: number; nan: boolean };
 export function runFor(world: World, graph: Graph, seed: number, seconds: number): RunSummary {
   const s = makeSim(world, graph, seed);
   let maxV = 0, nan = false;

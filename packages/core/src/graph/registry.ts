@@ -2,7 +2,7 @@
 // plus reserved hooks (rng.uniform, sim.predict) for MPPI/MPC/RL.
 import { type NodeDef, type EvalCtx, type Graph, evalGraph, makeGraph } from './engine.ts';
 import { nearestIndex, curvAheadAt, G } from '../sim/world.ts';
-import { stepDynamics } from '../sim/vehicle.ts';
+import { stepVehicle } from '../sim/vehicle.ts';
 import { uniform, gaussian } from '../rng.ts';
 import {
   makeVehicleObject, makeStaticObject, relativeObject, nearestObject, objectsInRadius,
@@ -453,7 +453,7 @@ export const NT: Record<string, NodeDef> = {
   'rng.gauss':   { kind:'prim', cat:'Random', outs:['v'], fn:(i,p,s,c)=>({ v:gaussian(c.rng) }) },
   // model-as-node: predict next (x,y,speed) given a control from the CURRENT car state
   'sim.predict': { kind:'builtin', cat:'Model', ins:['steer','throttle'], outs:['x','y','v'], fn:(i,p,s,c)=>{
-    const nx=stepDynamics(c.car, { steer:i.steer, throttle:i.throttle }, c.world, c.dt); return { x:nx.x, y:nx.y, v:nx.vx };
+    const nx=stepVehicle(c.car, { steer:i.steer, throttle:i.throttle }, c.world, c.dt); return { x:nx.x, y:nx.y, v:nx.vx };
   } },
 
   // ---- sinks (write command) — coerce unwired/NaN inputs to 0 so a partial graph is safe ----

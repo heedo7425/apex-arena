@@ -2,6 +2,46 @@
 
 All entries in this file document changes made by Codex in this repository.
 
+## 2026-07-23 - Physics v2 Phase 1 (opt-in corrected model)
+
+### Why
+design/claude-handoff-physics-v2.md Phase 1: fix the audited v1 correctness bugs (unclamped
+longitudinal force, wrong cross-slope gravity sign, stale post-step observations, single speed
+signal) while keeping v1 byte-frozen and selectable. v1 records, laps, and the exact PURSUIT lap
+must not change; v1 and v2 must never share a leaderboard.
+
+### Changes
+- world.ts: add `PhysicsVersion = 1|2`, optional `World.physicsVersion`, `buildWorld({physicsVersion})`,
+  and `PHYSICS_LATEST = 2`. `PHYSICS_VERSION` (frozen v1 contract) stays `1`.
+- vehicle.ts: v1 `stepDynamics` unchanged. New `stepDynamicsV2` with the four Phase 1 fixes —
+  (1) per-axle longitudinal force clamped to `mu*Fz`, (2) lateral capacity from the remaining
+  combined-slip budget, (3) gravity pulls downhill with a consistently normalized road tangent for
+  both grade and bank, (4) nearest index / on-track / height / grade recomputed from the integrated
+  pose. Adds `groundSpeed` (magnitude) alongside `v` (longitudinal). New `stepVehicle` dispatcher.
+- runner.ts: `makeSim` reads `world.physicsVersion ?? PHYSICS_VERSION`; state/lap/summary typed
+  `PhysicsVersion`; tick steps via `stepVehicle` and exposes `obs.groundSpeed`.
+- registry `sim.predict` and planning `trajectory.rollout` route through `stepVehicle` (v1 unchanged,
+  v2 consistent). No palette/composite/mission/medal changes (Phase 1 scope).
+- Tests: kept all v1 golden tests; added packages/core/test/physics-v2.ts (version selection, asphalt
+  & grass drive/brake friction limits, combined slip, grade/bank downhill signs, post-step
+  observations, longitudinal vs ground speed, determinism, 120/240 Hz convergence, v1 exact lap, v2
+  baseline). Wired into `pnpm --filter @apex/core test`.
+- Docs: design/physics-audit-v1.md Phase 1 marked complete with a v1/v2 measurement table and baseline laps.
+
+### Verification (offscreen only)
+- `pnpm --filter @apex/core test`: all 6 suites pass (drive, prims, blocks, planning, physics v1, physics v2).
+- `pnpm --filter @apex/web exec tsc --noEmit`: 0 errors. `pnpm --filter @apex/web build`: passes. `git diff --check`: clean.
+- v1 PURSUIT bestClean stays exactly 21.083333333332778. v2 PURSUIT is a deterministic 21.6167 s dirty
+  lap (bestClean null — v1 controller exceeds v2 grip). Force limits, downhill signs, post-step
+  observations, and sideslip speed split all verified numerically.
+- Offscreen Playwright smoke: app still loads on v1 (8 mission cards, L1 builds, sim renders, 0 page errors).
+
+### Next (Physics v2 Phase 2+)
+- Oriented-box narrow-phase collision with penetration correction + deterministic impulse.
+- Run AI opponents through the same `stepVehicle` model and command interface as players.
+- Ordered sectors/checkpoints for authoritative lap validation.
+- A v2-tuned reference controller and v2-specific medals/leaderboard/season (kept separate from v1).
+
 ## 2026-07-23 - Follow-up: spatial-overlay verification, A/B naming/lap, VISUALIZE crash fix
 
 ### Why
