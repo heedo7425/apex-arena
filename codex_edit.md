@@ -612,3 +612,18 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - Start physics v2 behind an explicit version switch instead of replacing v1 behavior.
 - Correct combined longitudinal/lateral grip and terrain bank direction, then recompute post-step track observations.
 - Retune missions and open a separate v2 leaderboard season before making v2 the default.
+
+## 2026-07-23 - Claude physics v2 handoff
+
+### Why
+- A fresh Claude session needs a repository-native source of truth rather than relying on chat history.
+- The next physics pass must not accidentally overwrite v1 behavior or invalidate the newly frozen lap contract.
+
+### Changes
+- Added `design/claude-handoff-physics-v2.md` with completed work, commit anchors, known limitations, migration rules, next scope, verification commands, and a ready-to-use Claude prompt.
+- Updated `CLAUDE.md` with the current date, full five-suite core test command, Phase 0 completion, and the mandatory handoff entry point.
+
+### Verification
+- Confirmed the handoff points to commit `7b6bf96`, exact PURSUIT v1 lap `21.083333333332778`, and live bundle `index-D_4qADz0.js`.
+- Confirmed the handoff explicitly preserves v1 and excludes collision, AI dynamics, checkpoints, mission tuning, and palette changes from the next pass.
+- Documentation passes `git diff --check`; no runtime source or build output changed.

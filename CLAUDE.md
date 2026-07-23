@@ -28,7 +28,7 @@
 
 ## 빌드 · 검증 · 배포 (반드시 이 순서)
 ```
-node packages/core/test/drive.ts && node packages/core/test/prims.ts && node packages/core/test/blocks.ts   # 코어
+pnpm --filter @apex/core test             # drive/prims/blocks/planning/physics 전체
 pnpm --filter @apex/web build          # → app/ 로 빌드 (vite base '/apex-arena/app/')
 git add -A && git commit && git push origin main                                                            # Pages 자동 배포
 ```
@@ -41,10 +41,11 @@ git add -A && git commit && git push origin main                                
 - **사용자는 항상 원격**: 이 머신에서 GUI 창을 띄우면 사용자 화면에 뜬다. 로컬 크롬/브라우저 실행 금지(헤드리스도 DISPLAY 있으면 창 뜸). 결과는 채팅 텍스트 + 배포 URL로.
 - public repo `heedo7425/apex-arena`, `main`에 직접 푸시(이 세션의 확립된 플로우). 커밋 메시지에 백틱 쓰지 말 것(bash가 실행해버림).
 
-## 현재 상태 (2026-07-22)
+## 현재 상태 (2026-07-23)
 - Codex UX 오버홀 + 내 후속 작업 반영: Parts Bay 좌측 레일, Pure Pursuit 프리미티브 조립화, L2/L3 블록 제공, **P-a 완료**(L0 어휘), **P-b 열기/fork/캡슐화 완료**, 반응형(상단바 겹침·sim 높이) 수정.
 - **P-b 완료**: 경로 접근자와 센서 배열 프리미티브를 추가하고 `std.lookahead`·`std.tocar`·`std.curvAhead`·`std.gripSpeed` 및 geometry/LiDAR L1 노드를 모두 열기/fork 가능한 composite로 전환했다. PURSUIT 랩은 정확히 동일하다.
 - composite 내부는 breadcrumb, 파트 설명, live signal, 자동 배치 fork를 제공한다. 유저 블록은 Parts Bay 보관함에 저장되어 모든 미션에서 재사용할 수 있고 그래프 오류는 해당 블록·포트 단위로 안내된다.
 - 에디터 VISUALIZE는 출력 신호를 읽기 전용으로 수집한다. simulation 시간만 사용하며 graph 계산·랩 결과에 영향을 주면 안 된다.
 - **P-c 일부/P-d enabler 완료**: vehicle state 기반 결정론 trajectory rollout과 Scene ObjectSet, DrivableSpace, PredictionSet, Intent, PlanningRequest, Cost/Constraint 블록이 registry·typed validation·master palette에 구현됐다. turnkey planner/알고리즘 노드는 금지한다.
 - **현재**: static avoidance(L5), overtaking(L6), candidate MPC(L7), RL evaluation(L8)과 기본 Path 저작, 선택형 4단계 Graph Academy, 로컬 Time Trial/Head-to-Head/Grid Start Race Hub까지 완료. 40항목 후속 프로그램은 `design/improvements-40.md`가 기준이며 replay, parameter sweep, scenario editor, uncertainty, policy provider는 남아 있다.
+- **Physics Phase 0 완료**: `PHYSICS_VERSION=1` 계약과 골든 테스트로 기존 랩을 동결했다. 다음 작업자는 반드시 `design/claude-handoff-physics-v2.md`를 읽고 v1을 유지한 명시적 v2 경로로 Phase 1을 진행한다.
