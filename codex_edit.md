@@ -475,6 +475,7 @@ Turn the steering mission into a full blank-canvas build while keeping the alrea
 - All four core suites pass; PURSUIT remains exactly `21.0833s`. Production app rebuild passes with `index-BVvSaNRr.js`.
 - Headless Chrome found 9 mission cards; L7/L8 each start with 3 prior-work nodes, both new palettes are present, and Linear policy opens with 8 rendered inner wires plus fork action. Browser errors: 0.
 - Offscreen evidence: `/tmp/apex-l7-mpc.png` and `/tmp/apex-l8-policy-open.png`.
+- GitHub Pages live HTML serves `index-BVvSaNRr.js` after push.
 
 ### Next
 - Add more than two candidates via an authorable candidate-list workflow, then expose cost breakdown and constraint events in VISUALIZE.
