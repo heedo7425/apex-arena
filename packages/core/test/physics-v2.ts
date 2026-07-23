@@ -1,5 +1,5 @@
 // Physics v2 Phase 1 tests. v2 is opt-in via world.physicsVersion=2; v1 stays frozen.
-import { DT, G, PHYSICS_LATEST, buildWorld, initCar, nearestIndex, stepDynamics, stepDynamicsV2, stepVehicle, makeSim, tick, runFor } from '../src/index.ts';
+import { DT, G, PHYSICS_LATEST, buildWorld, initCar, nearestIndex, castScan, pointInBox, stepDynamics, stepDynamicsV2, stepVehicle, makeSim, tick, runFor } from '../src/index.ts';
 import { PURSUIT } from '../src/graph/presets.ts';
 import type { CarState, Control, Height, World } from '../src/index.ts';
 
@@ -82,6 +82,19 @@ ok(v2run.bestClean === null, 'v1-tuned PURSUIT has no clean v2 lap (exceeds stri
 ok(v2run.laps.length === 1 && v2run.laps[0].dirty === true && v2run.laps[0].t.toFixed(4) === '21.6167', 'v2 PURSUIT baseline lap is a deterministic 21.6167 s dirty lap');
 const v2runB = runFor(buildWorld({physicsVersion:2}), PURSUIT, 1, 70);
 ok(JSON.stringify(v2run.laps) === JSON.stringify(v2runB.laps), 'v2 PURSUIT run is deterministic');
+
+// ---- v2 LiDAR uses an oriented box (v1 keeps the circumscribed circle) ----
+{ const box = { x:0, y:0, yaw:0, hl:4, hw:0.5 };
+  const circleR = Math.hypot(4, 0.5), px = 3.5, py = 1.5;
+  ok(px*px + py*py <= circleR*circleR, 'a corner point sits inside the circumscribed circle');
+  ok(!pointInBox(px, py, box), 'v2 oriented box excludes the corner point the circle would falsely hit'); }
+{ const w1 = { ...buildWorld(), height:flatH }, w2 = { ...buildWorld({ physicsVersion:2 }), height:flatH };
+  const c = initCar(w1), t = w1.track.tan[0];
+  const bar:any = { id:'bar', kind:'static', pose:{ x:c.x+t[0]*8, y:c.y+t[1]*8, yaw:Math.atan2(t[1],t[0])+0.6 },
+    velocity:{x:0,y:0}, yawRate:0, shape:{ type:'box', radius:0, length:10, width:0.8 }, confidence:1 };
+  const r1 = castScan(c, w1, 21, 2, [bar]).ranges, r2 = castScan(c, w2, 21, 2, [bar]).ranges;
+  ok(r2.every((v,i)=>v >= r1[i]-1e-9), 'v2 LiDAR never reports an obstacle nearer than v1 (box is inside the circle)');
+  ok(r2.some((v,i)=>v > r1[i]+1e-9), 'v2 LiDAR sees past circumscribed-circle false hits on grazing beams'); }
 
 console.log(failed === 0 ? '\nALL PASS - physics v2 Phase 1 forces, slopes, observations verified' : `\n${failed} FAILED`);
 if (failed) process.exit(1);

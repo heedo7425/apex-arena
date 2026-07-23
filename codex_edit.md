@@ -2,6 +2,23 @@
 
 All entries in this file document changes made by Codex in this repository.
 
+## 2026-07-23 - Follow-up: v2 LiDAR oriented-box (audit P1 #8)
+
+### Why
+Tractable follow-up chosen by the user. Audit P1 #8: LiDAR used a circumscribed circle for scene
+boxes, over-reporting obstacles near corners. Fix under physics v2; keep v1 frozen.
+
+### Changes
+- collision.ts: `pointInBox` (point inside an oriented box).
+- vehicle.ts castScan: under `world.physicsVersion === 2` a beam sample counts as a hit only when it
+  is inside the object's oriented box; v1 keeps the circumscribed-circle test unchanged. (collision.ts
+  imports only a type from vehicle.ts, so there is no runtime import cycle.)
+- Tests: physics-v2.ts adds a corner point inside the circle but outside the box, and asserts v2 LiDAR
+  never reports nearer than v1 (box ⊆ circle) while seeing past the circle's false hits on grazing beams.
+
+### Verification (offscreen)
+- All 9 core suites pass; v1 LiDAR/PURSUIT unchanged; v2 baseline unchanged. tsc 0 errors, build passes.
+
 ## 2026-07-23 - Physics v2 Phase 2: ordered checkpoint lap validation (v2-gated)
 
 ### Why

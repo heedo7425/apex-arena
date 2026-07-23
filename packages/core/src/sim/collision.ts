@@ -34,6 +34,12 @@ export function collideBoxes(a: CollisionBox, b: CollisionBox): { normal: [numbe
   return { normal: [nx, ny], depth: minDepth };
 }
 
+// point inside an oriented box (used by v2 LiDAR so corners are not over-reported by a circle).
+export function pointInBox(px: number, py: number, b: CollisionBox): boolean {
+  const dx = px - b.x, dy = py - b.y, c = Math.cos(b.yaw), s = Math.sin(b.yaw);
+  return Math.abs(c*dx + s*dy) <= b.hl && Math.abs(-s*dx + c*dy) <= b.hw;
+}
+
 export const carBoxOf = (c: CarState): CollisionBox => ({ x: c.x, y: c.y, yaw: c.yaw, hl: CAR_HL, hw: CAR_HW });
 const worldVel = (c: CarState): [number, number] => [c.vx*Math.cos(c.yaw) - c.vy*Math.sin(c.yaw), c.vx*Math.sin(c.yaw) + c.vy*Math.cos(c.yaw)];
 function setBodyVel(c: CarState, wx: number, wy: number) { const ch = Math.cos(c.yaw), sh = Math.sin(c.yaw); c.vx = wx*ch + wy*sh; c.vy = -wx*sh + wy*ch; }

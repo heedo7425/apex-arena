@@ -1,6 +1,7 @@
 // Dynamic single-track vehicle model — pure function (hook #2: model-as-node,
 // so MPPI/MPC can roll it out from inside a graph). Verified physics ported.
 import { type World, nearestIndex, G, DT } from './world.ts';
+import { pointInBox, boxForObject } from './collision.ts';
 
 import type { SceneObject } from '../planning/types.ts';
 export type CarState = {
@@ -120,6 +121,7 @@ export function stepVehicle(car: CarState, u: Control, world: World, dt: number 
 export type Scan = { ranges: number[]; a0: number; da: number };
 export function castScan(car: CarState, world: World, nBeams = 21, fov = 2.0, objects:SceneObject[] = world.objects ?? []): Scan {
   const T = world.track, a0 = -fov, da = 2*fov/(nBeams-1), ranges: number[] = [];
+  const boxHit = world.physicsVersion === 2; // v2: oriented-box; v1: circumscribed circle (frozen)
   for (let b = 0; b < nBeams; b++) {
     const ang = car.yaw + a0 + b*da, dx = Math.cos(ang), dy = Math.sin(ang);
     let r = 0.5, hint = car.idx, hit = 18;
@@ -127,9 +129,10 @@ export function castScan(car: CarState, world: World, nBeams = 21, fov = 2.0, ob
       r += 0.5; const px = car.x + dx*r, py = car.y + dy*r, nn = nearestIndex(T, px, py, hint); hint = nn.i;
       if (nn.dist > T.half) { hit = r - 0.25; break; }
       for(const object of objects){
-        const ox=px-object.pose.x,oy=py-object.pose.y
-        const radius=object.shape.type==='circle'?object.shape.radius:Math.hypot(object.shape.length,object.shape.width)/2
-        if(ox*ox+oy*oy<=radius*radius){hit=Math.min(hit,r-0.25);break}
+        const inside = boxHit
+          ? pointInBox(px, py, boxForObject(object))
+          : (()=>{ const ox=px-object.pose.x,oy=py-object.pose.y, radius=object.shape.type==='circle'?object.shape.radius:Math.hypot(object.shape.length,object.shape.width)/2; return ox*ox+oy*oy<=radius*radius; })()
+        if(inside){hit=Math.min(hit,r-0.25);break}
       }
       if(hit<18)break
     }
