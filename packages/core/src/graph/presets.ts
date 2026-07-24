@@ -55,4 +55,30 @@ export const PURSUIT: Graph = makeGraph({
   tsink: { type:'sink.throttle', in:{ x:['n','thr','v'] } },
 });
 
-export const PRESETS: Record<string, Graph> = { ftg: FTG, pursuit: PURSUIT };
+// physics v2 reference controller: same pure pursuit as PURSUIT, but a conservative grip-speed
+// target (lower vmax + margin) that stays inside v2's stricter combined-slip grip so it clean-laps.
+// Used to measure the v2 baseline and set v2-only medals; never mixed with v1 records.
+export const PURSUIT_V2: Graph = makeGraph({
+  pose: { type:'src.pose' }, track: { type:'src.track' }, speed: { type:'src.speed' },
+  Ld: { type:'const', params:{ value:6 } },
+  look: { type:'std.lookahead', in:{ pose:['n','pose','pose'], track:['n','track','track'], Ld:['n','Ld','v'] } },
+  e: { type:'std.tocar', in:{ pt:['n','look','pt'], pose:['n','pose','pose'] } },
+  comp: { type:'vec.xy', in:{ e:['n','e','e'] } },
+  dist: { type:'vec.len', in:{ e:['n','e','e'] } },
+  two: { type:'const', params:{ value:2 } },
+  twoY: { type:'mul', in:{ a:['n','two','v'], b:['n','comp','y'] } },
+  dsq: { type:'mul', in:{ a:['n','dist','v'], b:['n','dist','v'] } },
+  k: { type:'div', in:{ a:['n','twoY','v'], b:['n','dsq','v'] } },
+  gain: { type:'const', params:{ value:5.2 } },
+  sraw: { type:'mul', in:{ a:['n','k','v'], b:['n','gain','v'] } },
+  steer: { type:'clamp', params:{ lo:-1, hi:1 }, in:{ x:['n','sraw','v'] } },
+  ssink: { type:'sink.steer', in:{ x:['n','steer','v'] } },
+  ka: { type:'std.curvAhead', in:{ pose:['n','pose','pose'], track:['n','track','track'] } },
+  vtgt: { type:'std.gripSpeed', params:{ vmax:11, margin:0.6 }, in:{ k:['n','ka','k'] } },
+  verr: { type:'sub', in:{ a:['n','vtgt','v'], b:['n','speed','v'] } },
+  pid: { type:'ctrl.pid', params:{ kp:0.6, ki:0.06, kd:0 }, in:{ err:['n','verr','v'] } },
+  thr: { type:'clamp', params:{ lo:-1, hi:1 }, in:{ x:['n','pid','u'] } },
+  tsink: { type:'sink.throttle', in:{ x:['n','thr','v'] } },
+});
+
+export const PRESETS: Record<string, Graph> = { ftg: FTG, pursuit: PURSUIT, 'pursuit-v2': PURSUIT_V2 };

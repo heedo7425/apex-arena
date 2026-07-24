@@ -9,6 +9,10 @@ import { makeRng, type Rng } from '../rng.ts';
 
 export type Medals = { dev: number; gold: number; silver: number; bronze: number };
 export const DEFAULT_MEDALS: Medals = { dev: 20.5, gold: 22.5, silver: 26, bronze: 33 };
+// physics v2 medals are a separate ladder (v2 grip is stricter; the v2 reference laps ~27.8 s).
+// v1 and v2 medals/records are never compared in the same ranking.
+export const MEDALS_V2: Medals = { dev: 26.5, gold: 28.5, silver: 32, bronze: 40 };
+export const medalsForVersion = (v: PhysicsVersion): Medals => v === 2 ? MEDALS_V2 : DEFAULT_MEDALS;
 export type LapResult = { t: number; dirty: boolean; physicsVersion: PhysicsVersion };
 
 // physics v2 lap validation: ordered interior checkpoints (lap-progress fractions) that must be

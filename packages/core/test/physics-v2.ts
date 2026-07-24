@@ -1,6 +1,6 @@
 // Physics v2 Phase 1 tests. v2 is opt-in via world.physicsVersion=2; v1 stays frozen.
-import { DT, G, PHYSICS_LATEST, buildWorld, initCar, nearestIndex, castScan, pointInBox, stepDynamics, stepDynamicsV2, stepVehicle, makeSim, tick, runFor } from '../src/index.ts';
-import { PURSUIT } from '../src/graph/presets.ts';
+import { DT, G, PHYSICS_LATEST, buildWorld, initCar, nearestIndex, castScan, pointInBox, stepDynamics, stepDynamicsV2, stepVehicle, makeSim, tick, runFor, medalFor, medalsForVersion, DEFAULT_MEDALS, MEDALS_V2 } from '../src/index.ts';
+import { PURSUIT, PURSUIT_V2 } from '../src/graph/presets.ts';
 import type { CarState, Control, Height, World } from '../src/index.ts';
 
 let failed = 0;
@@ -95,6 +95,20 @@ ok(JSON.stringify(v2run.laps) === JSON.stringify(v2runB.laps), 'v2 PURSUIT run i
   const r1 = castScan(c, w1, 21, 2, [bar]).ranges, r2 = castScan(c, w2, 21, 2, [bar]).ranges;
   ok(r2.every((v,i)=>v >= r1[i]-1e-9), 'v2 LiDAR never reports an obstacle nearer than v1 (box is inside the circle)');
   ok(r2.some((v,i)=>v > r1[i]+1e-9), 'v2 LiDAR sees past circumscribed-circle false hits on grazing beams'); }
+
+// ---- v2 rollout foundation: a v2-tuned reference controller that clean-laps, and a separate medal ladder ----
+{ const v2ref = runFor(buildWorld({ physicsVersion:2 }), PURSUIT_V2, 1, 70);
+  ok(v2ref.bestClean !== null, 'the v2 reference controller (PURSUIT_V2) completes a clean v2 lap');
+  ok(v2ref.laps.length >= 2 && v2ref.laps.every(l=>!l.dirty), 'PURSUIT_V2 laps are all clean on v2 (stays inside stricter grip)');
+  ok(v2ref.bestClean! > 26 && v2ref.bestClean! < 29, 'v2 reference baseline is around 27.5 s (measured, documented)');
+  const v2refB = runFor(buildWorld({ physicsVersion:2 }), PURSUIT_V2, 1, 70);
+  ok(v2ref.bestClean === v2refB.bestClean, 'the v2 reference lap is deterministic');
+  ok(medalFor(v2ref.bestClean, medalsForVersion(2)) === 'gold', 'the v2 reference earns gold on the v2 ladder');
+  ok(medalsForVersion(2) === MEDALS_V2 && medalsForVersion(1) === DEFAULT_MEDALS, 'v1 and v2 use separate medal ladders');
+  ok(MEDALS_V2.gold !== DEFAULT_MEDALS.gold, 'v2 and v1 medal thresholds are not the same (never comparable)');
+  // v1 reference stays frozen and is not mixed with v2
+  const v1ref = runFor(buildWorld(), PURSUIT, 1, 70);
+  ok(v1ref.physicsVersion === 1 && v2ref.physicsVersion === 2, 'runs are tagged with the version actually used'); }
 
 console.log(failed === 0 ? '\nALL PASS - physics v2 Phase 1 forces, slopes, observations verified' : `\n${failed} FAILED`);
 if (failed) process.exit(1);

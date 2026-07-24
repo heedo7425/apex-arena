@@ -129,9 +129,20 @@ Combined slip is verified behaviorally: adding throttle under a saturating steer
 ### Baseline lap times (never compared across versions)
 
 - **physics v1 PURSUIT**: `bestClean = 21.083333333332778 s` (frozen contract, still exact).
-- **physics v2 PURSUIT**: the v1-tuned Pure Pursuit exceeds v2's stricter combined-slip grip and has
-  **no clean lap** (`bestClean = null`); its single lap is a deterministic `21.6167 s` **dirty** lap.
-  A v2-tuned controller and v2-specific medals/leaderboards are future work (do not compare with v1).
+- **physics v2 PURSUIT (v1-tuned)**: exceeds v2's stricter combined-slip grip and has **no clean lap**
+  (`bestClean = null`); its single lap is a deterministic `21.6167 s` **dirty** lap.
+- **physics v2 reference (`PURSUIT_V2`)**: same pure pursuit with a conservative grip-speed target
+  (vmax 11, margin 0.6) that stays inside v2 grip. It **clean-laps deterministically at ~27.575 s**
+  (all laps clean). This is the v2 baseline and earns `gold` on the **separate v2 medal ladder**
+  `MEDALS_V2 = { dev 26.5, gold 28.5, silver 32, bronze 40 }` (`medalsForVersion(2)`). v1 and v2 medals
+  and records are never compared in one ranking.
+
+### v2 rollout status
+
+Foundation delivered in core: a v2-tuned reference controller (`PURSUIT_V2`), a measured v2 baseline,
+a separate `MEDALS_V2` ladder + `medalsForVersion`, and per-run/lap physics-version tagging. Not yet
+done (a larger product step): switching individual missions to v2 with per-track medal re-measurement,
+and a v2-only online leaderboard/season. Missions still run on v1 until that rollout.
 
 ### Phase 2: make racing fair
 

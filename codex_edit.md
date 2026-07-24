@@ -2,6 +2,30 @@
 
 All entries in this file document changes made by Codex in this repository.
 
+## 2026-07-24 - v2 rollout foundation: reference controller + separate medal ladder
+
+### Why
+User chose the "v2-tuned controller first" rollout path. The v1-tuned pursuit can't clean-lap on v2,
+so a v2 reference controller, a measured v2 baseline, and a v2-only medal ladder are needed before any
+mission runs on v2. v1 records/medals must never mix with v2.
+
+### Changes
+- presets.ts: `PURSUIT_V2` — the same pure pursuit as PURSUIT with a conservative grip-speed target
+  (vmax 11, margin 0.6) so it stays inside v2's stricter combined-slip grip. Added to PRESETS as
+  `pursuit-v2` and exported.
+- runner.ts: `MEDALS_V2 = { dev 26.5, gold 28.5, silver 32, bronze 40 }` and `medalsForVersion(v)` so v2
+  uses its own ladder. Runs/laps already carry the physics version used.
+- Tests (physics-v2.ts): PURSUIT_V2 clean-laps deterministically on v2 (~27.575 s, all laps clean),
+  earns gold on the v2 ladder, and v1/v2 ladders are distinct; runs are version-tagged.
+
+### Verification (offscreen)
+- All 9 core suites pass. v2 reference = deterministic ~27.575 s clean; v1 PURSUIT stays exactly
+  21.083333333332778. tsc 0 errors, web build passes.
+
+### Next (v2 rollout, larger product step — not done here)
+- Switch individual missions to v2 with per-track medal re-measurement; v2-only leaderboard/season.
+- The app still runs missions on v1 until that rollout.
+
 ## 2026-07-23 - Follow-up: v2 LiDAR oriented-box (audit P1 #8)
 
 ### Why

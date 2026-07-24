@@ -9,4 +9,4 @@ export * from './graph/engine.ts';
 export * from './graph/validate.ts';
 export * from './graph/inline.ts';
 export { NT } from './graph/registry.ts';
-export { FTG, PURSUIT, PRESETS } from './graph/presets.ts';
+export { FTG, PURSUIT, PURSUIT_V2, PRESETS } from './graph/presets.ts';
