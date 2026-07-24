@@ -93,7 +93,7 @@ Follow-the-Gap `argmax→각도` · 완성 속도정책. (2026-07-21 `std.pursui
   Logic(gt·le·ge·eq·ne·and·or·not) · Vector(make·scale·add·sub·dot·normalize·rotate·angle·dist) ·
   Array(get·slice·window·range·diff·argmin·min·sum·mean + 고차 filter/reduce/zipWith) · State(delay·accum·lowpass·rateLimit).
   registry+validate(포트타입)+nodeMeta(마스터 카탈로그) 일괄. 단위검증 `test/prims.ts`(20 assert) + 기존 랩 결정론 유지.
-  고차(map/filter/reduce/zipWith)는 core엔 있으나 **에디터 람다 저작 UI 전까지 팔레트 미노출**. Struct 생성(make.waypoint/make.command)은 P-c(Path)와 함께.
+  고차(map/filter/reduce/zipWith)는 ✅**에디터 람다 저작 UI 완료(2026-07-24)** — Higher-order 카테고리로 팔레트 노출, 더블클릭하면 `arg`(원소)/`arg2`(짝)/`argacc`(누적) → `▹ λ 반환`(lambda.out) 표식으로 내부 람다를 편집(nested 편집 에디터). 기본 람다(map=identity, reduce=sum, zipWith=mul, filter=>0) 제공. Struct 생성(make.waypoint/make.command)은 P-c(Path)와 함께.
 - **P-b ✅ 완료(2026-07-22)** — shipped `lookahead`·`tocar`·`curvAhead`·`gripSpeed`와 신규 `nearestWpt`·`crossTrack`·`headingErr`, LiDAR 3종을 전부 L0 서브그래프 기반 composite로 전환. `path.at` 등 경계 프리미티브와 파라미터 fork 치환까지 포함하며 기존 결정론 랩을 완전히 보존.
   에디터는 중첩 breadcrumb, 내부 PART GUIDE, 실시간 신호, 충돌 회피 fork 배치, 원인별 회로 진단, 사용자 블록 이름 지정·영구 보관함을 지원.
 - **P-c ✅ 핵심 완료(2026-07-23)** — vehicle state와 일정/시간별 command로 결정론적 trajectory 후보를 생성한다. `points.empty/append`, `path.fromPoints`, `path.midpoints`, `path.offset`, `path.resample`로 경계·점열에서 reference path를 저작하며 N-candidate lattice와 valid-aware 평가까지 연결된다. 고급 racing-line 반복 최적화는 별도 확장이다.

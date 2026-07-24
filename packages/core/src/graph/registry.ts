@@ -457,6 +457,10 @@ export const NT: Record<string, NodeDef> = {
   } },
 
   // ---- sinks (write command) — coerce unwired/NaN inputs to 0 so a partial graph is safe ----
+  // lambda output marker (editor-only): designates the return of a higher-order lambda.
+  // Dropped at compile time (its wired source becomes the lambda's outNode/outPort), so it
+  // never runs inside a real map/filter/reduce/zipWith evaluation.
+  'lambda.out': { kind:'sink', cat:'Lambda', ins:['v'], fn:()=>({}) },
   'sink.steer':    { kind:'sink', cat:'Output', ins:['x'], fn:(i,p,s,c)=>{ c.cmd.steer=Number.isFinite(i.x)?i.x:0; return {}; } },
   'sink.throttle': { kind:'sink', cat:'Output', ins:['x'], fn:(i,p,s,c)=>{ c.cmd.throttle=Number.isFinite(i.x)?i.x:0; return {}; } },
   'sink.reward': { kind:'metric', cat:'Reward', ins:['x'], outs:['value'], fn:(i,p,s,c)=>{ (c.metrics??={}).reward=Number.isFinite(i.x)?i.x:0; return {value:(c.metrics.reward as number)} } },

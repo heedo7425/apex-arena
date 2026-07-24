@@ -5,9 +5,9 @@ import '@xyflow/react/dist/style.css'
 import { GraphNode } from './GraphNode'
 import { VisualizePanel } from './VisualizePanel'
 import { connectionIssue, graphIssues, newNode, rfToCore, coreToRF, type RFNode, type RFEdge } from './compile'
-import { defaultParams, metaOf, colorOf, ins, outs, PALETTE_CATS } from './nodeMeta'
+import { defaultParams, metaOf, colorOf, ins, outs, PALETTE_CATS, HIGHER_ORDER, defaultLambda, lambdaPalette } from './nodeMeta'
 import { useBlockLibrary, useLive, usePending, useVisualization } from '../store'
-import { NT, inlineComposite, encapsulate, portType, type Graph } from '@apex/core'
+import { NT, inlineComposite, encapsulate, portType, makeGraph, type Graph } from '@apex/core'
 
 const nodeTypes = { apex: GraphNode }
 
@@ -82,6 +82,74 @@ function InnerView({ node, onClose, onFork, onSave }: { node:OpenNode; onClose:(
   )
 }
 
+// Editable inner editor for a higher-order node's lambda (arg → ▹ λ 반환).
+function LambdaEditor({ node, onApply, onClose }:{ node:{id:string;type:string;lambda:Graph}; onApply:(g:Graph)=>void; onClose:()=>void }) {
+  const OUT='__lout'
+  const seed=React.useMemo(()=>{
+    const rf=coreToRF(node.lambda)
+    const maxX=Math.max(120,...rf.nodes.map(n=>n.position.x))
+    const outNode:any={ id:OUT, type:'apex', position:{x:maxX+240,y:60}, data:{ coreType:'lambda.out', params:{} } }
+    const edges:any[]=[...rf.edges]
+    if(node.lambda.outNode) edges.push({ id:`${node.lambda.outNode}.${node.lambda.outPort}->${OUT}.v`, source:node.lambda.outNode, sourceHandle:node.lambda.outPort!, target:OUT, targetHandle:'v' })
+    return { nodes:[...rf.nodes,outNode], edges }
+  },[node])
+  const [nodes,setNodes,onNodesChange]=useNodesState([] as any)
+  const [edges,setEdges,onEdgesChange]=useEdgesState([] as any)
+  const [err,setErr]=useState<string|null>(null)
+  const latest=useRef<{nodes:any[];edges:any[]}>({nodes:[],edges:[]}); latest.current={nodes:nodes as any,edges:edges as any}
+  const pending=useRef<{node:string;handle:string;kind:'source'|'target'}|null>(null)
+  const onParam=(id:string,key:string,val:number)=>setNodes((nds:any)=>nds.map((n:any)=>n.id===id?{...n,data:{...n.data,params:{...n.data.params,[key]:val}}}:n))
+  const onPort=(nd:string,handle:string,kind:'source'|'target')=>{
+    const p=pending.current
+    if(p&&p.kind!==kind&&p.node!==nd){
+      const src=kind==='source'?{node:nd,handle}:{node:p.node,handle:p.handle}
+      const tgt=kind==='target'?{node:nd,handle}:{node:p.node,handle:p.handle}
+      const issue=connectionIssue(latest.current.nodes as any,latest.current.edges as any,src.node,src.handle,tgt.node,tgt.handle)
+      if(issue){setErr(issue);pending.current=null;usePending.getState().setSel(null);return}
+      setEdges((eds:any)=>addEdge({id:`${src.node}.${src.handle}->${tgt.node}.${tgt.handle}`,source:src.node,sourceHandle:src.handle,target:tgt.node,targetHandle:tgt.handle},eds))
+      setErr(null);pending.current=null;usePending.getState().setSel(null)
+    } else { pending.current={node:nd,handle,kind};usePending.getState().setSel(`${nd}|${handle}|${kind}`) }
+  }
+  const withCb=(ns:any[])=>ns.map(n=>({...n,data:{...n.data,onParam,onPort}}))
+  React.useEffect(()=>{ setNodes(withCb(seed.nodes) as any); setEdges(seed.edges as any); setErr(null) },[seed])
+  const addPart=(type:string)=>{ const i=(nodes as any).length; const nn=newNode(type,60+(i%3)*180,60+Math.floor(i/3)*120); setNodes((nds:any)=>nds.concat({...nn,data:{coreType:type,params:defaultParams(type),onParam,onPort}})) }
+  const onConnect=(c:any)=>{ if(!c.source||!c.sourceHandle||!c.target||!c.targetHandle)return; const issue=connectionIssue(latest.current.nodes as any,latest.current.edges as any,c.source,c.sourceHandle,c.target,c.targetHandle); if(issue){setErr(issue);return} setEdges((eds:any)=>addEdge({...c,id:`${c.source}.${c.sourceHandle}->${c.target}.${c.targetHandle}`},eds));setErr(null) }
+  const apply=()=>{
+    const core=rfToCore(latest.current.nodes as any,latest.current.edges as any)
+    const outId=Object.keys(core.nodes).find(id=>core.nodes[id].type==='lambda.out')
+    const ref=outId?core.nodes[outId].in?.v:undefined
+    if(!ref||ref[0]!=='n'){ setErr('▹ λ 반환에 결과 신호를 연결하세요.'); return }
+    const inner:any={...core.nodes}; delete inner[outId!]
+    onApply(makeGraph(inner, ref[1] as string, ref[2] as string)); onClose()
+  }
+  return (
+    <div className="inner-view">
+      <div className="inner-bar">
+        <button className="iv-close" onClick={onClose}>← 취소</button>
+        <span className="iv-title">{metaOf(node.type).label} · 람다 편집 <em>arg → ▹ λ 반환</em></span>
+        <button className="iv-fork" onClick={apply}>적용 · 저장</button>
+      </div>
+      <div className="iv-fork-note">{err?<span style={{color:'var(--bad)'}}>{err}</span>:'왼쪽 파트를 캔버스에 추가하고 arg 원소를 계산해 ▹ λ 반환에 연결하세요 · 포트 클릭 또는 드래그로 연결'}</div>
+      <div className="lambda-body">
+        <div className="lambda-palette">
+          {lambdaPalette(node.type).map(t=><button key={t} className="pal-chip" style={{['--part' as any]:colorOf(t)}} onClick={()=>addPart(t)}><i>+</i><span>{metaOf(t).label}</span></button>)}
+        </div>
+        <div className="inner-flow">
+          <ReactFlowProvider>
+            <ReactFlow nodes={nodes as any} edges={edges as any} nodeTypes={nodeTypes}
+              onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
+              deleteKeyCode={["Backspace","Delete"]} fitView minZoom={0.4} maxZoom={2}
+              onPaneClick={()=>{pending.current=null;usePending.getState().setSel(null)}}
+              proOptions={{hideAttribution:true}}>
+              <Background color="#314052" gap={24} size={1}/>
+            </ReactFlow>
+          </ReactFlowProvider>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 type Decorate = Record<string, { label?: string; highlight?: boolean; tag?: string }>
 type HoverInfo = { type:string; x:number; y:number }
 function signalUnit(type:string,port:string){
@@ -110,6 +178,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
   const [zoom,setZoom] = useState(1)
   const [info,setInfo]=useState<string|null>(null)
   const [openNode,setOpenNode]=useState<OpenNode|null>(null)
+  const [openLambda,setOpenLambda]=useState<{id:string;type:string;lambda:Graph}|null>(null)
   const [selectedIds,setSelectedIds]=useState<string[]>([])
   const blockUid=useRef(1)
   const [hover,setHover]=useState<HoverInfo|null>(null)
@@ -246,6 +315,18 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     const label = rfNode?.data?.label || (type==='blk.user' ? (rfNode?.data?.params?.label || '▣ 내 블록') : metaOf(type).label)
     setOpenNode({ id, type, label, sub, params:{...(rfNode?.data?.params||{})} });onSkill?.('open')
   }
+  const onNodeDouble = (id:string, type:string) => {
+    if(HIGHER_ORDER.has(type)){
+      const rfNode = latest.current.nodes.find(n=>n.id===id) as any
+      const lambda = (rfNode?.data?.params?.lambda as Graph) ?? defaultLambda(type)
+      setOpenLambda({ id, type, lambda });onSkill?.('open')
+    } else openBlock(id, type)
+  }
+  const applyLambda = (id:string, lambda:Graph) => {
+    remember()
+    setNodes((nds:any)=>nds.map((n:any)=>n.id===id?{...n,data:{...n.data,params:{...n.data.params,lambda}}}:n))
+    setNotice('람다를 저장했습니다.')
+  }
   const groupSelected = () => {
     const ids = selectedIds.filter(id => latest.current.nodes.some(n=>n.id===id))
     if(ids.length < 2) return
@@ -262,8 +343,8 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
     onSkill?.('add');remember();setRecentParts(r=>[type,...r.filter(x=>x!==type)].slice(0,5))
     const index=nodes.length
     const nn=newNode(type,compact?10+(index%2)*225:70+(index%3)*260,compact?70+Math.floor(index/2)*138:70+(Math.floor(index/3)%4)*128)
-    setNodes((nds:any)=>nds.concat({...nn,data:{coreType:type,params:{...defaultParams(type),...(nodeDefaults?.[type]??{})},onParam,onPort,onHover:showHover,onHoverEnd:hideHover}}))
-    setNotice(`${metaOf(type).label} 파트를 장착했습니다.`)
+    setNodes((nds:any)=>nds.concat({...nn,data:{coreType:type,params:{...defaultParams(type),...(HIGHER_ORDER.has(type)?{lambda:defaultLambda(type)}:{}),...(nodeDefaults?.[type]??{})},onParam,onPort,onHover:showHover,onHoverEnd:hideHover}}))
+    setNotice(HIGHER_ORDER.has(type)?`${metaOf(type).label} 장착 · 더블클릭해 람다를 편집`:`${metaOf(type).label} 파트를 장착했습니다.`)
     if(compact)setBayOpen(false)
     frameBuild()
   }
@@ -399,7 +480,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
           onEdgeDoubleClick={(_,edge:any)=>visualizeSignal(edge.source,edge.sourceHandle)}
           isValidConnection={c=>!!c.source&&!!c.sourceHandle&&!!c.target&&!!c.targetHandle&&!connectionIssue(latest.current.nodes,latest.current.edges,c.source,c.sourceHandle,c.target,c.targetHandle)}
           onNodeClick={(_,node:any)=>{hideHover();setSelectedEdgeId(null);setInfo(node.data.coreType)}} onPaneClick={()=>{clearPending();setSelectedEdgeId(null);hideHover()}}
-          onNodeDoubleClick={(_,node:any)=>openBlock(node.id,node.data.coreType)}
+          onNodeDoubleClick={(_,node:any)=>onNodeDouble(node.id,node.data.coreType)}
           onMove={(_,viewport)=>setZoom(viewport.zoom)}
           fitView minZoom={0.58} maxZoom={2} proOptions={{hideAttribution:true}}>
           <Background color="#314052" gap={24} size={1}/>
@@ -418,6 +499,7 @@ function EditorInner({ initial, palette, onGraph, decorate, highlightPalette, no
           </div>
         </div>}
         {openNode&&<InnerView node={openNode} onClose={()=>setOpenNode(null)} onFork={forkOpen} onSave={saveOpen} />}
+        {openLambda&&<LambdaEditor node={openLambda} onApply={(g)=>applyLambda(openLambda.id,g)} onClose={()=>setOpenLambda(null)} />}
       </div>
       {hover&&<div className="node-tooltip" role="tooltip" style={{left:hover.x,top:hover.y,['--tip' as any]:colorOf(hover.type)}}>
         <div className="nt-cap">{metaOf(hover.type).cat} · PART GUIDE · 클릭하면 고정</div>

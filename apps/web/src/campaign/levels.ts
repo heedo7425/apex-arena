@@ -86,7 +86,7 @@ export const LEVELS: Level[] = [
     requirements:[{kind:'node',type:'std.curvAhead',label:'전방 곡률'},{kind:'node',type:'std.gripSpeed',label:'그립 속도'},{kind:'edge',from:'std.gripSpeed',fromPort:'v',to:'blk.speedPid',toPort:'target',label:'계획 속도를 속도 제어기에 전달'}], unlock:'곡률 기반 속도 계획' },
   { id:'l4', n:4, title:'보이지 않는 길', kicker:'FOLLOW THE GAP',
     teach:'속도 제어는 준비돼 있습니다. LiDAR 노이즈를 정리하고 가장 넓게 이어진 안전 공간을 골라 STEER로 만드세요.',
-    palette:['src.scan','lidar.preprocess','lidar.widestGap','mul','add','clamp','sink.steer'], objective:{type:'clean'}, starter:L4,
+    palette:['src.scan','lidar.preprocess','lidar.widestGap','array.map','array.reduce','const','sub','lt','select','mul','add','clamp','sink.steer'], objective:{type:'clean'}, starter:L4,
     requirements:[{kind:'edge',from:'src.scan',fromPort:'ranges',to:'lidar.preprocess',toPort:'ranges',label:'LiDAR 거리를 전처리'},{kind:'edge',from:'lidar.preprocess',fromPort:'ranges',to:'lidar.widestGap',toPort:'ranges',label:'연속된 안전 공간 탐색'},{kind:'node',type:'mul',label:'빔 인덱스를 각도로 변환'},{kind:'node',type:'add',label:'센서 시작각 보정'},{kind:'edge',from:'clamp',fromPort:'v',to:'sink.steer',toPort:'x',label:'안전 조향을 STEER에 전달'}], unlock:'Follow-the-Gap' },
   { id:'l5', n:5, title:'막힌 레이싱 라인', kicker:'STATIC AVOIDANCE',
     teach:'레이싱 라인 위 장애물을 감지하고, 가까워졌을 때만 기존 조향에 회피 오프셋을 합성하세요.',

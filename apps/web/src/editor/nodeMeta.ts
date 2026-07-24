@@ -1,5 +1,6 @@
 // Display metadata for palette + editor nodes. Ports (ins/outs) come from core NT.
-import { NT } from '@apex/core'
+import { NT, makeGraph } from '@apex/core'
+import type { Graph } from '@apex/core'
 
 export type ParamSpec = { key:string; label:string; min:number; max:number; step:number; def:number }
 export type Meta = { label:string; cat:string; params?:ParamSpec[]; desc?:string; real?:string }
@@ -8,7 +9,7 @@ export type Meta = { label:string; cat:string; params?:ParamSpec[]; desc?:string
 export const CAT_COLOR: Record<string,string> = {
   Sensors:'#6FA8DC', Math:'#9AA6B4', Logic:'#E4736A', Array:'#B58BE0', Vector:'#67C88A', State:'#D69A57',
   Struct:'#6FA8DC', Path:'#E7B24C', Geometry:'#E7B24C', LiDAR:'#B58BE0', Planning:'#E7B24C', Control:'#1FDDC9', Random:'#c98bff', Model:'#8fd6c9', Output:'#1FDDC9',
-  Module:'#8C7CF0', Composite:'#8C7CF0', Policy:'#4D89C4', Reward:'#D97852',
+  Module:'#8C7CF0', Composite:'#8C7CF0', Policy:'#4D89C4', Reward:'#D97852', 'Higher-order':'#B58BE0', Lambda:'#C99A5B',
   Scene:'#4F9DA6', Space:'#78A55A', Trajectory:'#E58C45', Prediction:'#C779A8', Behavior:'#E7B24C', Cost:'#D66B58', Constraint:'#B85C5C',
 }
 
@@ -127,7 +128,14 @@ export const META: Record<string, Meta> = {
   'array.slice':{label:'slice',cat:'Array',desc:'i~j 구간을 잘라 새 배열.'},
   'array.window':{label:'window',cat:'Array',desc:'i부터 w개(닫힌 트랙은 끝에서 앞으로 감쌈). 전방 구간 볼 때.'},
   'array.range':{label:'range',cat:'Array',desc:'0..n−1 정수 배열.'},'array.diff':{label:'diff',cat:'Array',desc:'이웃 원소 차이 배열(길이 −1). 곡률·기울기.'},
-  'array.map':{label:'Map',cat:'Array',desc:'배열의 각 원소에 같은 연산(내부 서브그래프)을 적용해 새 배열을 만듦.'},
+  'array.map':{label:'Map',cat:'Higher-order',desc:'배열의 각 원소(arg)에 람다를 적용해 새 배열을 만듦. 더블클릭해 람다를 편집.'},
+  'array.filter':{label:'Filter',cat:'Higher-order',desc:'람다가 참(bool)인 원소만 남김. arg → lambda.out(bool).'},
+  'array.reduce':{label:'Reduce',cat:'Higher-order',desc:'누적값(argacc)과 원소(arg)로 하나의 값으로 접음. init에서 시작.'},
+  'array.zipWith':{label:'ZipWith',cat:'Higher-order',desc:'두 배열을 짝지어(arg, arg2) 람다로 합침.'},
+  'arg':{label:'arg (원소)',cat:'Lambda',desc:'람다의 현재 원소. map/filter/reduce/zipWith 안에서만 사용.'},
+  'arg2':{label:'arg2 (짝)',cat:'Lambda',desc:'ZipWith에서 두 번째 배열의 짝 원소.'},
+  'argacc':{label:'argacc (누적)',cat:'Lambda',desc:'Reduce의 누적값(이전까지 접힌 결과).'},
+  'lambda.out':{label:'▹ λ 반환',cat:'Lambda',desc:'람다의 반환값. 이 입력에 연결된 신호가 람다의 결과가 됩니다.'},
   'std.lookahead':{label:'Lookahead point',cat:'Geometry',desc:'전방 Ld미터 앞의 경로 지점(목표점)을 찾음. Pure Pursuit가 이 점을 향해 조향.',real:'F1TENTH 기본 컨트롤러의 L1 점.'},
   'std.tocar':{label:'To car frame',cat:'Geometry',desc:'월드 좌표의 점을 차 기준 좌표로 변환. e.y가 좌우 오차(양수=왼쪽).'},
   'vec.xy':{label:'vec → x,y',cat:'Vector',desc:'벡터(예: To car frame의 e)를 x·y 성분으로 분해. Pure Pursuit는 좌우 오차 y를 씀.'},
@@ -168,14 +176,29 @@ export function ins(type:string):string[]{ return NT[type]?.ins ?? [] }
 export function outs(type:string):string[]{ return NT[type]?.outs ?? [] }
 export function metaOf(type:string):Meta{ return META[type] ?? {label:type,cat:'Math'} }
 export function colorOf(type:string):string{ return CAT_COLOR[metaOf(type).cat] ?? '#9AA6B4' }
+
+// ---- higher-order lambda authoring ----
+export const HIGHER_ORDER = new Set(['array.map','array.filter','array.reduce','array.zipWith'])
+// default lambda for a new higher-order node (already compiled: outNode/outPort set)
+export function defaultLambda(type:string):Graph{
+  if(type==='array.reduce') return makeGraph({ a:{type:'arg'}, ac:{type:'argacc'}, s:{type:'add',in:{a:['n','a','v'],b:['n','ac','v']}} }, 's','v')
+  if(type==='array.zipWith') return makeGraph({ a:{type:'arg'}, b:{type:'arg2'}, m:{type:'mul',in:{a:['n','a','v'],b:['n','b','v']}} }, 'm','v')
+  if(type==='array.filter') return makeGraph({ a:{type:'arg'}, thr:{type:'const',params:{value:0}}, keep:{type:'gt',in:{a:['n','a','v'],b:['n','thr','v']}} }, 'keep','v')
+  return makeGraph({ a:{type:'arg'} }, 'a','v') // map: identity element
+}
+// parts available inside a lambda editor for a given higher-order type
+export function lambdaPalette(type:string):string[]{
+  const args = ['arg', ...(type==='array.zipWith'?['arg2']:[]), ...(type==='array.reduce'?['argacc']:[])]
+  return [...args,'lambda.out','const','add','sub','mul','div','abs','neg','min','max','clamp','sqrt','pow','atan2','hypot','lt','gt','le','ge','eq','and','or','not','select','vec.make','vec.xy','vec.len','vec.scale','vec.add','vec.sub','vec.dot']
+}
 export function defaultParams(type:string):Record<string,number>{
   const o:Record<string,number>={}; (metaOf(type).params??[]).forEach(p=>o[p.key]=p.def); return o
 }
 
 // palette grouped by category (which node types the player can drop)
 // master catalog (palette-v1). Levels expose a curated SUBSET via level.palette.
-// Higher-order (map/filter/reduce/zipWith) are omitted until lambda authoring exists.
 export const PALETTE_CATS: {cat:string; types:string[]}[] = [
+  {cat:'Higher-order', types:['array.map','array.filter','array.reduce','array.zipWith']},
   {cat:'Sensors',  types:['src.scan','src.speed','src.pose','src.track','src.vehicleState','src.objects']},
   {cat:'Math',     types:['const','add','sub','mul','div','abs','neg','sign','mod','pow','sqrt','min','max','clamp','lerp','sin','cos','atan2','hypot','wrapAngle']},
   {cat:'Logic',    types:['lt','gt','le','ge','eq','ne','and','or','not','select']},

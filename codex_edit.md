@@ -2,6 +2,32 @@
 
 All entries in this file document changes made by Codex in this repository.
 
+## 2026-07-24 - Editor lambda authoring UI (higher-order map/filter/reduce/zipWith)
+
+### Why
+Higher-order nodes existed in core but were hidden from the palette because there was no way to author
+their inner lambda. This adds a nested editable lambda editor so players can build map/filter/reduce/
+zipWith graphs themselves (design philosophy: author, not pick presets).
+
+### Changes
+- core registry/validate: `lambda.out` marker node (kind sink, no-op; dropped at compile). arg/arg2/argacc already existed.
+- nodeMeta: META for map/filter/reduce/zipWith (new Higher-order category) + arg/arg2/argacc/lambda.out
+  (Lambda category); `HIGHER_ORDER`, `defaultLambda(type)` (map=identity, reduce=sum, zipWith=mul,
+  filter=>0), `lambdaPalette(type)` (arg[/arg2/argacc] + lambda.out + L0 math/logic/vector).
+- Editor: a `LambdaEditor` nested editable graph — seeds from the node's `params.lambda` plus a wired
+  `▹ λ 반환`, has its own lambda palette, click/drag connect (reused connectionIssue), and on apply
+  compiles back (extracts the lambda.out source as outNode/outPort) into `params.lambda`. Adding a
+  higher-order node attaches a default lambda; double-click opens the lambda editor (composites still
+  open the read-only InnerView). L4 palette now exposes Map/Reduce (+ const/sub/lt/select) so scan
+  preprocessing can be authored, and the feature is reachable in a mission.
+
+### Verification (offscreen)
+- tsc 0 errors; web build passes; all 9 core suites pass (registry/validate changes safe; v1 & v2
+  baselines unchanged).
+- Playwright: L4 shows the Higher-order Map chip; adding Map then double-clicking opens the lambda
+  editor titled "Map · 람다 편집 arg → ▹ λ 반환" with the default arg→λ반환 wiring and the lambda
+  palette; apply compiles and closes; 0 page errors. Screenshot confirms the nested editor.
+
 ## 2026-07-24 - v2 rollout foundation: reference controller + separate medal ladder
 
 ### Why

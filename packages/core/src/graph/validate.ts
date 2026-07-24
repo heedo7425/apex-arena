@@ -139,7 +139,7 @@ const PORTS: Record<string, PortShape> = {
   'vec.rotate': { ins:{ e:'point', th:'num' }, outs:{ e:'point' } }, 'vec.angle': { ins:{ e:'point' }, outs:{ v:'num' } },
   'vec.dist': { ins:{ a:'point', b:'point' }, outs:{ v:'num' } },
   // array & iteration
-  'arg2': { outs:{ v:'any' } }, 'argacc': { outs:{ v:'any' } },
+  'arg2': { outs:{ v:'any' } }, 'argacc': { outs:{ v:'any' } }, 'lambda.out': { ins:{ v:'any' } },
   'array.filter': { ins:{ arr:'any' }, outs:{ v:'any' } }, 'array.reduce': { ins:{ arr:'any', init:'any' }, outs:{ v:'any' } },
   'array.zipWith': { ins:{ a:'any', b:'any' }, outs:{ v:'any' } }, 'array.get': { ins:{ arr:'any', i:'num' }, outs:{ v:'any' } },
   'array.slice': { ins:{ arr:'any', i:'num', j:'num' }, outs:{ v:'any' } }, 'array.window': { ins:{ arr:'any', i:'num', w:'num' }, outs:{ v:'any' } },
