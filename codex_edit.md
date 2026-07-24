@@ -2,6 +2,32 @@
 
 All entries in this file document changes made by Codex in this repository.
 
+## 2026-07-24 - v2 rollout: per-mission v2 mode + per-track medals + separate records
+
+### Why
+Extend the v2 rollout from core foundation into gameplay: let players run any mission under physics v2,
+fairly judged and with records kept fully separate from v1 (never mixed). Online leaderboard stays
+deferred (needs a backend).
+
+### Changes
+- worlds.ts: `missionVenue(id, physicsVersion=1)` rebuilds the venue under the chosen model; `v2MedalsFor(id)`
+  runs `PURSUIT_V2` on that exact venue (cached) and derives fair per-track v2 medals from its clean lap.
+- store.ts: `bestKey(id, version)` (`id@v2` for v2); `complete(id, time, physicsVersion=1)` writes the best
+  under the version key so v1 and v2 bests never overwrite each other.
+- LevelScreen: a v1/v2 toggle (per mission, hidden on tutorial/skills). v2 rebuilds the world, judges the
+  time objective against the per-track v2 reference (`v2MedalsFor(id).gold`), tags the BEST readout with a
+  v2 badge, and records under the v2 key. The Viewport remounts on toggle. Race submissions carry the mode.
+- raceOnline.ts: RunSubmission/MatchTicket/LeaderboardEntry version widened to PhysicsVersion (1|2).
+
+### Verification (offscreen)
+- tsc 0 errors; all 9 core suites pass; web build passes. Core check: PURSUIT_V2 clean-laps ORBIT (27.7 s),
+  RIDGELINE (41.4 s), Sensor Canyon (32.8 s) — v2 mode is winnable on every venue.
+- Playwright (L2): v1/v2 toggle present, switching to v2 activates the v2 world and shows the v2 BEST tag
+  (separate record), 0 page errors. Screenshot confirms the toggle and v2 tag.
+
+### Next (still deferred / larger)
+- v2-only online leaderboard/season (needs backend). Optional Phase 3 tire fidelity.
+
 ## 2026-07-24 - Editor lambda authoring UI (higher-order map/filter/reduce/zipWith)
 
 ### Why

@@ -1,9 +1,9 @@
-import { PHYSICS_VERSION } from '@apex/core'
+import { PHYSICS_VERSION, type PhysicsVersion } from '@apex/core'
 
 export type RaceMode='time-trial'|'head-to-head'|'grid-start'
-export type LeaderboardEntry={rank:number;player:string;time:number;verified:boolean;algorithm:string;physicsVersion:typeof PHYSICS_VERSION}
-export type RunSubmission={version:1;physicsVersion:typeof PHYSICS_VERSION;mode:RaceMode;playerId:string;designHash:string;seed:number;lapTime:number;dirty:boolean;inputsHash:string}
-export type MatchTicket={version:1;physicsVersion:typeof PHYSICS_VERSION;mode:Exclude<RaceMode,'time-trial'>;playerId:string;designHash:string;region:string}
+export type LeaderboardEntry={rank:number;player:string;time:number;verified:boolean;algorithm:string;physicsVersion:PhysicsVersion}
+export type RunSubmission={version:PhysicsVersion;physicsVersion:PhysicsVersion;mode:RaceMode;playerId:string;designHash:string;seed:number;lapTime:number;dirty:boolean;inputsHash:string}
+export type MatchTicket={version:PhysicsVersion;physicsVersion:PhysicsVersion;mode:Exclude<RaceMode,'time-trial'>;playerId:string;designHash:string;region:string}
 
 const api=(import.meta.env.VITE_RACE_API_URL as string|undefined)?.replace(/\/$/,'')
 const ws=import.meta.env.VITE_RACE_WS_URL as string|undefined

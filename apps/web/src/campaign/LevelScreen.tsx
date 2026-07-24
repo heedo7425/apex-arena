@@ -5,9 +5,9 @@ import { Editor } from '../editor/Editor'
 import { coreToRF } from '../editor/compile'
 import { metaOf } from '../editor/nodeMeta'
 import { Viewport } from '../sim/Viewport'
-import { useDesignLibrary, useGame, useLive, useTut, useVisualization } from '../store'
+import { useDesignLibrary, useGame, useLive, useTut, useVisualization, bestKey } from '../store'
 import { levelById, LEVELS, ACADEMY_LEVELS, RACE_LEVELS } from './levels'
-import { missionVenue } from './worlds'
+import { missionVenue, v2MedalsFor } from './worlds'
 import { hashDesign, playerId, submitRun } from '../race/raceOnline'
 
 type MissionBrief = {
@@ -109,8 +109,10 @@ function issueLabel(issue: GraphIssue, graph:Graph): string {
 
 export function LevelScreen({ id }: { id: string }) {
   const level = levelById(id)
-  const venue = useMemo(() => missionVenue(id), [id])
+  const [physMode, setPhysMode] = useState<1|2>(1)
+  const venue = useMemo(() => missionVenue(id, physMode), [id, physMode])
   const world = venue.world
+  const v2Ref = useMemo(() => physMode===2 ? v2MedalsFor(id) : null, [id, physMode])
   const [editorGraph,setEditorGraph]=useState<Graph>(level.starter)
   const [editorRevision,setEditorRevision]=useState(0)
   const initial = useMemo(() => coreToRF(editorGraph), [editorGraph])
@@ -156,7 +158,7 @@ export function LevelScreen({ id }: { id: string }) {
   const waitingMessage = `회로 대기 · ${wiringIssue}`
 
   useEffect(() => {
-    setGraph(level.starter);setEditorGraph(level.starter);setEditorRevision(r=>r+1);setHintLevel(0);setTutMoved(false);setSkills(new Set());setPane('graph');setResult(null);useVisualization.getState().clearAll()
+    setGraph(level.starter);setEditorGraph(level.starter);setEditorRevision(r=>r+1);setHintLevel(0);setTutMoved(false);setSkills(new Set());setPane('graph');setResult(null);setPhysMode(1);useVisualization.getState().clearAll()
   }, [id, level.starter])
 
   const finishTut = () => { complete('tut', 60); useGame.getState().goAcademy() }
@@ -175,7 +177,7 @@ export function LevelScreen({ id }: { id: string }) {
   const onSpeedTrial = (t:number) => {
     if (level.objective.type!=='speed') return
     useVisualization.getState().setRunLap(t)
-    complete(level.id, t)
+    complete(level.id, t, physMode)
     setResult({ ok:true, msg:'8 m/s 고정 성공 · ' + t.toFixed(2) + 's' })
   }
 
@@ -184,12 +186,14 @@ export function LevelScreen({ id }: { id: string }) {
     if (!dirty) useVisualization.getState().setRunLap(t)  // latest clean lap → A/B run capture
     if (dirty) { setResult({ ok:false, msg:`트랙 이탈 · ${t.toFixed(2)}s` }); return }
     if(level.path==='race'&&level.id!=='rt'&&position>1){setResult({ok:false,msg:`P${position} FINISH · 1위로 완주해야 승리합니다.`});return}
-    if (level.objective.type === 'time' && t > level.objective.target) {
-      setResult({ ok:false, msg:`클린 랩 ${t.toFixed(2)}s · 목표까지 ${(t-level.objective.target).toFixed(2)}s` }); return
+    // v2 mode is judged against the v2 reference (its own grip), never the v1 target
+    if (level.objective.type === 'time') {
+      const target = physMode===2 ? (v2Ref?.gold ?? Infinity) : level.objective.target
+      if (t > target) { setResult({ ok:false, msg:`클린 랩 ${t.toFixed(2)}s · 목표까지 ${(t-target).toFixed(2)}s` }); return }
     }
-    complete(level.id, t)
-    if(level.id==='rt')void submitRun({version:1,physicsVersion:PHYSICS_VERSION,mode:'time-trial',playerId:playerId(),designHash:hashDesign(graph),seed:1,lapTime:t,dirty:false,inputsHash:'autonomous-graph'}).catch(()=>{})
-    setResult({ ok:true, msg:`클리어 · ${t.toFixed(2)}s` })
+    complete(level.id, t, physMode)
+    if(level.id==='rt')void submitRun({version:physMode,physicsVersion:physMode,mode:'time-trial',playerId:playerId(),designHash:hashDesign(graph),seed:1,lapTime:t,dirty:false,inputsHash:'autonomous-graph'}).catch(()=>{})
+    setResult({ ok:true, msg:`클리어 · ${t.toFixed(2)}s${physMode===2?' · PHYSICS v2':''}` })
   }
 
   useEffect(()=>{if(level.objective.type==='skills'&&requirementsMet&&!result){complete(level.id,0);setResult({ok:true,msg:'그래프 도구 실습 완료'})}},[level.objective.type,requirementsMet,result,complete,level.id])
@@ -208,7 +212,11 @@ export function LevelScreen({ id }: { id: string }) {
           <span className="eyebrow">{level.kicker}</span>
           <div className="lv-title"><b>0{level.n}</b> {level.title}</div>
         </div>
-        <div className="lv-best mono">BEST {best[level.id] != null ? best[level.id].toFixed(2) + 's' : '—'}</div>
+        {!isTut && level.objective.type!=='skills' && <div className="phys-toggle" role="group" aria-label="물리 버전">
+          <button className={physMode===1?'on':''} onClick={()=>{setPhysMode(1);setResult(null);setSimKey(k=>k+1)}} title="물리 v1 (기본, 프리즈된 랩·메달)">v1</button>
+          <button className={physMode===2?'on':''} onClick={()=>{setPhysMode(2);setResult(null);setSimKey(k=>k+1)}} title="물리 v2 (보정 모델 · 별도 기록·메달, 더 어려움)">v2</button>
+        </div>}
+        <div className="lv-best mono">{physMode===2&&<em className="v2-tag">v2</em>}BEST {best[bestKey(level.id, physMode)] != null ? best[bestKey(level.id, physMode)].toFixed(2) + 's' : '—'}</div>
         <button className="help-btn" aria-label="도움말 열기" title="도움말" onClick={() => useTut.getState().show()}>?</button>
       </div>
 
@@ -250,7 +258,7 @@ export function LevelScreen({ id }: { id: string }) {
         </button>
         <div className={'lv-pane lv-right' + (pane !== 'sim' ? ' mobile-hidden' : '')}>
           <div className="circuit-head"><div><span>{venue.name}</span><b>{venue.layout}</b></div><em><i /> TELEMETRY ONLINE</em></div>
-          <Viewport key={simKey} world={world} graph={simGraph} canRun={canRun} raceField={level.path==='race'&&level.id!=='rt'}
+          <Viewport key={`${simKey}-v${physMode}`} world={world} graph={simGraph} canRun={canRun} raceField={level.path==='race'&&level.id!=='rt'}
             trial={level.objective.type === 'speed' ? level.objective : undefined} onTrial={onSpeedTrial}
             onValues={(vals, info) => {
               setVals(vals); setHud({ speed:info.speed, best:info.best, hold:info.hold, position:info.position, field:info.field })
@@ -275,7 +283,7 @@ export function LevelScreen({ id }: { id: string }) {
           </div>
           <div className="lv-hud mono">
             <span><small>SPEED</small><b>{Math.round(hud.speed*3.6)}</b> km/h</span>
-            <span><small>OBJECTIVE</small><b>{level.path==='race'&&level.id!=='rt'?'FINISH P1':level.objective.type==='motion' ? 'CREATE MOTION' : level.objective.type==='skills' ? 'USE GRAPH TOOLS' : level.objective.type === 'time' ? 'CLEAN ≤ ' + level.objective.target + 's' : level.objective.type === 'speed' ? Math.round(level.objective.target*3.6) + ' km/h · ' + level.objective.hold + 's' : 'CLEAN LAP'}</b></span>
+            <span><small>OBJECTIVE</small><b>{level.path==='race'&&level.id!=='rt'?'FINISH P1':level.objective.type==='motion' ? 'CREATE MOTION' : level.objective.type==='skills' ? 'USE GRAPH TOOLS' : level.objective.type === 'time' ? 'CLEAN ≤ ' + (physMode===2 ? (v2Ref?.gold ?? '—') : level.objective.target) + 's' : level.objective.type === 'speed' ? Math.round(level.objective.target*3.6) + ' km/h · ' + level.objective.hold + 's' : 'CLEAN LAP'}</b></span>
             <span><small>{level.path==='race'&&level.id!=='rt'?'RACE POSITION':isTut ? 'OBSERVATION' : isL1 ? 'TARGET HOLD' : 'SESSION BEST'}</small><b>{level.path==='race'&&level.id!=='rt'?`P${hud.position} / ${hud.field}`:level.objective.type==='motion' ? (tutMoved ? 'MOTION DETECTED' : 'NO MOTION') : isL1||id==='a2' ? Math.min(hud.hold, level.objective.type === 'speed' ? level.objective.hold : 0).toFixed(1) + ' / 2.0s' : hud.best != null ? hud.best.toFixed(2)+'s' : '—'}</b></span>
           </div>
           {result && <div ref={resultRef} className={'lv-result ' + (result.ok ? 'ok' : 'bad')}>

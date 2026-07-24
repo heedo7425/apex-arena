@@ -32,7 +32,12 @@ button{cursor:pointer;font-family:var(--sans)}
 .back{background:transparent;border:1px solid var(--hairS);color:var(--ink);border-radius:8px;padding:7px 12px;font-size:.82rem}
 .back:hover{border-color:var(--signal)}
 .lv-title{font-size:.95rem}.lv-title b{color:var(--signal-strong,var(--signal))}
-.lv-best{margin-left:auto;color:var(--mut);font-size:.78rem}
+.lv-best{color:var(--mut);font-size:.78rem}
+.phys-toggle{margin-left:auto;display:inline-flex;border:1px solid var(--hair);border-radius:8px;overflow:hidden;font-family:var(--mono)}
+.phys-toggle button{padding:5px 11px;background:var(--surf2);color:var(--mut);border:0;font-size:.72rem;letter-spacing:.03em}
+.phys-toggle button.on{background:var(--signal);color:#04231f;font-weight:700}
+.phys-toggle button:first-child{border-right:1px solid var(--hair)}
+.v2-tag{display:inline-block;margin-right:5px;padding:1px 5px;border-radius:4px;background:color-mix(in srgb,var(--gold) 22%,transparent);color:var(--gold);font-family:var(--mono);font-size:.6rem;font-style:normal;font-weight:700}
 .lv-teach{padding:10px 18px;background:rgba(31,221,201,.05);border-bottom:1px solid var(--hair);color:var(--mut);font-size:.84rem;line-height:1.5}
 .lv-body{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:0;min-height:0}
 @media(max-width:900px){.lv-body{grid-template-columns:1fr;overflow:auto}}

@@ -1,4 +1,4 @@
-import { buildWorld } from '@apex/core'
+import { buildWorld, runFor, PURSUIT_V2, type Medals } from '@apex/core'
 import type { Height, Vec2, World, SceneObject } from '@apex/core'
 
 export type MissionVenue = {
@@ -33,7 +33,26 @@ const venue = (name:string, layout:string, kind:MissionVenue['kind'], ctrl:Vec2[
   return { world, name, layout, kind }
 }
 
-export function missionVenue(id:string): MissionVenue {
+// physics-versioned venue: v2 rebuilds the same track under the corrected model (opt-in per mission).
+export function missionVenue(id:string, physicsVersion:1|2=1): MissionVenue {
+  const mv = baseVenue(id)
+  if (physicsVersion === 2) mv.world.physicsVersion = 2
+  return mv
+}
+
+// v2 medals for a venue, measured from the v2 reference controller on that exact track (fair per-track).
+const v2MedalCache = new Map<string, Medals | null>()
+export function v2MedalsFor(id:string): Medals | null {
+  if (v2MedalCache.has(id)) return v2MedalCache.get(id)!
+  const world = missionVenue(id, 2).world
+  const r = runFor(world, PURSUIT_V2, 1, 90)
+  const R = r.bestClean
+  const medals = R == null ? null : { dev: +(R-0.6).toFixed(2), gold: +(R+1.4).toFixed(2), silver: +(R+5).toFixed(2), bronze: +(R+12).toFixed(2) }
+  v2MedalCache.set(id, medals)
+  return medals
+}
+
+function baseVenue(id:string): MissionVenue {
   if (id === 'tut' || id === 'a3') return venue('IGNITION PAD', 'PIT APRON · BAY 00', 'pad', [
     [0,0],[38,0],[62,18],[62,48],[38,66],[0,66],[-24,48],[-24,18],
   ], { half:10, flat:true })

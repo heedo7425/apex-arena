@@ -172,8 +172,10 @@ type Game = {
   goAcademy: () => void
   goRace: () => void
   goLevel: (id: string) => void
-  complete: (id: string, time: number) => void
+  complete: (id: string, time: number, physicsVersion?: 1 | 2) => void
 }
+// best records are kept separate per physics version and never mixed
+export const bestKey = (id: string, physicsVersion: 1 | 2 = 1) => physicsVersion === 2 ? `${id}@v2` : id
 export const useGame = create<Game>((set, get) => {
   const s = load()
   // Academy is optional: every player starts at the main map and opts into hands-on basics.
@@ -184,10 +186,11 @@ export const useGame = create<Game>((set, get) => {
     goAcademy: () => set({ screen:'academy', levelId:null }),
     goRace: () => set({ screen:'race', levelId:null }),
     goLevel: (id) => set({ screen: 'level', levelId: id }),
-    complete: (id, time) => {
+    complete: (id, time, physicsVersion = 1) => {
       const st = get()
       const completed = st.completed.includes(id) ? st.completed : [...st.completed, id]
-      const best = { ...st.best, [id]: st.best[id] != null ? Math.min(st.best[id], time) : time }
+      const key = bestKey(id, physicsVersion)  // v1 and v2 bests are stored under different keys
+      const best = { ...st.best, [key]: st.best[key] != null ? Math.min(st.best[key], time) : time }
       save({ physicsVersion:PHYSICS_VERSION, completed, best }); set({ completed, best })
     },
   }

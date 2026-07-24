@@ -139,10 +139,15 @@ Combined slip is verified behaviorally: adding throttle under a saturating steer
 
 ### v2 rollout status
 
-Foundation delivered in core: a v2-tuned reference controller (`PURSUIT_V2`), a measured v2 baseline,
-a separate `MEDALS_V2` ladder + `medalsForVersion`, and per-run/lap physics-version tagging. Not yet
-done (a larger product step): switching individual missions to v2 with per-track medal re-measurement,
-and a v2-only online leaderboard/season. Missions still run on v1 until that rollout.
+Core foundation: a v2-tuned reference controller (`PURSUIT_V2`), a measured v2 baseline, a separate
+`MEDALS_V2` ladder + `medalsForVersion`, and per-run/lap physics-version tagging.
+
+**In-game rollout (2026-07-24)**: each mission has a **v1/v2 toggle**. v2 rebuilds that mission's venue
+under the corrected model (`missionVenue(id, 2)`), judges the lap against the **per-track v2 reference**
+(`v2MedalsFor(id)` runs `PURSUIT_V2` on that exact venue and derives medals from its clean lap), and
+stores the best under a **separate key** (`bestKey(id,2) = id@v2`) so v1 and v2 records/medals are never
+mixed. `PURSUIT_V2` clean-laps every venue (ORBIT 27.7 s, RIDGELINE 41.4 s, Sensor Canyon 32.8 s), so
+v2 mode is winnable. Still deferred (needs backend): a v2-only **online** leaderboard/season.
 
 ### Phase 2: make racing fair
 
